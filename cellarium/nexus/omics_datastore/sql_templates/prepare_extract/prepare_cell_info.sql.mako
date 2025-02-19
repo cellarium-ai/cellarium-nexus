@@ -1,0 +1,24 @@
+<%!
+    from nexus.omics_datastore.bq_ops import constants
+%>
+<%
+    from nexus.omics_datastore.bq_sql import mako_helpers as mh
+
+    select_column_names_processed = mh.add_cell_info_required_columns(select_columns)
+    # Remove column aliases because after creating temporary tables all the columns are
+    # part of the single table `c`
+    select_column_names_processed = mh.remove_leading_alias(select_column_names_processed)
+    # This is required for random ordering during extraction
+    select_column_names_processed.append("farm_finger")
+%>
+create or replace table `${project}.${dataset}.${extract_table_prefix}${constants.BQ_EXTRACT_CELL_INFO_TABLE_NAME}`
+partition by range_bucket(extract_bin, generate_array(0, ${partition_bin_count}, ${partition_size}))
+cluster by extract_bin
+as
+${mh.select(select_column_names_processed)},
+% if assign_bin_by_category:
+    dense_rank() over (order by ${extract_bin_category_column_name}) as extract_bin
+% else:
+    cast(floor((row_number() over (order by farm_finger) - 1) / ${extract_bin_size}) as int) as extract_bin
+% endif
+from `${project}.${dataset}.${extract_table_prefix}${constants.BQ_EXTRACT_CELL_INFO_RANDOMIZED_TABLE_NAME}` c

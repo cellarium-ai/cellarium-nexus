@@ -1,0 +1,39 @@
+{% extends "unfold/filters/filters_field.html" %}
+
+{% block filter_form %}
+  <form method="GET" class="unfold-filter-form {% if choice.attrs.class %}{{ choice.attrs.class }}{% endif %}">
+    {% for field in choice.form %}
+      {% if field.name|slice:"-8:" != "_exclude" %}
+        <div class="mb-3">
+          {{ field.label_tag }}
+          {{ field }}
+          {% if field.help_text %}
+            <div class="form-text">{{ field.help_text }}</div>
+          {% endif %}
+        </div>
+      {% else %}
+        <div class="exclude-checkbox-container">
+          {{ field }}
+          {{ field.label_tag }}
+          {% if field.help_text %}
+            <div class="form-text">{{ field.help_text }}</div>
+          {% endif %}
+        </div>
+      {% endif %}
+    {% endfor %}
+    
+    {# Preserve all other GET parameters except our own #}
+    {% for k, v in request.GET.items %}
+      {% if k != choice.form.name and k != choice.form.name|add:"_exclude" and k != choice.form.name|add:"__icontains" %}
+        <input type="hidden" name="{{ k }}" value="{{ v }}">
+      {% endif %}
+    {% endfor %}
+    
+    <div class="d-flex justify-content-end">
+      <button type="submit" class="btn btn-primary btn-sm">
+        <i class="bi bi-funnel{% if choice.attrs.class %}-fill text-danger{% endif %} me-1"></i>
+        Filter
+      </button>
+    </div>
+  </form>
+{% endblock %} 

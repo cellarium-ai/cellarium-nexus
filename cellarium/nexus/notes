@@ -1,0 +1,16 @@
+# Database
+
+DB_CLUSTER_NAME=cellarium-db-cluster # Cluster name
+NUM_CPUS=2 # Number of CPUs
+MEMORY=8GB # Memory size
+STORAGE_SIZE=10GB # Disk storage size
+
+gcloud sql instances create $DB_CLUSTER_NAME \
+    --edition=ENTERPRISE \
+    --database-version=POSTGRES_16 \
+    --cpu=$NUM_CPUS \
+    --memory=$MEMORY \
+    --storage-size=$STORAGE_SIZE \
+    --require-ssl \
+    --region=us-central
+
