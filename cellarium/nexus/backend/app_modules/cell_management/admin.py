@@ -34,7 +34,6 @@ from nexus.omics_datastore.controller import NexusDataController
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.filters.admin import (
     ChoicesDropdownFilter,
-    FieldTextFilter,
     RangeNumericFilter,
     RelatedDropdownFilter,
 )

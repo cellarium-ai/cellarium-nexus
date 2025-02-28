@@ -1,11 +1,9 @@
 from datetime import datetime
 from enum import Enum
 from typing import Any, Literal
-from uuid import UUID
 
 from nexus.clients.api_schemas import CellInfoAPISchema, FeatureInfoAPISchema, IngestInfoAPISchema
 from nexus.clients.base import BaseAPIHTTPClient
-from pydantic import BaseModel
 
 
 class ApiEndpoints:

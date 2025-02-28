@@ -1,4 +1,3 @@
-from django.contrib.contenttypes.models import ContentType
 from django.db import IntegrityError
 from django.db.models import DateTimeField
 from django.utils import timezone

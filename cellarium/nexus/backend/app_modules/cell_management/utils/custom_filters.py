@@ -6,7 +6,7 @@ specifically designed to work with Django Unfold.
 """
 
 import logging
-from typing import Any, List, Optional, cast
+from typing import Any, List
 
 from django import forms
 from django.contrib import admin
@@ -16,7 +16,7 @@ from django.http.request import HttpRequest as WSGIRequest
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.contrib.filters.admin import FieldTextFilter
-from unfold.widgets import INPUT_CLASSES, UnfoldAdminTextInputWidget
+from unfold.widgets import UnfoldAdminTextInputWidget
 
 logger = logging.getLogger(__name__)
 

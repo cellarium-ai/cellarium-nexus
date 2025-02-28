@@ -1,8 +1,8 @@
 import json
-from typing import Any, Callable
+from typing import Any
 
 import requests
-from nexus.clients import exceptions, header_names, status_codes
+from nexus.clients import exceptions, status_codes
 
 JsonObject = dict[str, Any]
 JsonData = JsonObject | list[JsonObject]

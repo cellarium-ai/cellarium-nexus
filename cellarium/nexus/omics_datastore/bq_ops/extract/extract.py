@@ -5,9 +5,8 @@ Extract data from BigQuery tables into AnnData files.
 import concurrent.futures as concurrency
 import logging
 import multiprocessing
-import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any
 
 import anndata as ad
 import numpy as np
@@ -18,7 +17,7 @@ from nexus.omics_datastore import bq_sql
 from nexus.omics_datastore.bq_ops import constants
 from nexus.omics_datastore.bq_ops.extract.metadata_extractor import MetadataExtractor
 from nexus.omics_datastore.bq_ops.extract.prepare_extract import FeatureSchema
-from scipy.sparse import coo_matrix, spmatrix
+from scipy.sparse import coo_matrix
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

@@ -7,7 +7,7 @@ import os
 import pathlib
 import tempfile
 from datetime import datetime
-from typing import Any, List, Optional, Sequence
+from typing import Any, Sequence
 
 from google.cloud import bigquery
 from nexus.clients import NexusBackendAPIClient

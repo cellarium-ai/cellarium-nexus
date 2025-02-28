@@ -4,7 +4,7 @@ Provide a centralized controller for BigQuery operations in the Nexus datastore.
 
 import logging
 from pathlib import Path
-from typing import Any, List, Optional, Sequence
+from typing import Any, Sequence
 
 from google.cloud import bigquery
 from nexus.omics_datastore.bq_ops.create_bq_tables import create_bigquery_objects

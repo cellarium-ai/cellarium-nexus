@@ -2,7 +2,7 @@ import typing as t
 from typing import Any
 
 from nexus.omics_datastore.bq_sql import exceptions
-from nexus.omics_datastore.bq_sql.constants import CAS_CELL_INFO_REQUIRED_COLUMN_NAMES, ComparisonOperators
+from nexus.omics_datastore.bq_sql.constants import ComparisonOperators
 from nexus.omics_datastore.bq_sql.validation.template_data_validator import validate_column_name
 
 

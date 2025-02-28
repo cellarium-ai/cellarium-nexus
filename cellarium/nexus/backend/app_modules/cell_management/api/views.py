@@ -1,14 +1,10 @@
-import os
-from pathlib import Path
-from typing import Any, Type
+from typing import Type
 
-from django.db import transaction
 from django.db.models import Model
 from google.cloud import storage
 from nexus.backend.app_modules.cell_management import models, services
 from nexus.backend.app_modules.cell_management.api import serializers
 from nexus.backend.app_modules.cell_management.services import import_from_avro
-from nexus.omics_datastore.bq_ops import constants
 from rest_framework import status
 from rest_framework.generics import CreateAPIView, GenericAPIView, ListCreateAPIView, RetrieveUpdateAPIView
 from rest_framework.request import Request

@@ -1,5 +1,4 @@
 import logging
-from typing import TYPE_CHECKING
 
 import sqlparse
 from mako.template import Template

@@ -1,6 +1,5 @@
 import logging
 import math
-import pathlib
 import time
 import uuid
 from datetime import datetime
@@ -10,7 +9,7 @@ from google.api_core.exceptions import Forbidden, NotFound
 from google.cloud import bigquery
 from nexus.omics_datastore.bq_avro_schemas import cell_management, converter
 from nexus.omics_datastore.bq_ops import constants
-from nexus.omics_datastore.bq_ops.create_bq_tables import create_bigquery_objects, create_staging_table
+from nexus.omics_datastore.bq_ops.create_bq_tables import create_staging_table
 
 MAX_RETRY_ATTEMPTS = 5
 

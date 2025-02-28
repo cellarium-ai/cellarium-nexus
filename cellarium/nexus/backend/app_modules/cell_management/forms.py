@@ -1,9 +1,6 @@
-import json
 
 from django import forms
-from django.core.exceptions import ValidationError
 from django.utils.translation import gettext_lazy as _
-from nexus.omics_datastore.bq_avro_schemas.column_mapping import ColumnMappingSchema
 from unfold.widgets import UnfoldAdminFileFieldWidget, UnfoldAdminSelectWidget, UnfoldAdminTextInputWidget
 
 from .models import BigQueryDataset, ColumnMapping, FeatureSchema

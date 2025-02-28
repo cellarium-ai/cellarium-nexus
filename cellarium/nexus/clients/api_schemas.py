@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, BeforeValidator, TypeAdapter
+from pydantic import BaseModel, BeforeValidator
 
 
 def parse_dict(value: Any) -> dict[str, Any]:

@@ -1,7 +1,6 @@
-from typing import Callable, List, Tuple
+from typing import List, Tuple
 
 from django.apps import apps
-from django.utils.translation import gettext_lazy as _
 
 
 def get_obs_column_choices() -> List[Tuple[str, str]]:
