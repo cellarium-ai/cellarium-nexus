@@ -28,6 +28,7 @@ from nexus.backend.app_modules.cell_management.utils.custom_filters import Multi
 from nexus.backend.app_modules.cell_management.utils.filters import (
     extract_filters_from_django_admin_request,
     get_default_dataset,
+    serialize_filters_to_json,
 )
 from nexus.omics_datastore.bq_ops.extract.prepare_extract import FeatureSchema as ExtractFeatureSchema
 from nexus.omics_datastore.controller import NexusDataController
@@ -48,6 +49,13 @@ BIGQUERY_SUCCESS_MESSAGE_LINK_FORMAT = (
 BIGQUERY_SUCCESS_MESSAGE_TEXT = "BigQuery dataset in GCP was created successfully."
 CHANGELIST_ACTION_FORM = "admin/custom_templates/changelist_action_with_form.html"
 REQUIRED_CSV_FILE_COLUMNS = ["gcs_file_path"]
+
+# Form titles and messages
+PREPARE_EXTRACT_TABLES_TITLE = "Prepare Extract Tables"
+PREPARE_BUTTON_TITLE = "Prepare"
+NO_DATASETS_ERROR = "No BigQuery datasets available"
+MULTIPLE_DATASETS_ERROR = "Multiple BigQuery datasets exist. Please select a BigQuery dataset for extraction."
+EXTRACT_SUCCESS_MESSAGE = "Extract tables prepared successfully"
 
 logger = logging.getLogger(__name__)
 
@@ -187,43 +195,59 @@ class CellInfoAdmin(ModelAdmin):
 
         :return: HTTP response
         """
-        form = PrepareExtractTablesForm(request.POST or None)
+        # First try to get the BigQuery dataset
+        bigquery_dataset = None
+        
+        # Try to get dataset from request parameters
+        filters, bigquery_dataset = extract_filters_from_django_admin_request(request)
+        
+        # If no dataset from filters, try to get the default one
+        if not bigquery_dataset:
+            bigquery_dataset = get_default_dataset()
+            if not bigquery_dataset:
+                dataset_count = BigQueryDataset.objects.count()
+                if dataset_count == 0:
+                    messages.error(request, _(NO_DATASETS_ERROR))
+                    return redirect("admin:cell_management_cellinfo_changelist")
+                else:
+                    messages.error(request, _(MULTIPLE_DATASETS_ERROR))
+                    return redirect("admin:cell_management_cellinfo_changelist")
+        
+        # Get the original filter parameters from the referer URL if available
+        original_filters = {}
+        referer = request.META.get('HTTP_REFERER', '')
+        if referer and '?' in referer:
+            from urllib.parse import parse_qs, urlparse
+            query_params = parse_qs(urlparse(referer).query)
+            # Convert query params to a flat dictionary
+            original_filters = {k: v[0] for k, v in query_params.items()}
+            logger.info(f"Original filter parameters: {original_filters}")
+            
+            # Update request.GET with original filters
+            # Create a mutable copy of request.GET
+            request.GET = request.GET.copy()
+            request.GET.update(original_filters)
+            
+            # Re-extract filters with updated request.GET
+            filters, _ = extract_filters_from_django_admin_request(request)
+        
+        # Create initial form data with extracted filters and dataset
+        initial_data = {
+            'filters': serialize_filters_to_json(filters) if filters else None,
+            'bigquery_dataset': bigquery_dataset,  # Pass the dataset object directly
+        }
+        
+        form = PrepareExtractTablesForm(request.POST or None, initial=initial_data)
 
         if request.method == "POST" and form.is_valid():
             # Get form data
             feature_schema = form.cleaned_data["feature_schema"]
             extract_table_prefix = form.cleaned_data["extract_table_prefix"]
-
-            # Extract filters and determine BigQuery dataset
-            try:
-                # Try to extract filters and dataset from request
-                filters, bigquery_dataset = extract_filters_from_django_admin_request(request)
-
-                # Log the extracted filters for debugging
-                logger.info(f"Extracted filters for extraction: {filters}")
-
-                # If no dataset from filters, try to use default
-                if not bigquery_dataset:
-                    bigquery_dataset = get_default_dataset()
-
-                    # If still no dataset, handle the error cases
-                    if not bigquery_dataset:
-                        dataset_count = BigQueryDataset.objects.count()
-                        if dataset_count == 0:
-                            messages.error(request, _("No BigQuery datasets available"))
-                        else:
-                            messages.error(
-                                request,
-                                _(
-                                    "Multiple BigQuery datasets exist. Please apply a BigQuery dataset filter before extraction."
-                                ),
-                            )
-                        return redirect("admin:cell_management_cellinfo_changelist")
-
-            except (BigQueryDataset.DoesNotExist, ValueError):
-                messages.error(request, _("Selected BigQuery dataset does not exist"))
-                return redirect("admin:cell_management_cellinfo_changelist")
-
+            filters = form.cleaned_data["filters"] or {}
+            
+            # Use the pre-selected dataset instead of getting it from the form
+            # since we've already validated its existence
+            
             # Convert FeatureSchema to ExtractFeatureSchema sequence
             features: Sequence[ExtractFeatureSchema] = [
                 ExtractFeatureSchema(id=idx, symbol=feature.symbol, ensemble_id=feature.ensemble_id)
@@ -283,7 +307,7 @@ class CellInfoAdmin(ModelAdmin):
                 max_workers=10,
             )
 
-            messages.success(request, _("Extract tables prepared successfully"))
+            messages.success(request, _(EXTRACT_SUCCESS_MESSAGE))
             return redirect("admin:cell_management_cellinfo_changelist")
 
         return render(
@@ -291,8 +315,8 @@ class CellInfoAdmin(ModelAdmin):
             CHANGELIST_ACTION_FORM,
             {
                 "form": form,
-                "title": _("Prepare Extract Tables"),
-                "submit_button_title": _("Prepare"),
+                "title": PREPARE_EXTRACT_TABLES_TITLE,
+                "submit_button_title": PREPARE_BUTTON_TITLE,
                 **self.admin_site.each_context(request),
             },
         )

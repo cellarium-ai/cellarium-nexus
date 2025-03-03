@@ -2,7 +2,9 @@
 Utility functions for handling filters in the cell management app.
 """
 
+import json
 import logging
+from typing import Any
 
 from django.http import HttpRequest
 from nexus.backend.app_modules.cell_management.models import BigQueryDataset
@@ -12,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def extract_filters_from_django_admin_request(
     request: HttpRequest, dataset_filter_key: str = "ingest__bigquery_dataset"
-) -> tuple[dict[str, list | str], BigQueryDataset | None]:
+) -> tuple[dict[str, Any], BigQueryDataset | None]:
     """
     Extract filters from Django admin request parameters and determine the BigQuery dataset.
 
@@ -33,10 +35,16 @@ def extract_filters_from_django_admin_request(
     # Log all GET parameters for debugging
     logger.info(f"All request GET parameters: {dict(request.GET.items())}")
 
+    # Skip processing if no GET parameters
+    if not request.GET:
+        logger.info("No GET parameters found in request")
+        return filters, bigquery_dataset
+
     # Process all GET parameters to build filters
     for key, value in request.GET.items():
         # Skip empty values and pagination parameters
-        if not value or key in ("p", "e", "o"):
+        if not value or key in ("p", "e", "o") or key.startswith("_"):
+            logger.debug(f"Skipping parameter {key}={value}")
             continue
 
         # Handle the BigQuery dataset filter separately
@@ -47,49 +55,60 @@ def extract_filters_from_django_admin_request(
             except (BigQueryDataset.DoesNotExist, ValueError) as e:
                 logger.error(f"Error retrieving BigQuery dataset: {str(e)}")
                 raise
-        # Add other filters to the filters dictionary
-        elif not key.startswith("_"):  # Skip internal parameters
-            # Handle multiple values (field__in=val1,val2,val3)
-            if key.endswith("__in"):
-                # Extract the field name and handle potential normalization (underscores instead of spaces)
-                field_name = key.replace("__in", "")
+            continue
 
-                # Process the filter values
-                processed_values = []
+        # Skip parameters that don't correspond to model fields
+        if key.endswith("_exclude") or key.endswith("_from") or key.endswith("_to"):
+            continue
 
-                if isinstance(value, str):
-                    # Simple comma-separated string (most common case)
-                    if "," in value:
-                        # Split by comma and clean each value
-                        values = [v.strip() for v in value.split(",") if v.strip()]
-                        processed_values.extend(values)
-                    else:
-                        # Single value
-                        processed_values.append(value.strip())
-                elif isinstance(value, list):
-                    # Already a list - Note: This might not be needed as Django typically sends strings
-                    for v in value:
-                        if isinstance(v, str):
-                            processed_values.append(v.strip())
-                        else:
-                            processed_values.append(v)
-                else:
-                    # Single value of any type
-                    processed_values.append(value)
+        # Get the base key and check for exclude flag
+        is_exclude = False
+        base_key = key
+        exclude_value = request.GET.get(f"{key}_exclude")
+        if exclude_value == "on":
+            is_exclude = True
+            logger.info(f"Found exclude flag for {key}")
 
-                # Log the processed values
-                logger.info(f"Processed filter values for {field_name}: {processed_values}")
+        # Handle range filters
+        from_value = request.GET.get(f"{key}_from")
+        to_value = request.GET.get(f"{key}_to")
+        if from_value or to_value:
+            if from_value:
+                try:
+                    numeric_value = float(from_value)
+                    filters[f"c.{base_key}__gte"] = numeric_value
+                    logger.info(f"Added range filter (from) for {base_key}: gte={numeric_value}")
+                except ValueError:
+                    filters[f"c.{base_key}__gte"] = from_value
+                    logger.info(f"Added string range filter (from) for {base_key}: gte={from_value}")
 
-                if processed_values:
-                    # Format for BigQuery SQL template: field_name__in
-                    filters[f"c.{field_name}__in"] = processed_values
-                    logger.info(f"Added multiple filter values for {field_name}: {processed_values}")
+            if to_value:
+                try:
+                    numeric_value = float(to_value)
+                    filters[f"c.{base_key}__lte"] = numeric_value
+                    logger.info(f"Added range filter (to) for {base_key}: lte={numeric_value}")
+                except ValueError:
+                    filters[f"c.{base_key}__lte"] = to_value
+                    logger.info(f"Added string range filter (to) for {base_key}: lte={to_value}")
+            continue
+
+        # Handle multiple values
+        if "," in value:
+            values = [v.strip() for v in value.split(",") if v.strip()]
+            if values:
+                filter_key = f"c.{key}__not_in" if is_exclude else f"c.{key}__in"
+                filters[filter_key] = values
+                logger.info(f"Added multiple {'exclude' if is_exclude else 'include'} filter for {key}: {values}")
+        else:
+            # Handle single value
+            if is_exclude:
+                filters[f"c.{key}__not_eq"] = value
+                logger.info(f"Added single exclude filter for {key}: {value}")
             else:
-                # Format for BigQuery SQL template: field_name__eq
                 filters[f"c.{key}__eq"] = value
-                logger.info(f"Added single filter value for {key}: {value}")
+                logger.info(f"Added single filter for {key}: {value}")
 
-    # Log the filters being used
+    # Log the final filters
     logger.info(f"Extracted filters: {filters}")
 
     return filters, bigquery_dataset
@@ -110,3 +129,27 @@ def get_default_dataset() -> BigQueryDataset | None:
             return bigquery_dataset
 
     return None
+
+
+def serialize_filters_to_json(filters: dict[str, Any]) -> str:
+    """
+    Serialize filters dictionary to a JSON string.
+
+    :param filters: Dictionary of filters to serialize
+
+    :return: JSON string representation of filters
+    """
+    return json.dumps(filters, indent=2)
+
+
+def deserialize_filters_from_json(filters_json: str) -> dict[str, Any]:
+    """
+    Deserialize filters from a JSON string.
+
+    :param filters_json: JSON string of filters
+
+    :raise json.JSONDecodeError: If JSON string is invalid
+
+    :return: Dictionary of filters
+    """
+    return json.loads(filters_json) if filters_json else {}
