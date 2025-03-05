@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     "django.contrib.admin",
     "rest_framework",
     "storages",
+    "django_json_widget",
     "nexus.backend.app_modules.cell_management",
     "nexus.backend.app_modules.core",
 ]

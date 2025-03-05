@@ -1,9 +1,50 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
 from unfold.widgets import UnfoldAdminFileFieldWidget, UnfoldAdminSelectWidget, UnfoldAdminTextInputWidget
+from django_json_widget.widgets import JSONEditorWidget as BaseJSONEditorWidget
 import json
 
 from .models import BigQueryDataset, ColumnMapping, FeatureSchema
+
+
+class CustomJSONEditorWidget(BaseJSONEditorWidget):
+    """
+    Custom JSON editor widget that properly handles both string and dict inputs.
+    """
+    def __init__(self, attrs: dict | None = None, mode: str = 'tree', options: dict | None = None, width: str | None = None, height: str | None = None) -> None:
+        default_options = {
+            'modes': ['tree', 'code'],
+            'mode': mode,
+            'search': True,
+            'onLoad': '''function (editor) {
+                editor.expandAll();
+            }'''
+        }
+        if options:
+            default_options.update(options)
+
+        super().__init__(attrs=attrs, mode=mode, options=default_options, width=width, height=height)
+
+    def format_value(self, value: dict | str | None) -> dict | None:
+        """
+        Format the value for the widget.
+
+        :param value: The value to format (can be string or dict)
+        :return: Python dict or None
+        """
+        if value is None:
+            return None
+            
+        if isinstance(value, dict):
+            return value
+            
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                return None
+                
+        return None
 
 
 class ValidateNewDataChangeListActionForm(forms.Form):
@@ -103,8 +144,21 @@ class PrepareExtractTablesForm(forms.Form):
     filters = forms.JSONField(
         label=_("Filters"),
         required=False,
-        widget=forms.Textarea(attrs={'rows': 4}),
-        help_text=_("JSON formatted filters to apply during extraction"),
+        widget=CustomJSONEditorWidget(
+            attrs={
+                'height': '400px',
+                'width': '100%',
+            },
+            options={
+                'modes': ['tree', 'code'],
+                'mode': 'tree',
+                'search': True,
+                'sortObjectKeys': True,
+                'enableSort': False,  
+                'enableTransform': False,
+            }
+        ),
+        help_text=_("JSON formatted filters to apply during extraction. Use tree view for easier editing."),
     )
 
     def __init__(self, *args, **kwargs):
@@ -113,6 +167,16 @@ class PrepareExtractTablesForm(forms.Form):
 
         If there's only one BigQuery dataset, make the field read-only.
         """
+        # If initial data contains filters as a string, parse it to dict
+        if 'initial' in kwargs and 'filters' in kwargs['initial']:
+            filters = kwargs['initial']['filters']
+            if isinstance(filters, str):
+                try:
+                    kwargs['initial']['filters'] = json.loads(filters)
+                except json.JSONDecodeError:
+                    # If parsing fails, keep as is
+                    pass
+        
         super().__init__(*args, **kwargs)
         
         # If there's an initial dataset, make the field read-only
@@ -147,6 +211,10 @@ class PrepareExtractTablesForm(forms.Form):
         if not filters:
             return {}
         
+        # If filters is already a dict, return it
+        if isinstance(filters, dict):
+            return filters
+            
         try:
             if isinstance(filters, str):
                 return json.loads(filters)

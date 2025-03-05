@@ -13,6 +13,11 @@ from django.shortcuts import redirect, render
 from django.urls import path, reverse
 from django.utils.html import format_html, format_html_join
 from django.utils.translation import gettext_lazy as _
+from nexus.backend.app_modules.cell_management.forms import (
+    CreateSchemaFromCSVForm,
+    IngestNewDataChangeListActionForm,
+    PrepareExtractTablesForm,
+)
 from nexus.backend.app_modules.cell_management.models import (
     BigQueryDataset,
     CellFeatureInfo,
@@ -40,22 +45,20 @@ from unfold.contrib.filters.admin import (
 )
 from unfold.decorators import action
 
-from .forms import CreateSchemaFromCSVForm, IngestNewDataChangeListActionForm, PrepareExtractTablesForm
-
 # Constants at the top
 BIGQUERY_SUCCESS_MESSAGE_LINK_FORMAT = (
     '<a href="{url_link}" target="_blank" style="text-decoration: underline;">View in BigQuery</a>'
 )
-BIGQUERY_SUCCESS_MESSAGE_TEXT = "BigQuery dataset in GCP was created successfully."
+BIGQUERY_SUCCESS_MESSAGE_TEXT = _("BigQuery dataset in GCP was created successfully.")
 CHANGELIST_ACTION_FORM = "admin/custom_templates/changelist_action_with_form.html"
 REQUIRED_CSV_FILE_COLUMNS = ["gcs_file_path"]
 
 # Form titles and messages
-PREPARE_EXTRACT_TABLES_TITLE = "Prepare Extract Tables"
-PREPARE_BUTTON_TITLE = "Prepare"
-NO_DATASETS_ERROR = "No BigQuery datasets available"
-MULTIPLE_DATASETS_ERROR = "Multiple BigQuery datasets exist. Please select a BigQuery dataset for extraction."
-EXTRACT_SUCCESS_MESSAGE = "Extract tables prepared successfully"
+PREPARE_EXTRACT_TABLES_TITLE = _("Prepare Extract Tables")
+PREPARE_BUTTON_TITLE = _("Prepare")
+NO_DATASETS_ERROR = _("No BigQuery datasets available")
+MULTIPLE_DATASETS_ERROR = _("Multiple BigQuery datasets exist. Please select a BigQuery dataset for extraction.")
+EXTRACT_SUCCESS_MESSAGE = _("Extract tables prepared successfully")
 
 logger = logging.getLogger(__name__)
 
@@ -233,7 +236,7 @@ class CellInfoAdmin(ModelAdmin):
         
         # Create initial form data with extracted filters and dataset
         initial_data = {
-            'filters': serialize_filters_to_json(filters) if filters else None,
+            'filters': filters,  # Pass the filters dict directly, not as JSON string
             'bigquery_dataset': bigquery_dataset,  # Pass the dataset object directly
         }
         
@@ -307,7 +310,7 @@ class CellInfoAdmin(ModelAdmin):
                 max_workers=10,
             )
 
-            messages.success(request, _(EXTRACT_SUCCESS_MESSAGE))
+            messages.success(request=request, message=EXTRACT_SUCCESS_MESSAGE)
             return redirect("admin:cell_management_cellinfo_changelist")
 
         return render(
