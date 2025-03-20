@@ -39,7 +39,7 @@ from nexus.omics_datastore.bq_ops import constants
 # Default value for maximum batch size of avro files when they are being created by avro writer
 FLUSH_BATCH_SIZE_DEFAULT = 10000
 # Default value for count matrix multiprocessing batch size
-COUNT_MATRIX_MULTIPROCESSING_BATCH_SIZE_DEFAULT = 5000
+COUNT_MATRIX_MULTIPROCESSING_BATCH_SIZE_DEFAULT = 500
 # Default value for feature id lookup.
 ORIGINAL_FEATURE_ID_LOOKUP_DEFAULT = "index"
 
@@ -136,7 +136,7 @@ def optimized_raw_matrix_read_coo(
     if constants.VAR_NEXUS_ID not in adata.var.columns:
         raise KeyError(f"Required column '{constants.VAR_NEXUS_ID}' not found in var data")
 
-    # Fetch corresponding UUIDs from metadata
+    # Fetch corresponding IDs from metadata
     row_id_list = adata.obs[constants.OBS_NEXUS_ID].iloc[coord.row + row_offset].tolist()
     col_id_list = adata.var[constants.VAR_NEXUS_ID].iloc[coord.col].tolist()
 
@@ -444,13 +444,12 @@ def dump_core_matrix_batch(
     """
     Read data, and write the raw X matrix with existing UUID4 identifiers using buffered writing.
     """
-    start = current_milli_time()
-    logger.info(f"Working on core matrix batch {batch_num}...")
-
+    logger.info(f"Starting batch {batch_num} processing rows {row_offset} to {end}")
     row_ids, col_ids, raw_counts = optimized_raw_matrix_read_coo(
         input_file_path=input_file_path, row_offset=row_offset, end=end
     )
-    logger.info(f"Batch {batch_num} - Read anndata, subset matrix... in {current_milli_time() - start} ms")
+    logger.info(f"Batch {batch_num}: Found {len(set(row_ids))} unique cell IDs")
+    logger.info(f"Batch {batch_num}: First few cell IDs: {list(set(row_ids))[:5]}")
 
     start = current_milli_time()
     data_array_int = [int(x) for x in raw_counts]
@@ -506,6 +505,11 @@ def dump_core_matrix_in_parallel(
         )
         for x in range(num_batches)
     ]
+
+    logger.info(f"Total cells: {total_cells}")
+    logger.info(f"Batch size: {count_matrix_multiprocessing_batch_size}")
+    for batch_num, start, end in batches:
+        logger.info(f"Batch {batch_num}: rows {start} to {end}")
 
     start = current_milli_time()
     logger.info(f"{num_batches} batches will be created to ingest raw count matrix.")
@@ -616,5 +620,5 @@ def create_ingest_files(
             "feature_info.avro",
             "raw_counts_*.csv",
         ],
-        "adata_uns_clean": adata_uns,
+        "adata_uns_clean": json.loads(json.dumps(obj=adata_uns, cls=NumpyJSONEncoder)),
     }
