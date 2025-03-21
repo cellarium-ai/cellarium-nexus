@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     "django_json_widget",
     "nexus.backend.app_modules.cell_management",
     "nexus.backend.app_modules.core",
+    "nexus.backend.app_modules.curriculum",
 ]
 
 MIDDLEWARE = [
@@ -163,7 +164,7 @@ UNFOLD = {
         "show_all_applications": True,
         "navigation": [
             {
-                "title": _("Data Management"),
+                "title": _("Omics Data"),
                 "separator": True,
                 "collapsible": False,
                 "items": [
@@ -171,6 +172,11 @@ UNFOLD = {
                         "title": _("Cell Information"),
                         "icon": "science",
                         "link": reverse_lazy("admin:cell_management_cellinfo_changelist"),
+                    },
+                    {
+                        "title": _("Curriculums"),
+                        "icon": "school",
+                        "link": reverse_lazy("admin:curriculum_curriculum_changelist"),
                     },
                     {
                         "title": _("Feature Schemas"),

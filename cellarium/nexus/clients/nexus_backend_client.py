@@ -2,7 +2,12 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Literal
 
-from nexus.clients.api_schemas import CellInfoAPISchema, FeatureInfoAPISchema, IngestInfoAPISchema
+from nexus.clients.api_schemas import (
+    CellInfoAPISchema,
+    CurriculumAPISchema,
+    FeatureInfoAPISchema,
+    IngestInfoAPISchema,
+)
 from nexus.clients.base import BaseAPIHTTPClient
 
 
@@ -14,6 +19,7 @@ class ApiEndpoints:
     CELL_INFO_RESERVE_INDEXES: str = "api/cell_management/cell-info/reserve-indexes"
     FEATURE_INFO_RESERVE_INDEXES: str = "api/cell_management/feature-info/reserve-indexes"
     INGEST_FROM_AVRO: str = "api/cell_management/ingest-from-avro/"
+    REGISTER_CURRICULUM: str = "api/curriculum/curriculums/"
 
 
 class ReserveIndexesModelType(Enum):
@@ -177,3 +183,38 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
         api_out = self.post_json(endpoint=ApiEndpoints.INGEST_FROM_AVRO, data=data)
 
         return {"cell_info_count": api_out["cell_info_count"], "feature_info_count": api_out["feature_info_count"]}
+
+    def register_curriculum(
+        self,
+        *,
+        cell_count: int,
+        extract_bin_size: int,
+        extract_files_dir: str,
+        metadata_file_path: str,
+        filters_json: dict[str, Any] | None = None,
+    ) -> CurriculumAPISchema:
+        """
+        Register a new curriculum.
+
+        :param cell_count: Number of cells to extract
+        :param extract_bin_size: Size of extraction bins
+        :param extract_files_dir: Directory path for extract files
+        :param metadata_file_path: Path to metadata file
+        :param filters_json: Optional JSON filters for cell selection
+
+        :raise HTTPError: if the request fails
+        :raise ValueError: if the request data is invalid
+
+        :return: Registered curriculum object
+        """
+        data = {
+            "cell_count": cell_count,
+            "extract_bin_size": extract_bin_size,
+            "extract_files_dir": extract_files_dir,
+            "metadata_file_path": metadata_file_path,
+        }
+        if filters_json is not None:
+            data["filters_json"] = filters_json
+
+        api_out = self.post_json(endpoint=ApiEndpoints.REGISTER_CURRICULUM, data=data)
+        return CurriculumAPISchema(**api_out)

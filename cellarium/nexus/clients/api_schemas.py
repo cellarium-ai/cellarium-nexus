@@ -19,28 +19,26 @@ class IngestInfoAPISchema(BaseModel):
     nexus_uuid: str
     bigquery_dataset: str
     ingest_start_timestamp: datetime
-    status: Literal["STARTED", "SUCCEEDED", "FAILED"] | None = None
-    metadata_extra: Annotated[dict[str, Any] | None, BeforeValidator(parse_dict)] = None
-    paper_title: str | None = None
     ingest_finish_timestamp: datetime | None = None
+    metadata_extra: dict[str, Any] | None = None
+    status: str | None = None
 
 
 class FeatureInfoAPISchema(BaseModel):
     id: int
     ensemble_id: str
     symbol: str
-    ingest_id: str
-    biotype: str | None = None
-    is_filtered: bool | None = None
-    reference: str | None = None
-    metadata_extra: Annotated[dict[str, Any] | None, BeforeValidator(parse_dict)] = None
+    ingest_id: int
+    tag: str | None = None
+    metadata_extra: dict[str, Any] | None = None
 
 
 class CellInfoAPISchema(BaseModel):
     id: int
     original_id: str
-    ingest_id: str
-    metadata_extra: Annotated[dict[str, Any] | None, BeforeValidator(parse_dict)] = None
+    ingest_id: int
+    tag: str | None = None
+    metadata_extra: dict[str, Any] | None = None
 
     # Cell Features
     donor_id: str | None = None
@@ -64,3 +62,17 @@ class CellInfoAPISchema(BaseModel):
     organism_ontology_term_id: str | None = None
     self_reported_ethnicity_ontology_term_id: str | None = None
     sex_ontology_term_id: str | None = None
+
+
+class CurriculumAPISchema(BaseModel):
+    """
+    API schema for Curriculum model.
+    """
+    id: int
+    creator_id: int
+    cell_count: int
+    extract_bin_size: int
+    extract_files_dir: str
+    metadata_file_path: str
+    created_at: datetime
+    filters_json: dict[str, Any] | None = None
