@@ -292,8 +292,7 @@ class NexusDataController:
         self,
         *,
         extract_table_prefix: str,
-        start_bin: int,
-        end_bin: int,
+        bins: list[int],
         bucket_name: str,
         extract_bucket_path: str,
         obs_columns: list[str] | None = None,
@@ -303,8 +302,7 @@ class NexusDataController:
         Extract data from prepared extract tables into AnnData files and upload to GCS.
 
         :param extract_table_prefix: Prefix for extract table names
-        :param start_bin: Starting bin number (inclusive)
-        :param end_bin: Ending bin number (inclusive)
+        :param bins: List of bin numbers to extract
         :param bucket_name: GCS bucket name
         :param extract_bucket_path: Path within bucket
         :param obs_columns: Optional list of observation columns to include
@@ -320,8 +318,7 @@ class NexusDataController:
             # Extract data locally
             self.bq_controller.extract_data(
                 extract_table_prefix=extract_table_prefix,
-                start_bin=start_bin,
-                end_bin=end_bin,
+                bins=bins,
                 output_dir=temp_dir_path,
                 obs_columns=obs_columns,
                 max_workers=max_workers,
@@ -333,3 +330,48 @@ class NexusDataController:
                 local_directory_path=temp_dir_path,
                 prefix=f"{extract_bucket_path}/extract_files",
             )
+
+    def check_missing_bins(
+        self,
+        *,
+        expected_bins: list[int],
+        bucket_name: str,
+        extract_bucket_path: str,
+    ) -> list[int]:
+        """
+        Check which bins are missing from the extract path.
+
+        :param expected_bins: List of bin numbers that should be present
+        :param bucket_name: GCS bucket name
+        :param extract_bucket_path: Path within bucket
+
+        :raise google.api_core.exceptions.GoogleAPIError: If bucket operations fail
+
+        :return: List of missing bin numbers
+        """
+        extract_path = f"{extract_bucket_path}/extract_files"
+        existing_files = gc_utils.list_blobs(
+            bucket_name=bucket_name,
+            prefix=extract_path,
+        )
+
+        # Extract bin numbers from filenames
+        existing_bins = set()
+        for blob in existing_files:
+            if blob.name.endswith(".h5ad"):
+                try:
+                    bin_num = int(blob.name.split("_")[-1].replace(".h5ad", ""))
+                    existing_bins.add(bin_num)
+                except (ValueError, IndexError):
+                    logger.warning(f"Could not parse bin number from filename: {blob.name}")
+                    continue
+
+        # Find missing bins
+        missing_bins = [bin_num for bin_num in expected_bins if bin_num not in existing_bins]
+
+        if missing_bins:
+            logger.warning(f"Found {len(missing_bins)} missing bins: {missing_bins}")
+        else:
+            logger.info("All expected bins are present")
+
+        return missing_bins

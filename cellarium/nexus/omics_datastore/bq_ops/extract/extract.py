@@ -351,8 +351,7 @@ def extract_bins(
     project: str,
     dataset: str,
     extract_table_prefix: str,
-    start_bin: int,
-    end_bin: int,
+    bins: list[int],
     output_dir: Path,
     obs_columns: list[str] | None = None,
     max_workers: int | None = None,
@@ -364,8 +363,7 @@ def extract_bins(
     :param project: GCP project ID
     :param dataset: BigQuery dataset ID
     :param extract_table_prefix: Prefix for extract table names
-    :param start_bin: Starting bin number (inclusive)
-    :param end_bin: Ending bin number (inclusive)
+    :param bins: List of bin numbers to extract
     :param output_dir: Local directory to save AnnData files
     :param obs_columns: Optional observation columns to include
     :param max_workers: Maximum number of parallel workers
@@ -380,7 +378,7 @@ def extract_bins(
         max_workers=max_workers, initializer=child_init, initargs=(logging.getLevelName(logging.INFO),)
     ) as executor:
         futures = []
-        for bin_num in range(start_bin, end_bin + 1):
+        for bin_num in bins:
             output_path = output_dir / f"extract_{bin_num}.h5ad"
             future = executor.submit(
                 extract_bin_to_anndata_worker,

@@ -302,8 +302,7 @@ class CellInfoAdmin(ModelAdmin):
             )
             controller.extract_data(
                 extract_table_prefix=extract_table_prefix,
-                start_bin=0,
-                end_bin=0,
+                bins=[0],  # Extract only bin 0 for now
                 bucket_name=settings.BUCKET_NAME_PRIVATE,
                 extract_bucket_path=extract_bucket_path,
                 obs_columns=obs_columns,
