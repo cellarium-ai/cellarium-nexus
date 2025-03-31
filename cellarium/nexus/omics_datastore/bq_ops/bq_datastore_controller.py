@@ -127,14 +127,12 @@ class BQDatastoreController:
         self,
         *,
         gcs_bucket_name: str,
-        ingest_id: str,
         gcs_stage_dir: str,
     ) -> None:
         """
         Ingest data from GCS into BigQuery tables.
 
         :param gcs_bucket_name: GCS bucket name containing the data
-        :param ingest_id: Unique identifier for this ingestion
         :param gcs_stage_dir: Directory in the bucket containing staged files
 
         :raise google.api_core.exceptions.GoogleAPIError: If ingestion fails
@@ -143,7 +141,6 @@ class BQDatastoreController:
             project_id=self.project,
             dataset=self.dataset,
             gcs_bucket_name=gcs_bucket_name,
-            ingest_id=ingest_id,
             gcs_stage_dir=gcs_stage_dir,
         )
 

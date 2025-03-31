@@ -1,8 +1,3 @@
-import typing as t
-import kfp
-import functools
-from kfp import dsl
-from google_cloud_pipeline_components.v1.custom_job import create_custom_training_job_from_component
 from cellarium.nexus.workflows.kubeflow.utils import job
 
 
@@ -14,14 +9,11 @@ def create_ingest_files_job(gcs_config_path: str):
 
     params = read_component_config(gcs_path=gcs_config_path, schema_class=CreateIngestFiles)
 
-    # Initialize NexusDataController
     controller = NexusDataController(
         project_id=params.project_id,
         nexus_backend_api_url=params.nexus_backend_api_url,
         bigquery_dataset=params.bigquery_dataset,
     )
-
-    # Call create_ingest_files through the controller
     controller.create_ingest_files(
         input_file_path=params.data_source_path,
         tag=params.tag,
@@ -40,17 +32,13 @@ def ingest_data_to_bigquery_job(gcs_config_path: str):
 
     params = read_component_config(gcs_path=gcs_config_path, schema_class=IngestDataToBigQuery)
 
-    # Initialize NexusDataController
     controller = NexusDataController(
         project_id=params.project_id,
         nexus_backend_api_url=params.nexus_backend_api_url,
         bigquery_dataset=params.bigquery_dataset,
     )
-
-    # Call ingest_data_to_bigquery through the controller
     controller.ingest_data_to_bigquery(
         bucket_name=params.bucket_name,
-        ingest_uuid=params.ingest_bucket_path,
         bucket_stage_dir=params.ingest_bucket_path,
     )
 
@@ -63,14 +51,11 @@ def prepare_extract_job(gcs_config_path: str):
 
     params = read_component_config(gcs_path=gcs_config_path, schema_class=BQOpsPrepareExtract)
 
-    # Initialize NexusDataController
     controller = NexusDataController(
         project_id=params.project_id,
         nexus_backend_api_url=params.nexus_backend_api_url,
         bigquery_dataset=params.bigquery_dataset,
     )
-
-    # Call prepare_extract_tables through the controller
     controller.prepare_extract_tables(
         extract_table_prefix=params.extract_table_prefix,
         features=params.features,
@@ -90,14 +75,11 @@ def extract_job(gcs_config_path: str):
 
     params = read_component_config(gcs_path=gcs_config_path, schema_class=BQOpsExtract)
 
-    # Initialize NexusDataController
     controller = NexusDataController(
         project_id=params.project_id,
         nexus_backend_api_url=params.nexus_backend_api_url,
         bigquery_dataset=params.bigquery_dataset,
     )
-
-    # Call extract_data through the controller
     controller.extract_data(
         extract_table_prefix=params.extract_table_prefix,
         bins=params.bins,

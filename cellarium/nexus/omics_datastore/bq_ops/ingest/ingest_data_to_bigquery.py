@@ -84,7 +84,6 @@ def load_table_from_gcs(
     file_format: bigquery.SourceFormat,
     gcs_bucket_name: str,
     gcs_stage_dir: str,
-    ingest_id: str,
 ) -> None:
     """
     Load data from GCS into a BigQuery table.
@@ -97,12 +96,11 @@ def load_table_from_gcs(
     :param file_format: Format of the source files (AVRO or CSV)
     :param gcs_bucket_name: Name of the GCS bucket
     :param gcs_stage_dir: Directory in GCS containing the data
-    :param ingest_id: Unique identifier for this ingestion
 
     :raise Exception: If the load job fails
     """
     table_id = f"{project}.{dataset}.{table_name}"
-    uri = f"gs://{gcs_bucket_name}/{gcs_stage_dir}/{ingest_id}/{file_pattern}"
+    uri = f"gs://{gcs_bucket_name}/{gcs_stage_dir}/{file_pattern}"
 
     # Configure the load job
     job_config = bigquery.LoadJobConfig(source_format=file_format)
@@ -130,7 +128,6 @@ def perform_load_table_from_gcs(
     file_format: bigquery.SourceFormat,
     gcs_bucket_name: str,
     gcs_stage_dir: str,
-    ingest_id: str,
 ) -> None:
     """
     Load data from GCS into a BigQuery table with retry logic.
@@ -143,7 +140,6 @@ def perform_load_table_from_gcs(
     :param file_format: Format of the source files (AVRO or CSV)
     :param gcs_bucket_name: Name of the GCS bucket
     :param gcs_stage_dir: Directory in GCS containing the data
-    :param ingest_id: Unique identifier for this ingestion
 
     :raise Exception: If the load job fails after retry attempts are exhausted
     """
@@ -157,7 +153,6 @@ def perform_load_table_from_gcs(
         file_format=file_format,
         gcs_bucket_name=gcs_bucket_name,
         gcs_stage_dir=gcs_stage_dir,
-        ingest_id=ingest_id,
     )
 
 
@@ -167,7 +162,6 @@ def load_data_into_staging(
     dataset: str,
     gcs_bucket_name: str,
     gcs_stage_dir: str,
-    ingest_id: str,
     ingestion_specs: List[Tuple[str, str, str, bigquery.SourceFormat]],
 ) -> bool:
     """
@@ -178,7 +172,6 @@ def load_data_into_staging(
     :param dataset: BigQuery dataset name
     :param gcs_bucket_name: GCS bucket name
     :param gcs_stage_dir: GCS staging directory
-    :param ingest_id: Unique identifier for this ingestion
     :param ingestion_specs: List of ingestion specifications
 
     :return: True if all loads succeed, False otherwise
@@ -197,8 +190,7 @@ def load_data_into_staging(
                 file_pattern=file_pattern,
                 file_format=source_format,
                 gcs_bucket_name=gcs_bucket_name,
-                gcs_stage_dir=gcs_stage_dir,
-                ingest_id=ingest_id,
+                gcs_stage_dir=gcs_stage_dir
             )
 
             logger.info(f"Successfully loaded staging table '{staging_table}'")
@@ -284,7 +276,6 @@ def ingest_data_to_bigquery(
     dataset: str,
     gcs_bucket_name: str,
     gcs_stage_dir: str,
-    ingest_id: str,
 ) -> None:
     """
     Ingest Avro and CSV files from GCS into BigQuery atomically.
@@ -299,7 +290,6 @@ def ingest_data_to_bigquery(
     :param dataset: BigQuery dataset name
     :param gcs_bucket_name: GCS Bucket name
     :param gcs_stage_dir: GCS directory containing the data files
-    :param ingest_id: Unique identifier for this ingestion
 
     :raise Exception: If any step of the ingestion process fails
     """
@@ -346,7 +336,6 @@ def ingest_data_to_bigquery(
         dataset=dataset,
         gcs_bucket_name=gcs_bucket_name,
         gcs_stage_dir=gcs_stage_dir,
-        ingest_id=ingest_id,
         ingestion_specs=ingestion_specs,
     )
 

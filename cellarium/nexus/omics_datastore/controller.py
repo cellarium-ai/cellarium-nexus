@@ -163,21 +163,18 @@ class NexusDataController:
         self,
         *,
         bucket_name: str,
-        ingest_uuid: str,
         bucket_stage_dir: str,
     ) -> None:
         """
         Ingest data from GCS into BigQuery tables.
 
         :param bucket_name: GCS bucket name containing the data
-        :param ingest_uuid: Unique identifier for this ingestion
         :param bucket_stage_dir: Directory in the bucket containing staged files
 
         :raise google.api_core.exceptions.GoogleAPIError: If ingestion fails
         """
         self.bq_controller.ingest_data(
             gcs_bucket_name=bucket_name,
-            ingest_id=ingest_uuid,
             gcs_stage_dir=bucket_stage_dir,
         )
 
