@@ -18,6 +18,7 @@ from nexus.omics_datastore.bq_ops import constants
 from nexus.omics_datastore.bq_ops.extract.metadata_extractor import MetadataExtractor
 from nexus.omics_datastore.bq_ops.extract.prepare_extract import FeatureSchema
 from scipy.sparse import coo_matrix
+from tenacity import retry, stop_after_attempt, wait_exponential, before_log
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -303,6 +304,35 @@ def child_init(log_level: str) -> None:
     )
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    before=before_log(logger, logging.INFO),
+)
+def perform_extraction(
+    *,
+    extractor: DataExtractor,
+    bin_number: int,
+    output_path: Path,
+    obs_columns: list[str] | None = None,
+) -> None:
+    """
+    Perform extraction with retry logic.
+
+    :param extractor: DataExtractor instance
+    :param bin_number: Bin number to extract
+    :param output_path: Local path to save AnnData file
+    :param obs_columns: Optional observation columns to include
+
+    :raise: Will raise any exception after retry attempts are exhausted
+    """
+    extractor.extract_bin_to_anndata(
+        bin_number=bin_number,
+        output_path=output_path,
+        obs_columns=obs_columns,
+    )
+
+
 def extract_bin_to_anndata_worker(
     *,
     project: str,
@@ -336,7 +366,8 @@ def extract_bin_to_anndata_worker(
     )
 
     try:
-        extractor.extract_bin_to_anndata(
+        perform_extraction(
+            extractor=extractor,
             bin_number=bin_number,
             output_path=output_path,
             obs_columns=obs_columns,

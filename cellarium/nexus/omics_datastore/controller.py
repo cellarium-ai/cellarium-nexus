@@ -10,8 +10,10 @@ from datetime import datetime
 from typing import Any, Sequence
 
 from google.cloud import bigquery
+
+from nexus import utils
 from nexus.clients import NexusBackendAPIClient
-from nexus.omics_datastore import gc_utils
+
 from nexus.omics_datastore.bq_ops.bq_datastore_controller import BQDatastoreController, FeatureSchema
 from nexus.omics_datastore.bq_ops.ingest.create_ingest_files import optimized_read_anndata
 
@@ -84,7 +86,7 @@ class NexusDataController:
 
         :return: Tuple of (ingest_id, nexus_uuid)
         """
-        input_file_bucket_name, input_file_bucket_path = gc_utils.get_bucket_name_and_file_path_from_gc_path(
+        input_file_bucket_name, input_file_bucket_path = utils.gcp.get_bucket_name_and_file_path_from_gc_path(
             full_gs_path=input_file_path
         )
 
@@ -104,7 +106,7 @@ class NexusDataController:
             # Download file from bucket
             logger.info("Downloading file from Bucket...")
             local_input_data_path = pathlib.Path(local_input_data_dir) / "adata.h5ad"
-            gc_utils.download_file_from_bucket(
+            utils.gcp.download_file_from_bucket(
                 bucket_name=input_file_bucket_name,
                 source_blob_name=input_file_bucket_path,
                 destination_file_name=local_input_data_path,
@@ -147,7 +149,7 @@ class NexusDataController:
 
                 # Upload to staging bucket
                 ingest_stage_dir = f"{bucket_stage_dir}/{ingest_info_api_struct.nexus_uuid}"
-                gc_utils.transfer_directory_to_bucket(
+                utils.gcp.transfer_directory_to_bucket(
                     bucket_name=bucket_name, local_directory_path=local_output_dir, prefix=ingest_stage_dir
                 )
 
@@ -325,7 +327,7 @@ class NexusDataController:
             )
 
             # Upload extracted files to GCS
-            gc_utils.transfer_directory_to_bucket(
+            utils.gcp.transfer_directory_to_bucket(
                 bucket_name=bucket_name,
                 local_directory_path=temp_dir_path,
                 prefix=f"{extract_bucket_path}/extract_files",
@@ -350,7 +352,7 @@ class NexusDataController:
         :return: List of missing bin numbers
         """
         extract_path = f"{extract_bucket_path}/extract_files"
-        existing_files = gc_utils.list_blobs(
+        existing_files = utils.gcp.list_blobs(
             bucket_name=bucket_name,
             prefix=extract_path,
         )

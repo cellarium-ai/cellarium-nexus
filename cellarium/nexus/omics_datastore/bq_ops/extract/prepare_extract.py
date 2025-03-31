@@ -5,11 +5,11 @@ Prepare BigQuery tables for efficient data extraction by preprocessing and stagi
 import csv
 import logging
 import tempfile
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
 
 from google.cloud import bigquery
+from pydantic import BaseModel
 from nexus.omics_datastore import bq_sql
 from nexus.omics_datastore.bq_ops.extract.metadata_extractor import MetadataExtractor
 
@@ -22,8 +22,7 @@ CELL_INFO_TEMPLATE = TEMPLATE_DIR / "prepare_cell_info.sql.mako"
 DROP_CELL_INFO_RAND_TEMPLATE = TEMPLATE_DIR / "drop_prepare_cell_info_randomized.sql.mako"
 
 
-@dataclass
-class FeatureSchema:
+class FeatureSchema(BaseModel):
     """
     Schema for feature data.
 

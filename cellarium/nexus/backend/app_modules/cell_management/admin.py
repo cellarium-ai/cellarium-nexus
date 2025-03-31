@@ -200,10 +200,10 @@ class CellInfoAdmin(ModelAdmin):
         """
         # First try to get the BigQuery dataset
         bigquery_dataset = None
-        
+
         # Try to get dataset from request parameters
         filters, bigquery_dataset = extract_filters_from_django_admin_request(request)
-        
+
         # If no dataset from filters, try to get the default one
         if not bigquery_dataset:
             bigquery_dataset = get_default_dataset()
@@ -215,31 +215,32 @@ class CellInfoAdmin(ModelAdmin):
                 else:
                     messages.error(request, _(MULTIPLE_DATASETS_ERROR))
                     return redirect("admin:cell_management_cellinfo_changelist")
-        
+
         # Get the original filter parameters from the referer URL if available
         original_filters = {}
-        referer = request.META.get('HTTP_REFERER', '')
-        if referer and '?' in referer:
+        referer = request.META.get("HTTP_REFERER", "")
+        if referer and "?" in referer:
             from urllib.parse import parse_qs, urlparse
+
             query_params = parse_qs(urlparse(referer).query)
             # Convert query params to a flat dictionary
             original_filters = {k: v[0] for k, v in query_params.items()}
             logger.info(f"Original filter parameters: {original_filters}")
-            
+
             # Update request.GET with original filters
             # Create a mutable copy of request.GET
             request.GET = request.GET.copy()
             request.GET.update(original_filters)
-            
+
             # Re-extract filters with updated request.GET
             filters, _ = extract_filters_from_django_admin_request(request)
-        
+
         # Create initial form data with extracted filters and dataset
         initial_data = {
-            'filters': filters,  # Pass the filters dict directly, not as JSON string
-            'bigquery_dataset': bigquery_dataset,  # Pass the dataset object directly
+            "filters": filters,  # Pass the filters dict directly, not as JSON string
+            "bigquery_dataset": bigquery_dataset,  # Pass the dataset object directly
         }
-        
+
         form = PrepareExtractTablesForm(request.POST or None, initial=initial_data)
 
         if request.method == "POST" and form.is_valid():
@@ -247,10 +248,10 @@ class CellInfoAdmin(ModelAdmin):
             feature_schema = form.cleaned_data["feature_schema"]
             extract_table_prefix = form.cleaned_data["extract_table_prefix"]
             filters = form.cleaned_data["filters"] or {}
-            
+
             # Use the pre-selected dataset instead of getting it from the form
             # since we've already validated its existence
-            
+
             # Convert FeatureSchema to ExtractFeatureSchema sequence
             features: Sequence[ExtractFeatureSchema] = [
                 ExtractFeatureSchema(id=idx, symbol=feature.symbol, ensemble_id=feature.ensemble_id)

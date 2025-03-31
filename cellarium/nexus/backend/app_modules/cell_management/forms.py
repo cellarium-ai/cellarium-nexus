@@ -11,14 +11,22 @@ class CustomJSONEditorWidget(BaseJSONEditorWidget):
     """
     Custom JSON editor widget that properly handles both string and dict inputs.
     """
-    def __init__(self, attrs: dict | None = None, mode: str = 'tree', options: dict | None = None, width: str | None = None, height: str | None = None) -> None:
+
+    def __init__(
+        self,
+        attrs: dict | None = None,
+        mode: str = "tree",
+        options: dict | None = None,
+        width: str | None = None,
+        height: str | None = None,
+    ) -> None:
         default_options = {
-            'modes': ['tree', 'code'],
-            'mode': mode,
-            'search': True,
-            'onLoad': '''function (editor) {
+            "modes": ["tree", "code"],
+            "mode": mode,
+            "search": True,
+            "onLoad": """function (editor) {
                 editor.expandAll();
-            }'''
+            }""",
         }
         if options:
             default_options.update(options)
@@ -34,16 +42,16 @@ class CustomJSONEditorWidget(BaseJSONEditorWidget):
         """
         if value is None:
             return None
-            
+
         if isinstance(value, dict):
             return value
-            
+
         if isinstance(value, str):
             try:
                 return json.loads(value)
             except json.JSONDecodeError:
                 return None
-                
+
         return None
 
 
@@ -136,7 +144,7 @@ class PrepareExtractTablesForm(forms.Form):
     bigquery_dataset = forms.ModelChoiceField(
         label=_("BigQuery Dataset"),
         queryset=BigQueryDataset.objects.all(),
-        widget=UnfoldAdminSelectWidget(attrs={'disabled': 'disabled'}),
+        widget=UnfoldAdminSelectWidget(attrs={"disabled": "disabled"}),
         help_text=_("BigQuery Dataset to extract data from"),
         required=False,  # Not required since we handle it in the view
     )
@@ -146,17 +154,17 @@ class PrepareExtractTablesForm(forms.Form):
         required=False,
         widget=CustomJSONEditorWidget(
             attrs={
-                'height': '400px',
-                'width': '100%',
+                "height": "400px",
+                "width": "100%",
             },
             options={
-                'modes': ['tree', 'code'],
-                'mode': 'tree',
-                'search': True,
-                'sortObjectKeys': True,
-                'enableSort': False,  
-                'enableTransform': False,
-            }
+                "modes": ["tree", "code"],
+                "mode": "tree",
+                "search": True,
+                "sortObjectKeys": True,
+                "enableSort": False,
+                "enableTransform": False,
+            },
         ),
         help_text=_("JSON formatted filters to apply during extraction. Use tree view for easier editing."),
     )
@@ -168,22 +176,22 @@ class PrepareExtractTablesForm(forms.Form):
         If there's only one BigQuery dataset, make the field read-only.
         """
         # If initial data contains filters as a string, parse it to dict
-        if 'initial' in kwargs and 'filters' in kwargs['initial']:
-            filters = kwargs['initial']['filters']
+        if "initial" in kwargs and "filters" in kwargs["initial"]:
+            filters = kwargs["initial"]["filters"]
             if isinstance(filters, str):
                 try:
-                    kwargs['initial']['filters'] = json.loads(filters)
+                    kwargs["initial"]["filters"] = json.loads(filters)
                 except json.JSONDecodeError:
                     # If parsing fails, keep as is
                     pass
-        
+
         super().__init__(*args, **kwargs)
-        
+
         # If there's an initial dataset, make the field read-only
-        if 'initial' in kwargs and kwargs['initial'].get('bigquery_dataset'):
-            self.fields['bigquery_dataset'].widget.attrs['disabled'] = 'disabled'
+        if "initial" in kwargs and kwargs["initial"].get("bigquery_dataset"):
+            self.fields["bigquery_dataset"].widget.attrs["disabled"] = "disabled"
             # Store the initial value to use it in clean
-            self._initial_dataset = kwargs['initial'].get('bigquery_dataset')
+            self._initial_dataset = kwargs["initial"].get("bigquery_dataset")
 
     def clean(self):
         """
@@ -192,11 +200,11 @@ class PrepareExtractTablesForm(forms.Form):
         Ensure the BigQuery dataset is set, either from the form or from the initial value.
         """
         cleaned_data = super().clean()
-        
+
         # If the field is disabled, it won't be in cleaned_data, so use the initial value
-        if 'bigquery_dataset' not in cleaned_data and hasattr(self, '_initial_dataset'):
-            cleaned_data['bigquery_dataset'] = self._initial_dataset
-        
+        if "bigquery_dataset" not in cleaned_data and hasattr(self, "_initial_dataset"):
+            cleaned_data["bigquery_dataset"] = self._initial_dataset
+
         return cleaned_data
 
     def clean_filters(self):
@@ -207,14 +215,14 @@ class PrepareExtractTablesForm(forms.Form):
 
         :return: Parsed JSON filters or empty dict
         """
-        filters = self.cleaned_data.get('filters')
+        filters = self.cleaned_data.get("filters")
         if not filters:
             return {}
-        
+
         # If filters is already a dict, return it
         if isinstance(filters, dict):
             return filters
-            
+
         try:
             if isinstance(filters, str):
                 return json.loads(filters)

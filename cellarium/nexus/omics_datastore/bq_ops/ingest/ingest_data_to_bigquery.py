@@ -1,17 +1,14 @@
 import logging
-import math
-import time
 import uuid
 from datetime import datetime
 from typing import List, Tuple
 
-from google.api_core.exceptions import Forbidden, NotFound
+from google.api_core.exceptions import Forbidden, NotFound, ServiceUnavailable, ServerError, TooManyRequests
 from google.cloud import bigquery
 from nexus.omics_datastore.bq_avro_schemas import cell_management, converter
 from nexus.omics_datastore.bq_ops import constants
 from nexus.omics_datastore.bq_ops.create_bq_tables import create_staging_table
-
-MAX_RETRY_ATTEMPTS = 5
+from tenacity import retry, stop_after_attempt, wait_exponential, before_log, retry_if_exception_type
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -119,6 +116,51 @@ def load_table_from_gcs(
     logger.info(f"Loaded {load_job.output_rows} rows into {table_id}")
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    before=before_log(logger, logging.INFO),
+)
+def perform_load_table_from_gcs(
+    client: bigquery.Client,
+    project: str,
+    dataset: str,
+    table_name: str,
+    file_pattern: str,
+    file_format: bigquery.SourceFormat,
+    gcs_bucket_name: str,
+    gcs_stage_dir: str,
+    ingest_id: str,
+) -> None:
+    """
+    Load data from GCS into a BigQuery table with retry logic.
+
+    :param client: The BigQuery client
+    :param project: GCP project ID
+    :param dataset: BigQuery dataset name
+    :param table_name: Name of the target table
+    :param file_pattern: Pattern to match source files in GCS
+    :param file_format: Format of the source files (AVRO or CSV)
+    :param gcs_bucket_name: Name of the GCS bucket
+    :param gcs_stage_dir: Directory in GCS containing the data
+    :param ingest_id: Unique identifier for this ingestion
+
+    :raise Exception: If the load job fails after retry attempts are exhausted
+    """
+    # Call the original load function with all passed parameters
+    load_table_from_gcs(
+        client=client,
+        project=project,
+        dataset=dataset,
+        table_name=table_name,
+        file_pattern=file_pattern,
+        file_format=file_format,
+        gcs_bucket_name=gcs_bucket_name,
+        gcs_stage_dir=gcs_stage_dir,
+        ingest_id=ingest_id,
+    )
+
+
 def load_data_into_staging(
     client: bigquery.Client,
     project_id: str,
@@ -127,7 +169,6 @@ def load_data_into_staging(
     gcs_stage_dir: str,
     ingest_id: str,
     ingestion_specs: List[Tuple[str, str, str, bigquery.SourceFormat]],
-    max_retry_attempts: int = MAX_RETRY_ATTEMPTS,
 ) -> bool:
     """
     Load data from GCS into staging tables with retry logic.
@@ -139,51 +180,32 @@ def load_data_into_staging(
     :param gcs_stage_dir: GCS staging directory
     :param ingest_id: Unique identifier for this ingestion
     :param ingestion_specs: List of ingestion specifications
-    :param max_retry_attempts: Maximum number of retry attempts per table
 
     :return: True if all loads succeed, False otherwise
     """
     all_loads_succeeded = True
 
     for final_table, staging_table, file_pattern, source_format in ingestion_specs:
-        attempt_counter = 1
-        while attempt_counter <= max_retry_attempts:
-            try:
-                logger.info(f"Loading {file_pattern} into staging table '{staging_table}' (Attempt {attempt_counter})")
+        try:
+            logger.info(f"Loading {file_pattern} into staging table '{staging_table}'")
 
-                # Attempt to load the data
-                load_table_from_gcs(
-                    client=client,
-                    project=project_id,
-                    dataset=dataset,
-                    table_name=staging_table,
-                    file_pattern=file_pattern,
-                    file_format=source_format,
-                    gcs_bucket_name=gcs_bucket_name,
-                    gcs_stage_dir=gcs_stage_dir,
-                    ingest_id=ingest_id,
-                )
+            perform_load_table_from_gcs(
+                client=client,
+                project=project_id,
+                dataset=dataset,
+                table_name=staging_table,
+                file_pattern=file_pattern,
+                file_format=source_format,
+                gcs_bucket_name=gcs_bucket_name,
+                gcs_stage_dir=gcs_stage_dir,
+                ingest_id=ingest_id,
+            )
 
-                logger.info(f"Successfully loaded staging table '{staging_table}'")
-                break  # Exit retry loop on success
+            logger.info(f"Successfully loaded staging table '{staging_table}'")
 
-            except Forbidden as e:
-                logger.warning(f"Forbidden error encountered: {e}")
-                if attempt_counter < max_retry_attempts:
-                    # Implement exponential backoff
-                    wait_time = math.exp(attempt_counter)
-                    logger.info(f"Retrying after {wait_time:.1f} seconds...")
-                    time.sleep(wait_time)
-                else:
-                    logger.error("Max retry attempts reached. Aborting ingestion.")
-                    all_loads_succeeded = False
-
-            except Exception as e:
-                logger.error(f"An error occurred loading into staging table {staging_table}: {e}")
-                all_loads_succeeded = False
-                break  # Exit retry loop on non-retryable error
-
-            attempt_counter += 1
+        except Exception as e:
+            logger.error(f"An error occurred loading into staging table {staging_table}: {e}")
+            all_loads_succeeded = False
 
     return all_loads_succeeded
 
@@ -263,7 +285,6 @@ def ingest_data_to_bigquery(
     gcs_bucket_name: str,
     gcs_stage_dir: str,
     ingest_id: str,
-    max_retry_attempts: int = MAX_RETRY_ATTEMPTS,
 ) -> None:
     """
     Ingest Avro and CSV files from GCS into BigQuery atomically.
@@ -279,7 +300,6 @@ def ingest_data_to_bigquery(
     :param gcs_bucket_name: GCS Bucket name
     :param gcs_stage_dir: GCS directory containing the data files
     :param ingest_id: Unique identifier for this ingestion
-    :param max_retry_attempts: Maximum number of retry attempts per operation
 
     :raise Exception: If any step of the ingestion process fails
     """
@@ -328,7 +348,6 @@ def ingest_data_to_bigquery(
         gcs_stage_dir=gcs_stage_dir,
         ingest_id=ingest_id,
         ingestion_specs=ingestion_specs,
-        max_retry_attempts=max_retry_attempts,
     )
 
     if all_loads_succeeded:

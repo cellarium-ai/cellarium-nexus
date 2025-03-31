@@ -13,6 +13,7 @@ class CurriculumAdmin(ModelAdmin):
 
     Provides functionality to manage curriculum metadata and extraction settings.
     """
+
     list_display = [
         "id",
         "creator",
@@ -62,4 +63,4 @@ class CurriculumAdmin(ModelAdmin):
         :param request: The HTTP request
         :return: Queryset with related fields
         """
-        return super().get_queryset(request).select_related("creator") 
+        return super().get_queryset(request).select_related("creator")

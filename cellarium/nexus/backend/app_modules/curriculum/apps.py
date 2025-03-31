@@ -6,6 +6,7 @@ class CurriculumConfig(AppConfig):
     """
     Configuration for the curriculum app.
     """
+
     default_auto_field = "django.db.models.BigAutoField"
     name = "nexus.backend.app_modules.curriculum"
-    verbose_name = _("Curriculum") 
+    verbose_name = _("Curriculum")

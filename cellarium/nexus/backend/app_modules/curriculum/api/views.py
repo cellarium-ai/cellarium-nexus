@@ -12,6 +12,7 @@ class CurriculumViewSet(viewsets.ModelViewSet):
     List, create, retrieve, update and delete Curriculum instances.
     Creator is automatically set to the authenticated user on creation.
     """
+
     serializer_class = CurriculumSerializer
     permission_classes = [IsAuthenticated]
     queryset = Curriculum.objects.all()
@@ -24,4 +25,4 @@ class CurriculumViewSet(viewsets.ModelViewSet):
 
         :param serializer: Validated serializer instance
         """
-        serializer.save(creator=self.request.user) 
+        serializer.save(creator=self.request.user)

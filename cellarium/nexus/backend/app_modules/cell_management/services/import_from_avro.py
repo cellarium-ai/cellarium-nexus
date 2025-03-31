@@ -7,6 +7,8 @@ from typing import Iterator
 import fastavro
 from django.conf import settings
 from django.db import transaction
+
+import utils.gcp
 from nexus.backend.app_modules.cell_management import models
 from nexus.omics_datastore import gc_utils
 from nexus.omics_datastore.bq_ops import constants
@@ -78,7 +80,7 @@ def fetch_cell_info(stage_dir: str, ingest_uuid: str, file_name: str) -> Sequenc
 
         # Download file from GCS using our utility
         source_blob_name = f"{stage_dir}/{ingest_uuid}/{file_name}"
-        gc_utils.download_file_from_bucket(
+        utils.gcp.download_file_from_bucket(
             bucket_name=settings.BUCKET_NAME_PRIVATE,
             source_blob_name=source_blob_name,
             destination_file_name=local_path,
@@ -149,7 +151,7 @@ def fetch_feature_info(stage_dir: str, ingest_uuid: str, file_name: str) -> Sequ
 
         # Download file from GCS using our utility
         source_blob_name = f"{stage_dir}/{ingest_uuid}/{file_name}"
-        gc_utils.download_file_from_bucket(
+        utils.gcp.download_file_from_bucket(
             bucket_name=settings.BUCKET_NAME_PRIVATE,
             source_blob_name=source_blob_name,
             destination_file_name=local_path,

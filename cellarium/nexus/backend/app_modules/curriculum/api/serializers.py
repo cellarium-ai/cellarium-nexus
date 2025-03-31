@@ -9,6 +9,7 @@ class CurriculumSerializer(serializers.ModelSerializer):
 
     :raise ValidationError: If validation fails for any field
     """
+
     class Meta:
         model = Curriculum
         fields = [
@@ -21,4 +22,4 @@ class CurriculumSerializer(serializers.ModelSerializer):
             "created_at",
             "filters_json",
         ]
-        read_only_fields = ["id", "creator", "created_at"] 
+        read_only_fields = ["id", "creator", "created_at"]

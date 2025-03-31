@@ -1,4 +1,3 @@
-
 from nexus.omics_datastore.bq_sql.constants import ComparisonOperators
 from nexus.omics_datastore.bq_sql.validation import exceptions
 
