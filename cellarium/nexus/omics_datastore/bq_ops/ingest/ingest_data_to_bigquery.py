@@ -3,12 +3,12 @@ import uuid
 from datetime import datetime
 from typing import List, Tuple
 
-from google.api_core.exceptions import Forbidden, NotFound, ServiceUnavailable, ServerError, TooManyRequests
+from google.api_core.exceptions import NotFound
 from google.cloud import bigquery
 from nexus.omics_datastore.bq_avro_schemas import cell_management, converter
 from nexus.omics_datastore.bq_ops import constants
 from nexus.omics_datastore.bq_ops.create_bq_tables import create_staging_table
-from tenacity import retry, stop_after_attempt, wait_exponential, before_log, retry_if_exception_type
+from tenacity import retry, stop_after_attempt, wait_exponential, before_log
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -190,7 +190,7 @@ def load_data_into_staging(
                 file_pattern=file_pattern,
                 file_format=source_format,
                 gcs_bucket_name=gcs_bucket_name,
-                gcs_stage_dir=gcs_stage_dir
+                gcs_stage_dir=gcs_stage_dir,
             )
 
             logger.info(f"Successfully loaded staging table '{staging_table}'")

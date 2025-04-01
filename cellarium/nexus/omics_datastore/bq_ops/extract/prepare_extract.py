@@ -12,6 +12,7 @@ from google.cloud import bigquery
 from pydantic import BaseModel
 from nexus.omics_datastore import bq_sql
 from nexus.omics_datastore.bq_ops.extract.metadata_extractor import MetadataExtractor
+from cellarium.nexus.shared import schemas
 
 logger = logging.getLogger(__name__)
 
@@ -22,18 +23,7 @@ CELL_INFO_TEMPLATE = TEMPLATE_DIR / "prepare_cell_info.sql.mako"
 DROP_CELL_INFO_RAND_TEMPLATE = TEMPLATE_DIR / "drop_prepare_cell_info_randomized.sql.mako"
 
 
-class FeatureSchema(BaseModel):
-    """
-    Schema for feature data.
 
-    :param id: Unique identifier for the feature
-    :param symbol: Gene symbol
-    :param ensemble_id: Ensemble identifier
-    """
-
-    id: int
-    symbol: str
-    ensemble_id: str
 
 
 class ExtractTablePreparer:
@@ -74,7 +64,7 @@ class ExtractTablePreparer:
         query = self.client.query(sql)
         return query.result()
 
-    def prepare_feature_table(self, features: Sequence[FeatureSchema]) -> None:
+    def prepare_feature_table(self, features: Sequence[schemas.FeatureSchema]) -> None:
         """
         Create feature mapping table from provided schema using CSV load job.
 
@@ -210,7 +200,7 @@ def prepare_extract_tables(
     project: str,
     dataset: str,
     extract_table_prefix: str,
-    features: Sequence[FeatureSchema],
+    features: Sequence[schemas.FeatureSchema],
     extract_bin_size: int | None = None,
     assign_bin_by_category: bool = False,
     extract_bin_category_column_name: str | None = None,

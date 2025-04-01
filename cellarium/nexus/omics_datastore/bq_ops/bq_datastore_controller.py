@@ -10,7 +10,8 @@ from google.cloud import bigquery
 from nexus.omics_datastore.bq_ops.create_bq_tables import create_bigquery_objects
 from nexus.omics_datastore.bq_ops.extract.extract import extract_bins
 from nexus.omics_datastore.bq_ops.extract.metadata_extractor import MetadataExtractor
-from nexus.omics_datastore.bq_ops.extract.prepare_extract import FeatureSchema, prepare_extract_tables
+from cellarium.nexus.shared import schemas
+from nexus.omics_datastore.bq_ops.extract.prepare_extract import prepare_extract_tables
 from nexus.omics_datastore.bq_ops.ingest.create_ingest_files import create_ingest_files
 from nexus.omics_datastore.bq_ops.ingest.ingest_data_to_bigquery import ingest_data_to_bigquery
 
@@ -170,7 +171,7 @@ class BQDatastoreController:
         self,
         *,
         extract_table_prefix: str,
-        features: Sequence[FeatureSchema],
+        features: Sequence[schemas.FeatureSchema],
         extract_bin_size: int | None = None,
         assign_bin_by_category: bool = False,
         extract_bin_category_column_name: str | None = None,

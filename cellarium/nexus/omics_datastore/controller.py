@@ -11,10 +11,9 @@ from typing import Any, Sequence
 
 from google.cloud import bigquery
 
-from nexus import utils
+from cellarium.nexus.shared import schemas, utils
 from nexus.clients import NexusBackendAPIClient
-
-from nexus.omics_datastore.bq_ops.bq_datastore_controller import BQDatastoreController, FeatureSchema
+from nexus.omics_datastore.bq_ops.bq_datastore_controller import BQDatastoreController
 from nexus.omics_datastore.bq_ops.ingest.create_ingest_files import optimized_read_anndata
 
 logger = logging.getLogger(__name__)
@@ -240,7 +239,7 @@ class NexusDataController:
         self,
         *,
         extract_table_prefix: str,
-        features: Sequence[FeatureSchema],
+        features: Sequence[schemas.FeatureSchema],
         filters: dict[str, Any] | None = None,
         obs_columns: list[str] | None = None,
         extract_bin_size: int = 10000,

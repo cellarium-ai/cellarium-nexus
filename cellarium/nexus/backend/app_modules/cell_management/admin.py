@@ -1,6 +1,8 @@
+import os
 import csv
 import logging
 from typing import Sequence
+import datetime
 
 import pandas as pd
 from django import forms
@@ -29,14 +31,23 @@ from nexus.backend.app_modules.cell_management.models import (
     ObsColumnMapping,
     VarColumnMapping,
 )
+
+from cellarium.nexus.workflows.kubeflow.component_configs import (
+    CreateIngestFiles,
+    IngestDataToBigQuery,
+)
+
+from cellarium.nexus.workflows.kubeflow.utils.job import submit_pipeline
+from cellarium.nexus.workflows.kubeflow.pipelines import ingest_data_pipeline
+
 from nexus.backend.app_modules.cell_management.utils.custom_filters import MultiValueTextFilter, OntologyTermFilter
 from nexus.backend.app_modules.cell_management.utils.filters import (
     extract_filters_from_django_admin_request,
     get_default_dataset,
-    serialize_filters_to_json,
 )
-from nexus.omics_datastore.bq_ops.extract.prepare_extract import FeatureSchema as ExtractFeatureSchema
-from nexus.omics_datastore.controller import NexusDataController
+from cellarium.nexus.shared import schemas, utils
+# from nexus.omics_datastore.controller import NexusDataController
+from nexus.omics_datastore.bq_ops import create_bq_tables
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.contrib.filters.admin import (
     ChoicesDropdownFilter,
@@ -94,14 +105,23 @@ class BigQueryDatasetAdmin(ModelAdmin):
         if is_new:
             try:
                 # Initialize the controller first
-                controller = NexusDataController(
-                    project_id=settings.GCP_PROJECT_ID,
-                    nexus_backend_api_url=settings.SITE_URL,
-                    bigquery_dataset=obj.name,
-                )
+                # controller = NexusDataController(
+                #     project_id=settings.GCP_PROJECT_ID,
+                #     nexus_backend_api_url=settings.SITE_URL,
+                #     bigquery_dataset=obj.name,
+                # )
 
                 # Create the BigQuery dataset and get the link
-                link_to_dataset = controller.create_bigquery_dataset(bigquery_dataset=obj.name, location="US")
+                # link_to_dataset = controller.create_bigquery_dataset(bigquery_dataset=obj.name, location="US")
+                from google.cloud import bigquery
+
+
+                link_to_dataset = create_bq_tables.create_bigquery_objects(
+                    client=bigquery.Client(),
+                    project=settings.GCP_PROJECT_ID,
+                    dataset=obj.name,
+                    location="US"
+                )
                 # Assign the link to the object's 'link' field for display in admin
                 obj.link = link_to_dataset
             except Exception as e:
@@ -252,9 +272,9 @@ class CellInfoAdmin(ModelAdmin):
             # Use the pre-selected dataset instead of getting it from the form
             # since we've already validated its existence
 
-            # Convert FeatureSchema to ExtractFeatureSchema sequence
-            features: Sequence[ExtractFeatureSchema] = [
-                ExtractFeatureSchema(id=idx, symbol=feature.symbol, ensemble_id=feature.ensemble_id)
+            # Convert FeatureSchema to schemas.FeatureSchema sequence
+            features: Sequence[schemas.FeatureSchema] = [
+                schemas.FeatureSchema(id=idx, symbol=feature.symbol, ensemble_id=feature.ensemble_id)
                 for idx, feature in enumerate(feature_schema.features.all())
             ]
 
@@ -410,11 +430,12 @@ class IngestInfoAdmin(ModelAdmin):
     @action(description=_("Ingest New Data"), url_path="ingest-new-data")
     def ingest_new_data(self, request: HttpRequest) -> HttpResponse:
         """
-        Ingest new data into the system.
+        Ingest new data into the system using Kubeflow pipeline.
 
         :param request: The HTTP request
 
         :raise ValidationError: If ingestion fails
+        :raise IOError: If there's an error writing configs to GCS
 
         :return: HTTP response
         """
@@ -431,27 +452,65 @@ class IngestInfoAdmin(ModelAdmin):
             if not all(col in df.columns for col in REQUIRED_CSV_FILE_COLUMNS):
                 raise ValidationError(f"CSV must contain columns: {', '.join(REQUIRED_CSV_FILE_COLUMNS)}")
 
-            tag = df["tag"].iloc[0] if "tag" in df.columns else None
-            stage_dir = f"{settings.BACKEND_PIPELINE_DIR}/data-ingests"
+            timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+            base_stage_dir = f"{settings.BACKEND_PIPELINE_DIR}/data-ingests"
 
-            # Initialize NexusDataController
-            controller = NexusDataController(
+            # Create ingest file configs for each row in the CSV
+            create_ingest_configs = []
+            stage_dirs = []
+            for i, row in df.iterrows():
+                # Extract file name without extension from gcs_file_path
+                file_path = row["gcs_file_path"]
+                file_name = os.path.basename(file_path)
+                file_name_without_ext = os.path.splitext(file_name)[0]
+                
+                # Create unique stage dir for this file
+                stage_dir = f"{base_stage_dir}/{timestamp}_{file_name_without_ext}"
+                stage_dirs.append(stage_dir)
+                
+                tag = row["tag"] if "tag" in df.columns else None
+                create_ingest_configs.append(
+                    CreateIngestFiles(
+                        project_id=settings.GCP_PROJECT_ID,
+                        nexus_backend_api_url=settings.SITE_URL,
+                        bigquery_dataset=bigquery_dataset.name,
+                        data_source_path=file_path,
+                        bucket_name=settings.BUCKET_NAME_PRIVATE,
+                        ingest_bucket_path=stage_dir,
+                        tag=tag,
+                        metadata_columns=column_mapping,
+                    )
+                )
+
+            # Create single ingest config for all files
+            # Use base_stage_dir since IngestDataToBigQuery will look in all subdirs
+            ingest_config = IngestDataToBigQuery(
                 project_id=settings.GCP_PROJECT_ID,
                 nexus_backend_api_url=settings.SITE_URL,
                 bigquery_dataset=bigquery_dataset.name,
-            )
-
-            # Use the controller to create ingest files and perform ingestion
-            controller.create_ingest_files_and_ingest(
-                input_file_path=df["gcs_file_path"].iloc[0],
-                tag=tag,
-                bigquery_dataset=bigquery_dataset.name,
                 bucket_name=settings.BUCKET_NAME_PRIVATE,
-                bucket_stage_dir=stage_dir,
-                column_mapping=column_mapping,
+                ingest_bucket_path=base_stage_dir,
             )
 
-            messages.success(request, _("Data ingestion started successfully"))
+            # Save configs to GCS
+            configs_stage_dir = f"gs://{settings.BUCKET_NAME_PRIVATE}/pipeline-configs"
+
+            create_ingest_config_paths = utils.workflows_configs.dump_configs_to_bucket(create_ingest_configs, configs_stage_dir)
+            # create_ingest_configs = [{"gcs_config_path": x} for x in create_ingest_config_paths]
+
+            ingest_paths = utils.workflows_configs.dump_configs_to_bucket([ingest_config], configs_stage_dir)
+            # Submit pipeline
+            submit_pipeline(
+                pipeline_component=ingest_data_pipeline,
+                display_name=f"Nexus Ingest Data - {bigquery_dataset.name}",
+                gcp_project=settings.GCP_PROJECT_ID,
+                pipeline_kwargs={
+                    "create_ingest_configs": create_ingest_config_paths,
+                    "ingest_config": ingest_paths[0],
+                },
+            )
+
+            messages.success(request, _("Data ingestion pipeline started successfully"))
             return redirect("admin:cell_management_ingestinfo_changelist")
 
         return render(

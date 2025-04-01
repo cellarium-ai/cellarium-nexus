@@ -16,7 +16,7 @@ from google.cloud.bigquery_storage import BigQueryReadClient, types
 from nexus.omics_datastore import bq_sql
 from nexus.omics_datastore.bq_ops import constants
 from nexus.omics_datastore.bq_ops.extract.metadata_extractor import MetadataExtractor
-from nexus.omics_datastore.bq_ops.extract.prepare_extract import FeatureSchema
+from cellarium.nexus.shared import schemas
 from scipy.sparse import coo_matrix
 from tenacity import retry, stop_after_attempt, wait_exponential, before_log
 
@@ -69,13 +69,13 @@ class DataExtractor:
         query = self.client.query(sql)
         return query.result()
 
-    def get_features(self) -> list[FeatureSchema]:
+    def get_features(self) -> list[schemas.FeatureSchema]:
         """
         Get features from extract feature info table.
 
         :raise google.api_core.exceptions.GoogleAPIError: If query fails
 
-        :return: List of FeatureSchema objects
+        :return: List of schemas.FeatureSchema objects
         """
         template_data = bq_sql.TemplateData(
             project=self.project,
@@ -84,7 +84,7 @@ class DataExtractor:
         )
         sql = bq_sql.render(str(GET_FEATURES_TEMPLATE), template_data)
         result = self.execute_query(sql=sql)
-        return [FeatureSchema(id=row["id"], symbol=row["symbol"], ensemble_id=row["ensemble_id"]) for row in result]
+        return [schemas.FeatureSchema(id=row["id"], symbol=row["symbol"], ensemble_id=row["ensemble_id"]) for row in result]
 
     def get_cells_in_bin_range(
         self,

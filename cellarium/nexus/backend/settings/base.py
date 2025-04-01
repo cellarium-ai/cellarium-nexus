@@ -1,17 +1,22 @@
+"""Base Django settings for Cellarium Nexus project."""
+
 from django.templatetags.static import static
 from django.urls import reverse_lazy
 from django.utils.translation import gettext_lazy as _
 from nexus.backend.settings import BASE_DIR, env
 
+# Core Django Settings
+# -------------------
 SECRET_KEY = env("SECRET_KEY")
-
 DEBUG = True
-
 ALLOWED_HOSTS = []
-SITE_URL = "http://localhost:8000"
+SITE_URL = env("SITE_URL")
+ROOT_URLCONF = "backend.urls"
+WSGI_APPLICATION = "nexus.backend.wsgi.application"
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# Application definition
-
+# Application Definition
+# ---------------------
 INSTALLED_APPS = [
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -39,8 +44,8 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = "backend.urls"
-
+# Template Configuration
+# ----------------------
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
@@ -57,9 +62,8 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "nexus.backend.wsgi.application"
-
-# Database
+# Database Configuration
+# ----------------------
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
@@ -70,7 +74,8 @@ DATABASES = {
         "PORT": env("DB_PORT"),
     }
 }
-# Password validation
+# Authentication and Security
+# --------------------------
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -86,20 +91,15 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-# Internationalization
+# Internationalization and Localization
+# ----------------------------------
 LANGUAGE_CODE = "en-us"
-
 TIME_ZONE = "UTC"
-
 USE_I18N = True
-
 USE_TZ = True
 
-
-# Default primary key field type
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
-# Django Unfold admin settings
+# Django Unfold Admin Settings
+# --------------------------
 UNFOLD = {
     "SITE_TITLE": "Cellarium Nexus",
     "SITE_HEADER": "Cellarium Nexus Admin",
@@ -250,54 +250,59 @@ UNFOLD = {
 }
 
 # Google Cloud Storage Settings
+# --------------------------
+GCP_PROJECT_ID = env("GCP_PROJECT_ID")
+BUCKET_NAME_PRIVATE = env("BUCKET_NAME_PRIVATE")
+BUCKET_NAME_PUBLIC = env("BUCKET_NAME_PUBLIC")
+STATIC_LOCATION = "static-files"
 
 # Static files settings
-# Static files (CSS, JavaScript, Images)
-STATIC_URL = "static/"
-STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [
-    BASE_DIR / "cellarium/nexus/backend/static",
+# --------------------
+STATIC_URL = f'https://storage.googleapis.com/{BUCKET_NAME_PUBLIC}/{STATIC_LOCATION}/'
+STATICFILES_DIRS = [BASE_DIR / "cellarium/nexus/backend/static"]
+
+# Google Cloud Storage settings
+GS_QUERYSTRING_AUTH = False  # Don't use signed URLs for static files
+GS_BUCKET_NAME = BUCKET_NAME_PUBLIC
+GS_PROJECT_ID = GCP_PROJECT_ID
+
+# Don't set ACLs (using uniform bucket-level access)
+GS_DEFAULT_ACL = None
+GS_OBJECT_PARAMETERS = {
+    'cache-control': 'public, max-age=86400'  # Cache for 24 hours
+}
+
+# CORS configuration for GCS
+GS_CORS_ORIGIN_ALLOW_ALL = True
+GS_CORS_METHODS = ['GET', 'OPTIONS']
+GS_CORS_MAX_AGE = 3600  # 1 hour cache
+GS_CORS_HEADERS = [
+    'Content-Type',
+    'Access-Control-Allow-Origin',
+    'Access-Control-Allow-Headers',
+    'Origin',
+    'X-Requested-With',
 ]
 
-# GS_BUCKET_NAME = "cellarium-file-system"
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        "OPTIONS": {
+            "project_id": GCP_PROJECT_ID,
+            "bucket_name": BUCKET_NAME_PUBLIC,
+            "location": STATIC_LOCATION,
+            "querystring_auth": False,
+        }
+    },
+    "staticfiles": {
+        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+        "OPTIONS": {
+            "project_id": GCP_PROJECT_ID,
+            "bucket_name": BUCKET_NAME_PUBLIC,
+            "location": STATIC_LOCATION,
+            "querystring_auth": False,
+        }
+    }
+}
 
-# STORAGES = {"default": {"BACKEND": "storages.backends.gcloud.GoogleCloudStorage", "OPTIONS": {}}}
-GCP_PROJECT_ID = "dsp-cell-annotation-service"
-BUCKET_NAME_PRIVATE = "cellarium-nx-file-system"
-BUCKET_NAME_PUBLIC = "cellarium-nx-public-files"
-STATIC_LOCATION = "static-files"
-# STORAGES = {
-#     "default": {
-#         "BACKEND": "nexus.backend.app_storages_backend.CustomGoogleCloudStorage",
-#         "OPTIONS": {
-#             "bucket_name": BUCKET_NAME_PRIVATE,
-#             "default_acl": "publicRead",
-#             "file_overwrite": False,
-#         },
-#     },
-#     "staticfiles": {
-#         "BACKEND": "nexus.backend.app_storages_backend.CustomGoogleCloudStorage",
-#         "OPTIONS": {
-#             "bucket_name": BUCKET_NAME_PUBLIC,
-#             "location": STATIC_LOCATION,
-#             "default_acl": "publicRead",
-#             "file_overwrite": True,
-#         },
-#     },
-# }
-# STATIC_URL = f"/static/"
-# STATIC_URL = f"https://storage.googleapis.com/{BUCKET_NAME_PUBLIC}/{STATIC_LOCATION}/"
 BACKEND_PIPELINE_DIR = "pipeline"
-# STATIC_ROOT = "django-static"
-# DEFAULT_FILE_STORAGE = "storages.backends.gcloud.GoogleCloudStorage"
-# STATICFILES_DIRS = [
-#     BASE_DIR / "cellarium/nexus/assets",  # Include the assets directory
-# ]
-# STATIC_URL = f"https://storage.googleapis.com/{GS_BUCKET_NAME}/static/"
-#
-# # Optional: Media files (if separate from static files)
-# MEDIA_URL = f"https://storage.googleapis.com/{GS_BUCKET_NAME}/media/"
-# MEDIA_ROOT = "media/"
-#
-# # Static files storage (optional, if different from media files)
-# STATICFILES_STORAGE = "storages.backends.gcloud.GoogleCloudStorage"

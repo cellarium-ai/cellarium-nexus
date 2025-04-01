@@ -1,6 +1,6 @@
 from pydantic import BaseModel
-from typing import Dict, Any, Optional, List
-from cellarium.nexus.omics_datastore.controller import FeatureSchema
+from typing import Dict, Any, Optional
+from cellarium.nexus.shared import schemas
 
 
 class CreateIngestFiles(BaseModel):
@@ -47,7 +47,7 @@ class BQOpsPrepareExtract(BaseModel):
     nexus_backend_api_url: str
     bigquery_dataset: str
     extract_table_prefix: str
-    features: list[FeatureSchema]
+    features: list[schemas.FeatureSchema]
     filters: dict[str, str]
     obs_columns: list[str]
     extract_bin_size: int

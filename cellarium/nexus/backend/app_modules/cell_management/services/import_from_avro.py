@@ -8,9 +8,9 @@ import fastavro
 from django.conf import settings
 from django.db import transaction
 
-import utils.gcp
+
+from cellarium.nexus.shared import utils
 from nexus.backend.app_modules.cell_management import models
-from nexus.omics_datastore import gc_utils
 from nexus.omics_datastore.bq_ops import constants
 
 # Configure logging

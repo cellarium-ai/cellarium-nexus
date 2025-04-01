@@ -16,27 +16,23 @@ def dsl_component_job(
     display_name: str = "",
     machine_type: str = "n1-standard-4",
     replica_count: int = 1,
-    **custom_job_params,  # Catch all extra parameters
+    **custom_job_params,
 ) -> t.Callable[[t.Callable], t.Callable]:
-    """
-    A decorator that converts a function into a Kubeflow pipeline component
-    and wraps it into a GCP custom training job.
-    """
-
     def decorator(func: t.Callable) -> t.Callable:
-        # Wrap function into a Kubeflow component
         component = dsl.component(base_image=base_image)(func)
 
-        # Return function that creates a training job
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            return create_custom_training_job_from_component(
+            job = create_custom_training_job_from_component(
                 component_spec=component,
                 display_name=display_name,
                 machine_type=machine_type,
                 replica_count=replica_count,
-                **custom_job_params,  # Pass remaining job parameters
+                **custom_job_params,
             )(*args, **kwargs)
+
+            # print(f"Created job type: {type(job)}")  # Debugging line
+            return job
 
         return wrapper
 

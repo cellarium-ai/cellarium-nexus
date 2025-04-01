@@ -1,6 +1,9 @@
-"""Utility functions for handling Kubeflow component configurations."""
+"""
+Utility functions for handling workflow configurations.
+"""
 
 import datetime
+import os
 import tempfile
 from typing import TypeVar
 
@@ -8,10 +11,7 @@ import yaml
 from pydantic import BaseModel
 from smart_open import open
 
-from cellarium.nexus.utils.gcp import (
-    get_bucket_name_and_file_path_from_gc_path,
-    upload_many_blobs_with_transfer_manager
-)
+from cellarium.nexus.shared import utils
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -61,7 +61,7 @@ def dump_configs_to_bucket(
     
     timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
     
-    bucket_name, prefix = get_bucket_name_and_file_path_from_gc_path(bucket_path)
+    bucket_name, prefix = utils.gcp.get_bucket_name_and_file_path_from_gc_path(bucket_path)
     
     if prefix and not prefix.endswith("/"):
         prefix += "/"
@@ -82,7 +82,7 @@ def dump_configs_to_bucket(
             local_file_paths.append(local_path)
             blob_names.append(f"{prefix}{filename}")
         
-        upload_many_blobs_with_transfer_manager(
+        utils.gcp.upload_many_blobs_with_transfer_manager(
             bucket_name=bucket_name,
             file_paths=local_file_paths,
             prefix=prefix,

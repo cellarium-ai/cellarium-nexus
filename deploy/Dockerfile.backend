@@ -1,0 +1,59 @@
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV DJANGO_SETTINGS_MODULE=cellarium.nexus.backend.settings
+ENV PYTHONPATH=/app:/app/cellarium:/app/cellarium/nexus
+
+# Install system dependencies required for PostgreSQL
+RUN apt-get update && apt-get install -y \
+    gcc \
+    python3-dev \
+    libpq-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set work directory
+RUN mkdir -p /app/cellarium/nexus && touch /app/cellarium/nexus/.env
+RUN touch /app/cellarium/__init__.py /app/cellarium/nexus/__init__.py
+WORKDIR /app
+
+# Install dependencies
+COPY requirements /app/requirements/
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+RUN pip install --no-cache-dir -r /app/requirements/backend.txt
+RUN pip install --no-cache-dir gunicorn
+
+# Copy project
+COPY cellarium /app/cellarium/
+COPY requirements /app/requirements/
+COPY setup.py pyproject.toml /app/
+
+# Install the package in development mode
+RUN pip install -e .
+
+# Verify package structure
+RUN ls -la /app/cellarium/nexus/backend/
+RUN python -c "import os, sys; print('Python path:', sys.path)"
+RUN python -c "import cellarium.nexus.backend; print('Successfully imported cellarium.nexus.backend')"
+
+# Create directory for static files
+RUN mkdir -p /app/staticfiles
+
+# Set up the application to use the .env file
+# Note: The .env file is expected to be injected at cellarium/nexus/.env
+ENV ENV_FILE=/app/cellarium/nexus/.env
+
+# Expose port
+EXPOSE 8000
+
+# Set the working directory to where manage.py is located
+WORKDIR /app
+
+# Verify file locations
+RUN find /app -name manage.py
+RUN ls -la /app/cellarium/nexus/backend/
+
+# Run with Django development server for testing
+CMD ["python", "cellarium/nexus/backend/manage.py", "runserver", "0.0.0.0:8000", "--noreload", "--verbosity", "2"]
