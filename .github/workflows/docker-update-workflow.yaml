@@ -3,14 +3,14 @@ on:
   workflow_dispatch:
     inputs:
       image-types:
-        description: 'Image types to build. Can be `standard`, `cuda` or `both`. Default is `both`.'
+        description: 'Image types to build. Can be `backend`, `pipelines` or `both`. Default is `both`.'
         required: false
         default: 'both'
         type: choice
         options:
           - both
-          - standard
-          - cuda
+          - backend
+          - pipelines
       image-tag:
         description: 'Docker image tag. Will use the short hash of the last commit in the branch if nothing is passed in.'
         required: false
@@ -50,7 +50,7 @@ jobs:
             echo "IMAGE_TAG=${{ inputs.image-tag }}" >> $GITHUB_ENV
           fi
         shell: bash
-      - id: build-standard
+      - id: build-backend
         uses: ./.github/actions/docker-build
         if: matrix.image-type == 'backend' && (inputs.image-types == 'backend' || inputs.image-types == 'both')
         with:
@@ -62,7 +62,7 @@ jobs:
           gcp-service-account-email: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
           add-latest-tag: ${{ inputs.add-latest-tag }}
 
-      - id: build-cuda
+      - id: build-pipelines
         uses: ./.github/actions/docker-build
         if: matrix.image-type == 'pipelines' && (inputs.image-types == 'pipelines' || inputs.image-types == 'both')
         with:

@@ -6,10 +6,10 @@ inputs:
     description: GCP Docker Registry name
   gcp-provider-id:
     required: true
-    description: CAS GCP Provider ID
+    description: Nexus GCP Provider ID
   gcp-service-account-email:
     required: true
-    description: CAS Deployer Service Account email
+    description: Nexus Deployer Service Account email
   image-name:
     required: true
     description: Image name for the created image
@@ -18,7 +18,7 @@ inputs:
     description: Tag for the created image
   image-type:
     required: true
-    description: Image types to build (standard, cuda)
+    description: Image types to build (backend, pipelines)
   add-latest-tag:
     required: true
     description: Push a `latest` tag to the artifact registry
@@ -57,7 +57,7 @@ runs:
         password: ${{ steps.google-login.outputs.access_token }}
 
     - id: docker-push
-      name: Create and push CAS images in Google Artifact Registry
+      name: Create and push Nexus images in Google Artifact Registry
       uses: docker/build-push-action@v5
       with:
         push: true
