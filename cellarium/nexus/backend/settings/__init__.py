@@ -7,7 +7,7 @@ env = environ.Env()
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent.parent
 
 
-env.read_env(BASE_DIR / "cellarium/nexus/.env")
+env.read_env(BASE_DIR / "conf/.env")
 
 if env("ENVIRONMENT") == "development":
     from .development import *  # noqa

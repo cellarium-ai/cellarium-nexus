@@ -64,7 +64,7 @@ prompt_value() {
 prompt_value "Enter the Docker image URL for Cellarium Nexus" "IMAGE_PATH"
 
 # Project settings
-prompt_value "Enter your Google Cloud Project ID" "PROJECT_ID"
+prompt_value "Enter your Google Cloud Project ID" "GCP_PROJECT_ID"
 
 # Database instance settings
 prompt_value "Enter database instance name" "DB_INSTANCE_NAME" "cellarium-nexus-instance"
@@ -73,6 +73,9 @@ prompt_value "Enter memory in GB" "DB_MEMORY" "8"
 prompt_value "Enter storage size in GB" "DB_STORAGE" "10"
 
 # Database settings
+prompt_value "Enter the region for the database instance" "DB_REGION" "us-central1"
+DB_INSTANCE_CONNECTION_NAME="${GCP_PROJECT_ID}:${DB_REGION}:${DB_INSTANCE_NAME}"
+echo -e "${GREEN}Constructed DB Instance Connection Name: ${DB_INSTANCE_CONNECTION_NAME}${NC}"
 prompt_value "Enter database name" "DB_NAME" "cellarium-nexus-db"
 prompt_value "Enter database user" "DB_USER" "cellarium-nexus-db-user"
 prompt_secret "Enter database password" "DB_PASSWORD"
@@ -87,7 +90,7 @@ prompt_value "Enter Backend service account name" "BACKEND_SA_NAME" "cellarium-b
 prompt_value "Enter Backend service account display name" "BACKEND_SA_DISPLAY_NAME" "Cellarium Backend Service Account"
 
 # Vertex AI Pipelines settings
-PIPELINE_BUCKET="${PROJECT_ID}-pipeline-root"
+PIPELINE_BUCKET="${GCP_PROJECT_ID}-pipeline-root"
 echo -e "${GREEN}Pipeline bucket will be: $PIPELINE_BUCKET${NC}"
 
 # Artifact Registry settings
@@ -103,11 +106,16 @@ prompt_value "Enter memory limit (in GB)" "MEMORY" "4"
 prompt_value "Enter request timeout (in seconds)" "TIMEOUT" "3600"
 
 # GCS bucket settings
-prompt_value "Enter private bucket name" "BUCKET_NAME_PRIVATE" "cellarium-nx-file-system"
-prompt_value "Enter public bucket name" "BUCKET_NAME_PUBLIC" "cellarium-nx-public-files"
+prompt_value "Enter private bucket name" "BUCKET_NAME_PRIVATE" "cellarium-nexus-file-system"
+prompt_value "Enter public bucket name" "BUCKET_NAME_PUBLIC" "cellarium-nexus-public-files"
 
 # Generate Django secret key
 prompt_secret "Enter Django secret key" "SECRET_KEY"
+
+# Django superuser settings
+prompt_value "Enter Django superuser username" "DJANGO_SUPERUSER_USERNAME" "admin"
+prompt_secret "Enter Django superuser password" "DJANGO_SUPERUSER_PASSWORD"
+prompt_value "Enter Django superuser email" "DJANGO_SUPERUSER_EMAIL" "admin@example.com"
 
 # Prompt for environment
 echo -e "\n${YELLOW}Select environment (default: development):${NC}"
@@ -132,9 +140,9 @@ echo "" >> "$output_file"
 
 # Write all variables to file
 declare -a vars=(
-    "PROJECT_ID"
+    "GCP_PROJECT_ID"
     "DB_INSTANCE_NAME"
-    "DB_VERSION"
+    "DB_INSTANCE_CONNECTION_NAME"
     "DB_REGION"
     "DB_NAME"
     "DB_USER"
@@ -153,6 +161,9 @@ declare -a vars=(
     "BUCKET_NAME_PUBLIC"
     "SECRET_KEY"
     "ENVIRONMENT"
+    "DJANGO_SUPERUSER_USERNAME"
+    "DJANGO_SUPERUSER_PASSWORD"
+    "DJANGO_SUPERUSER_EMAIL"
 )
 
 # Create a temporary file for secret manager (without exports)
@@ -171,8 +182,8 @@ echo -e "\n${GREEN}Starting deployment process...${NC}"
 
 # Verify project access
 echo -e "\n${YELLOW}Verifying Google Cloud project access...${NC}"
-if ! gcloud projects describe "${PROJECT_ID}" --project="${PROJECT_ID}" > /dev/null 2>&1; then
-    echo -e "${RED}Unable to access project ${PROJECT_ID}. Please ensure:${NC}"
+if ! gcloud projects describe "${GCP_PROJECT_ID}" --project="${GCP_PROJECT_ID}" > /dev/null 2>&1; then
+    echo -e "${RED}Unable to access project ${GCP_PROJECT_ID}. Please ensure:${NC}"
     echo -e "1. The project ID is correct"
     echo -e "2. You have the necessary permissions"
     echo -e "3. The project exists and is active"
@@ -233,7 +244,7 @@ create_service_account() {
     retry_operation "Creating service account ${sa_name}" \
         "gcloud iam service-accounts create \"${sa_name}\" \
         --display-name=\"${sa_display_name}\" \
-        --project=\"${PROJECT_ID}\""
+        --project=\"${GCP_PROJECT_ID}\""
 }
 
 echo -e "\n${YELLOW}Enabling required Google Cloud APIs...${NC}"
@@ -246,7 +257,7 @@ gcloud services enable \
     cloudbuild.googleapis.com \
     sqladmin.googleapis.com \
     bigquery.googleapis.com \
-    --project="${PROJECT_ID}"
+    --project="${GCP_PROJECT_ID}"
 check_command
 
 echo -e "\n${YELLOW}Creating GCS buckets...${NC}"
@@ -254,7 +265,7 @@ echo -e "\n${YELLOW}Creating GCS buckets...${NC}"
 echo "Creating private bucket: ${BUCKET_NAME_PRIVATE}"
 retry_operation "Creating private bucket ${BUCKET_NAME_PRIVATE}" \
     "gcloud storage buckets create \"gs://${BUCKET_NAME_PRIVATE}\" \
-    --project=\"${PROJECT_ID}\" \
+    --project=\"${GCP_PROJECT_ID}\" \
     --location=us-central1 \
     --uniform-bucket-level-access"
 
@@ -262,14 +273,14 @@ retry_operation "Creating private bucket ${BUCKET_NAME_PRIVATE}" \
 echo "Creating public bucket: ${BUCKET_NAME_PUBLIC}"
 retry_operation "Creating public bucket ${BUCKET_NAME_PUBLIC}" \
     "gcloud storage buckets create \"gs://${BUCKET_NAME_PUBLIC}\" \
-    --project=\"${PROJECT_ID}\" \
+    --project=\"${GCP_PROJECT_ID}\" \
     --location=us-central1 \
     --uniform-bucket-level-access"
 
 echo -e "\n${YELLOW}Configuring CORS for public bucket...${NC}"
 gcloud storage buckets update "gs://${BUCKET_NAME_PUBLIC}" \
     --cors-file=deploy/cors.json \
-    --project="${PROJECT_ID}"
+    --project="${GCP_PROJECT_ID}"
 check_command
 
 echo -e "\n${YELLOW}Configuring public bucket IAM policy...${NC}"
@@ -277,19 +288,19 @@ echo -e "\n${YELLOW}Configuring public bucket IAM policy...${NC}"
 cat > /tmp/bucket-policy.yaml << EOF
 bindings:
 - members:
-  - projectEditor:${PROJECT_ID}
-  - projectOwner:${PROJECT_ID}
+  - projectEditor:${GCP_PROJECT_ID}
+  - projectOwner:${GCP_PROJECT_ID}
   role: roles/storage.legacyBucketOwner
 - members:
-  - projectViewer:${PROJECT_ID}
+  - projectViewer:${GCP_PROJECT_ID}
   role: roles/storage.legacyBucketReader
 - members:
-  - projectEditor:${PROJECT_ID}
-  - projectOwner:${PROJECT_ID}
+  - projectEditor:${GCP_PROJECT_ID}
+  - projectOwner:${GCP_PROJECT_ID}
   role: roles/storage.legacyObjectOwner
 - members:
   - allUsers
-  - projectViewer:${PROJECT_ID}
+  - projectViewer:${GCP_PROJECT_ID}
   role: roles/storage.objectViewer
 EOF
 
@@ -307,8 +318,8 @@ grant_roles() {
     
     for role in "${roles[@]}"; do
         retry_operation "Granting ${role} to ${sa_name}" \
-            "gcloud projects add-iam-policy-binding \"${PROJECT_ID}\" \
-            --member=\"serviceAccount:${sa_name}@${PROJECT_ID}.iam.gserviceaccount.com\" \
+            "gcloud projects add-iam-policy-binding \"${GCP_PROJECT_ID}\" \
+            --member=\"serviceAccount:${sa_name}@${GCP_PROJECT_ID}.iam.gserviceaccount.com\" \
             --role=\"${role}\""
     done
 }
@@ -351,36 +362,36 @@ retry_operation "Creating Cloud SQL instance ${DB_INSTANCE_NAME}" \
     --cpu=\"${DB_CPU}\" \
     --memory=\"${DB_MEMORY}GB\" \
     --storage-size=\"${DB_STORAGE}\" \
-    --region=us-central1 \
+    --region=${DB_REGION} \
     --require-ssl \
     --root-password=\"${DB_PASSWORD}\" \
-    --project=\"${PROJECT_ID}\""
+    --project=\"${GCP_PROJECT_ID}\""
 
 echo -e "\n${YELLOW}Creating database and user...${NC}"
 # Create database
 retry_operation "Creating database ${DB_NAME}" \
     "gcloud sql databases create \"${DB_NAME}\" \
     --instance=\"${DB_INSTANCE_NAME}\" \
-    --project=\"${PROJECT_ID}\""
+    --project=\"${GCP_PROJECT_ID}\""
 
 # Create user
 retry_operation "Creating user ${DB_USER}" \
     "gcloud sql users create \"${DB_USER}\" \
     --instance=\"${DB_INSTANCE_NAME}\" \
     --password=\"${DB_PASSWORD}\" \
-    --project=\"${PROJECT_ID}\""
+    --project=\"${GCP_PROJECT_ID}\""
 
 echo -e "\n${YELLOW}Creating Secret Manager secrets...${NC}"
 # Create environment variables secret
 retry_operation "Creating secret ${ENV_SECRET_NAME}" \
     "gcloud secrets create \"${ENV_SECRET_NAME}\" \
     --replication-policy=\"automatic\" \
-    --project=\"${PROJECT_ID}\""
+    --project=\"${GCP_PROJECT_ID}\""
 
 # Update secret with environment variables
 gcloud secrets versions add "${ENV_SECRET_NAME}" \
     --data-file="${secret_file}" \
-    --project="${PROJECT_ID}"
+    --project="${GCP_PROJECT_ID}"
 
 # Clean up temporary file
 rm "${secret_file}"
@@ -392,12 +403,12 @@ retry_operation "Creating repository ${REPO_NAME}" \
     --repository-format=docker \
     --location=\"${REPO_LOCATION}\" \
     --description=\"Repository for Cellarium Nexus images\" \
-    --project=\"${PROJECT_ID}\""
+    --project=\"${GCP_PROJECT_ID}\""
 
 echo -e "\n${YELLOW}Creating Vertex AI Pipeline bucket...${NC}"
 retry_operation "Creating bucket ${PIPELINE_BUCKET}" \
     "gcloud storage buckets create \"gs://${PIPELINE_BUCKET}\" \
-    --project=\"${PROJECT_ID}\" \
+    --project=\"${GCP_PROJECT_ID}\" \
     --location=us-central1 \
     --uniform-bucket-level-access"
 
@@ -405,13 +416,13 @@ echo -e "\n${YELLOW}Deploying to Cloud Run...${NC}"
 
 # Add Cloud SQL connection permissions to service account
 retry_operation "Granting Cloud SQL Client role" \
-    "gcloud projects add-iam-policy-binding \"${PROJECT_ID}\" \
-    --member=\"serviceAccount:${BACKEND_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com\" \
+    "gcloud projects add-iam-policy-binding \"${GCP_PROJECT_ID}\" \
+    --member=\"serviceAccount:${BACKEND_SA_NAME}@${GCP_PROJECT_ID}.iam.gserviceaccount.com\" \
     --role=\"roles/cloudsql.client\""
 
 # Get the SQL instance connection name
 SQL_CONNECTION_NAME=$(gcloud sql instances describe "${DB_INSTANCE_NAME}" \
-    --project="${PROJECT_ID}" \
+    --project="${GCP_PROJECT_ID}" \
     --format="value(connectionName)")
 
 retry_operation "Deploying Cloud Run service ${SERVICE_NAME}" \
@@ -419,53 +430,76 @@ retry_operation "Deploying Cloud Run service ${SERVICE_NAME}" \
     --image=\"${IMAGE_PATH}\" \
     --platform=managed \
     --region=\"${REPO_LOCATION}\" \
-    --project=\"${PROJECT_ID}\" \
+    --project=\"${GCP_PROJECT_ID}\" \
     --min-instances=\"${MIN_INSTANCES}\" \
     --max-instances=\"${MAX_INSTANCES}\" \
     --cpu=\"${CPU}\" \
     --memory=\"${MEMORY}Gi\" \
     --timeout=\"${TIMEOUT}s\" \
-    --port=8000 \
-    --service-account=\"${BACKEND_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com\" \
+    --port=8080 \
+    --service-account=\"${BACKEND_SA_NAME}@${GCP_PROJECT_ID}.iam.gserviceaccount.com\" \
     --add-cloudsql-instances=\"${SQL_CONNECTION_NAME}\" \
-    --set-secrets=\"/app/cellarium/nexus/.env=${ENV_SECRET_NAME}:latest\" \
+    --set-secrets=\"/app/conf/.env=${ENV_SECRET_NAME}:latest\" \
     --allow-unauthenticated"
 
 # Get the service URL
 SERVICE_URL=$(gcloud run services describe "${SERVICE_NAME}" \
     --platform=managed \
     --region="${REPO_LOCATION}" \
-    --project="${PROJECT_ID}" \
+    --project="${GCP_PROJECT_ID}" \
     --format='value(status.url)')
 
-# Update local env file with SITE_URL
+# Extract domain from SERVICE_URL (remove https:// prefix)
+MAIN_HOST_ALLOWED=$(echo "${SERVICE_URL}" | sed 's|^https://||')
+echo -e "${GREEN}Extracted domain for ALLOWED_HOSTS: ${MAIN_HOST_ALLOWED}${NC}"
+
+# Update local env file with SITE_URL and MAIN_HOST_ALLOWED
 echo "export SITE_URL=\"${SERVICE_URL}\"" >> "$output_file"
-
-
+echo "export MAIN_HOST_ALLOWED=\"${MAIN_HOST_ALLOWED}\"" >> "$output_file"
 
 # Create temporary env file for secret update
 tmp_secret="/tmp/env_secret_$$"
+
+# First, get current secret content if it exists
+if gcloud secrets versions access latest --secret="${ENV_SECRET_NAME}" --project="${GCP_PROJECT_ID}" > "$tmp_secret" 2>/dev/null; then
+    echo -e "${GREEN}Retrieved existing secret content${NC}"
+else
+    echo -e "${YELLOW}No existing secret found, creating new one${NC}"
+    touch "$tmp_secret"
+fi
+
+# Add environment variables from the output file
 while IFS= read -r line; do
     # Remove 'export' and keep the rest
     clean_line="${line#export }"
-    echo "${clean_line}" >> "$tmp_secret"
+    # Extract variable name before the equals sign
+    var_name="${clean_line%%=*}"
+    # Only add if not already in the secret file
+    if ! grep -q "^${var_name}=" "$tmp_secret"; then
+        echo "${clean_line}" >> "$tmp_secret"
+    fi
 done < "$output_file"
 
-# Add SITE_URL to secret manager
+# Add or update SITE_URL and MAIN_HOST_ALLOWED in the secret file
+sed -i "/^SITE_URL=/d" "$tmp_secret"
+sed -i "/^MAIN_HOST_ALLOWED=/d" "$tmp_secret"
 echo "SITE_URL=${SERVICE_URL}" >> "$tmp_secret"
+echo "MAIN_HOST_ALLOWED=${MAIN_HOST_ALLOWED}" >> "$tmp_secret"
+
+echo -e "${GREEN}Added SITE_URL and MAIN_HOST_ALLOWED to secret file${NC}"
 
 # Update secret with new environment variables
-echo -e "\n${YELLOW}Updating environment secret with SITE_URL...${NC}"
+echo -e "\n${YELLOW}Updating environment secret with SITE_URL and MAIN_HOST_ALLOWED...${NC}"
 gcloud secrets versions add "${ENV_SECRET_NAME}" \
     --data-file="${tmp_secret}" \
-    --project="${PROJECT_ID}"
+    --project="${GCP_PROJECT_ID}"
 check_command
 
 # Clean up temporary file
 rm "$tmp_secret"
 
 # Generate Cloud Console URL
-CONSOLE_URL="https://console.cloud.google.com/run/detail/${REPO_LOCATION}/${SERVICE_NAME}/metrics?project=${PROJECT_ID}"
+CONSOLE_URL="https://console.cloud.google.com/run/detail/${REPO_LOCATION}/${SERVICE_NAME}/metrics?project=${GCP_PROJECT_ID}"
 
 echo -e "\n${GREEN}Deployment completed successfully!${NC}"
 echo -e "${YELLOW}Service URL:${NC} ${SERVICE_URL}"

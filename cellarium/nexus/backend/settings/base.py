@@ -9,11 +9,12 @@ from nexus.backend.settings import BASE_DIR, env
 # -------------------
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = True
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [env("MAIN_HOST_ALLOWED")]
 SITE_URL = env("SITE_URL")
 ROOT_URLCONF = "backend.urls"
 WSGI_APPLICATION = "nexus.backend.wsgi.application"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+ENVIRONMENT = env("ENVIRONMENT", default="local")
 
 # Application Definition
 # ---------------------
@@ -62,18 +63,23 @@ TEMPLATES = [
     },
 ]
 
-# Database Configuration
-# ----------------------
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": env("DB_NAME"),
-        "USER": env("DB_USER"),
-        "PASSWORD": env("DB_PASSWORD"),
-        "HOST": env("DB_HOST"),
-        "PORT": env("DB_PORT"),
-    }
+default_db_config = {
+    "ENGINE": "django.db.backends.postgresql",
+    "NAME": env("DB_NAME"),
+    "USER": env("DB_USER"),
+    "PASSWORD": env("DB_PASSWORD"),
 }
+
+if ENVIRONMENT != "local":
+    # Cloud Run environment using Cloud SQL socket
+    default_db_config["HOST"] = f'/cloudsql/{env("DB_INSTANCE_CONNECTION_NAME")}'
+else:
+    # Local or other environments using standard host/port
+    default_db_config["HOST"] = env("DB_HOST", default="localhost")  # Add default for local
+    default_db_config["PORT"] = env("DB_PORT", default="5432")  # Add default for local
+
+DATABASES = {"default": default_db_config}
+
 # Authentication and Security
 # --------------------------
 AUTH_PASSWORD_VALIDATORS = [
@@ -258,7 +264,7 @@ STATIC_LOCATION = "static-files"
 
 # Static files settings
 # --------------------
-STATIC_URL = f'https://storage.googleapis.com/{BUCKET_NAME_PUBLIC}/{STATIC_LOCATION}/'
+STATIC_URL = f"https://storage.googleapis.com/{BUCKET_NAME_PUBLIC}/{STATIC_LOCATION}/"
 STATICFILES_DIRS = [BASE_DIR / "cellarium/nexus/backend/static"]
 
 # Google Cloud Storage settings
@@ -268,20 +274,18 @@ GS_PROJECT_ID = GCP_PROJECT_ID
 
 # Don't set ACLs (using uniform bucket-level access)
 GS_DEFAULT_ACL = None
-GS_OBJECT_PARAMETERS = {
-    'cache-control': 'public, max-age=86400'  # Cache for 24 hours
-}
+GS_OBJECT_PARAMETERS = {"cache-control": "public, max-age=86400"}  # Cache for 24 hours
 
 # CORS configuration for GCS
 GS_CORS_ORIGIN_ALLOW_ALL = True
-GS_CORS_METHODS = ['GET', 'OPTIONS']
+GS_CORS_METHODS = ["GET", "OPTIONS"]
 GS_CORS_MAX_AGE = 3600  # 1 hour cache
 GS_CORS_HEADERS = [
-    'Content-Type',
-    'Access-Control-Allow-Origin',
-    'Access-Control-Allow-Headers',
-    'Origin',
-    'X-Requested-With',
+    "Content-Type",
+    "Access-Control-Allow-Origin",
+    "Access-Control-Allow-Headers",
+    "Origin",
+    "X-Requested-With",
 ]
 
 STORAGES = {
@@ -292,7 +296,7 @@ STORAGES = {
             "bucket_name": BUCKET_NAME_PUBLIC,
             "location": STATIC_LOCATION,
             "querystring_auth": False,
-        }
+        },
     },
     "staticfiles": {
         "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
@@ -301,8 +305,8 @@ STORAGES = {
             "bucket_name": BUCKET_NAME_PUBLIC,
             "location": STATIC_LOCATION,
             "querystring_auth": False,
-        }
-    }
+        },
+    },
 }
 
 BACKEND_PIPELINE_DIR = "pipeline"
