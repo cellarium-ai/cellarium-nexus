@@ -1,5 +1,7 @@
-# Database
+# Set up project
+gcloud config set project <project_name>
 
+# Database
 DB_CLUSTER_NAME=cellarium-db-cluster # Cluster name
 NUM_CPUS=2 # Number of CPUs
 MEMORY=8GB # Memory size
@@ -13,4 +15,13 @@ gcloud sql instances create $DB_CLUSTER_NAME \
     --storage-size=$STORAGE_SIZE \
     --require-ssl \
     --region=us-central
+
+# Secrets
+## Enable Secret manager API
+gcloud services enable secretmanager.googleapis.com
+
+## Create secrets for a remote server locally:
+
+
+# Vertex AI Pipelines
 

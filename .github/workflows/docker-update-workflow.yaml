@@ -1,4 +1,4 @@
-name: CAS Repository Docker Build Workflow
+name: Nexus Repository Docker Build Workflow
 on:
   workflow_dispatch:
     inputs:
