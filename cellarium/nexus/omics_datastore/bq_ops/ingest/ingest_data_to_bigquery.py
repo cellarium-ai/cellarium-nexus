@@ -4,6 +4,8 @@ from datetime import datetime
 from typing import List, Tuple
 
 from google.api_core.exceptions import NotFound
+from google.auth import default
+from google.auth.credentials import Credentials
 from google.cloud import bigquery
 from nexus.omics_datastore.bq_avro_schemas import cell_management, converter
 from nexus.omics_datastore.bq_ops import constants
@@ -23,8 +25,17 @@ def initialize_bigquery_client(project_id: str, dataset: str) -> bigquery.Client
     :param dataset: The BigQuery dataset name
 
     :return: An authenticated BigQuery client
+
+    :raise google.auth.exceptions.DefaultCredentialsError: If credentials cannot be obtained
     """
-    client = bigquery.Client(project=project_id)
+    credentials, _ = default()
+    if not isinstance(credentials, Credentials):
+        raise ValueError("Failed to obtain valid credentials")
+
+    client = bigquery.Client(
+        project=project_id,
+        credentials=credentials
+    )
     return client
 
 

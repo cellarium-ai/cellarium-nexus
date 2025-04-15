@@ -352,7 +352,7 @@ echo -e "\n${YELLOW}Granting IAM roles...${NC}"
 # Grant roles to Vertex AI Pipelines service account
 declare -a pipeline_roles=(
     "roles/aiplatform.user"
-    "roles/bigquery.dataEditor"
+    "roles/bigquery.admin"
     "roles/bigquery.jobUser"
     "roles/storage.admin"
 )
