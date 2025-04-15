@@ -11,6 +11,7 @@ SECRET_KEY = env("SECRET_KEY")
 DEBUG = True
 ALLOWED_HOSTS = [env("MAIN_HOST_ALLOWED")]
 SITE_URL = env("SITE_URL")
+CSRF_TRUSTED_ORIGINS = [SITE_URL]
 ROOT_URLCONF = "backend.urls"
 WSGI_APPLICATION = "nexus.backend.wsgi.application"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
@@ -310,3 +311,4 @@ STORAGES = {
 }
 
 BACKEND_PIPELINE_DIR = "pipeline"
+
