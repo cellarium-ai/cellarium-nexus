@@ -99,7 +99,8 @@ def upload_many_blobs_with_transfer_manager(bucket_name: str, file_paths: list[s
 
     for file_path in file_paths:
         file_name = file_path.split("/")[-1]
-        blob = storage.Blob(bucket=bucket, name=f"{prefix}/{file_name}")
+        # Prefix already has a trailing slash from workflows_configs.dump_configs_to_bucket
+        blob = storage.Blob(bucket=bucket, name=f"{prefix}{file_name}")
         filenames_blob_pairs.append((file_path, blob))
 
     results = transfer_manager.upload_many(

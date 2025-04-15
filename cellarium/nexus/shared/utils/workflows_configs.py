@@ -64,7 +64,8 @@ def dump_configs_to_bucket(
     bucket_name, prefix = utils.gcp.get_bucket_name_and_file_path_from_gc_path(bucket_path)
     
     if prefix:
-        prefix = prefix.rstrip("/") + "/"
+        # Remove any leading/trailing slashes and add a single trailing slash
+        prefix = prefix.strip("/") + "/"
 
     with tempfile.TemporaryDirectory() as temp_dir:
         local_file_paths = []
