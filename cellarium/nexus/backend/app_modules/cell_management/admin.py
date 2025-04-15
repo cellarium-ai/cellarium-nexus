@@ -35,10 +35,12 @@ from nexus.backend.app_modules.cell_management.models import (
 from cellarium.nexus.workflows.kubeflow.component_configs import (
     CreateIngestFiles,
     IngestDataToBigQuery,
+    BQOpsPrepareExtract,
+    BQOpsExtract,
 )
 
 from cellarium.nexus.workflows.kubeflow.utils.job import submit_pipeline
-from cellarium.nexus.workflows.kubeflow.pipelines import ingest_data_pipeline
+from cellarium.nexus.workflows.kubeflow.pipelines import ingest_data_pipeline, extract_data_pipeline
 
 from nexus.backend.app_modules.cell_management.utils.custom_filters import MultiValueTextFilter, OntologyTermFilter
 from nexus.backend.app_modules.cell_management.utils.filters import (
@@ -304,15 +306,11 @@ class CellInfoAdmin(ModelAdmin):
             # Construct extract bucket path
             extract_bucket_path = f"{settings.BACKEND_PIPELINE_DIR}/data_extracts/{extract_table_prefix}"
 
-            # Initialize NexusDataController
-            controller = NexusDataController(
+            # Create configs for the pipeline
+            prepare_extract_config = BQOpsPrepareExtract(
                 project_id=settings.GCP_PROJECT_ID,
                 nexus_backend_api_url=settings.SITE_URL,
                 bigquery_dataset=bigquery_dataset.name,
-            )
-
-            # Call prepare_extract_tables through the controller
-            controller.prepare_extract_tables(
                 extract_table_prefix=extract_table_prefix,
                 features=features,
                 filters=filters,
@@ -321,13 +319,36 @@ class CellInfoAdmin(ModelAdmin):
                 bucket_name=settings.BUCKET_NAME_PRIVATE,
                 extract_bucket_path=extract_bucket_path,
             )
-            controller.extract_data(
+            
+            extract_config = BQOpsExtract(
+                project_id=settings.GCP_PROJECT_ID,
+                nexus_backend_api_url=settings.SITE_URL,
+                bigquery_dataset=bigquery_dataset.name,
                 extract_table_prefix=extract_table_prefix,
                 bins=[0],  # Extract only bin 0 for now
                 bucket_name=settings.BUCKET_NAME_PRIVATE,
                 extract_bucket_path=extract_bucket_path,
                 obs_columns=obs_columns,
                 max_workers=10,
+            )
+            
+            # Save configs to GCS
+            configs_stage_dir = f"gs://{settings.BUCKET_NAME_PRIVATE}/pipeline-configs"
+            
+            prepare_extract_config_path = utils.workflows_configs.dump_configs_to_bucket([prepare_extract_config], configs_stage_dir)[0]
+            extract_config_paths = utils.workflows_configs.dump_configs_to_bucket([extract_config], configs_stage_dir)
+            
+            # Submit pipeline
+            submit_pipeline(
+                pipeline_component=extract_data_pipeline,
+                display_name=f"Nexus Extract Data - {bigquery_dataset.name}",
+                gcp_project=settings.GCP_PROJECT_ID,
+                pipeline_kwargs={
+                    "prepare_extract_config": prepare_extract_config_path,
+                    "extract_configs": extract_config_paths,
+                },
+                service_account=settings.PIPELINE_SERVICE_ACCOUNT,
+                pipeline_root_path=settings.PIPELINE_ROOT_PATH,
             )
 
             messages.success(request=request, message=EXTRACT_SUCCESS_MESSAGE)
@@ -508,6 +529,8 @@ class IngestInfoAdmin(ModelAdmin):
                     "create_ingest_configs": create_ingest_config_paths,
                     "ingest_config": ingest_paths[0],
                 },
+                service_account=settings.PIPELINE_SERVICE_ACCOUNT,
+                pipeline_root_path=settings.PIPELINE_ROOT_PATH,
             )
 
             messages.success(request, _("Data ingestion pipeline started successfully"))

@@ -63,8 +63,9 @@ def dump_configs_to_bucket(
     
     bucket_name, prefix = utils.gcp.get_bucket_name_and_file_path_from_gc_path(bucket_path)
     
-    if prefix and not prefix.endswith("/"):
-        prefix += "/"
+    if prefix:
+        if not prefix.endswith("/"):
+            prefix += "/"
 
     with tempfile.TemporaryDirectory() as temp_dir:
         local_file_paths = []

@@ -312,3 +312,6 @@ STORAGES = {
 
 BACKEND_PIPELINE_DIR = "pipeline"
 
+# Vertex AI Pipeline settings
+PIPELINE_SERVICE_ACCOUNT = env("PIPELINE_SERVICE_ACCOUNT", default=None)
+PIPELINE_ROOT_PATH = env("PIPELINE_ROOT_PATH", default=None)

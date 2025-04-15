@@ -138,25 +138,19 @@ echo "# Generated environment variables for Cellarium Nexus" > "$output_file"
 echo "# Generated on: $(date)" >> "$output_file"
 echo "" >> "$output_file"
 
+# Construct full service account emails and pipeline paths
+PIPELINE_SERVICE_ACCOUNT="${PIPELINE_SA_NAME}@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
+PIPELINE_ROOT_PATH="gs://${PIPELINE_BUCKET}/pipeline-root"
+
 # Write all variables to file
 declare -a vars=(
     "GCP_PROJECT_ID"
-    "DB_INSTANCE_NAME"
     "DB_INSTANCE_CONNECTION_NAME"
-    "DB_REGION"
     "DB_NAME"
     "DB_USER"
     "DB_PASSWORD"
-    "ENV_SECRET_NAME"
-    "PIPELINE_SA_NAME"
-    "PIPELINE_SA_DISPLAY_NAME"
-    "BACKEND_SA_NAME"
-    "BACKEND_SA_DISPLAY_NAME"
-    "PIPELINE_BUCKET"
-    "REPO_NAME"
-    "REPO_LOCATION"
-    "IMAGE_PATH"
-    "SERVICE_NAME"
+    "PIPELINE_SERVICE_ACCOUNT"
+    "PIPELINE_ROOT_PATH"
     "BUCKET_NAME_PRIVATE"
     "BUCKET_NAME_PUBLIC"
     "SECRET_KEY"
@@ -164,6 +158,8 @@ declare -a vars=(
     "DJANGO_SUPERUSER_USERNAME"
     "DJANGO_SUPERUSER_PASSWORD"
     "DJANGO_SUPERUSER_EMAIL"
+    "SITE_URL"
+    "MAIN_HOST_ALLOWED"
 )
 
 # Create a temporary file for secret manager (without exports)
@@ -397,13 +393,6 @@ gcloud secrets versions add "${ENV_SECRET_NAME}" \
 rm "${secret_file}"
 check_command
 
-echo -e "\n${YELLOW}Creating Artifact Registry repository...${NC}"
-retry_operation "Creating repository ${REPO_NAME}" \
-    "gcloud artifacts repositories create \"${REPO_NAME}\" \
-    --repository-format=docker \
-    --location=\"${REPO_LOCATION}\" \
-    --description=\"Repository for Cellarium Nexus images\" \
-    --project=\"${GCP_PROJECT_ID}\""
 
 echo -e "\n${YELLOW}Creating Vertex AI Pipeline bucket...${NC}"
 retry_operation "Creating bucket ${PIPELINE_BUCKET}" \

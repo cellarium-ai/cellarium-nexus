@@ -45,6 +45,8 @@ def submit_pipeline(
     gcp_project: str,
     pipeline_kwargs: dict[str, t.Any],
     pipeline_location: str = constants.DEFAULT_PIPELINE_LOCATION,
+    service_account: str | None = None,
+    pipeline_root_path: str | None = None,
 ) -> None:
     """
     Create and run a pipeline on Vertex AI Pipelines. Use a temporary file to compile the pipeline config,
@@ -55,6 +57,12 @@ def submit_pipeline(
     :param gcp_project: GCP Project where the pipeline should be submitted to.
     :param pipeline_kwargs: Keyword arguments to pass to the pipeline function.
     :param pipeline_location: Datacenter location of Google Cloud Platform to run the pipeline job.
+    :param service_account: Service account email to use for the pipeline execution. If None, the default compute
+                           service account will be used.
+    :param pipeline_root_path: GCS path to use as the pipeline root directory. If None, the default
+                             Vertex AI Pipelines location will be used.
+    
+    :raise: google.api_core.exceptions.GoogleAPIError: If pipeline submission fails.
     """
     temp_file = tempfile.NamedTemporaryFile(suffix=".yaml")
     os.environ["GRPC_DNS_RESOLVER"] = "native"
@@ -63,11 +71,20 @@ def submit_pipeline(
 
     compiler.Compiler().compile(pipeline_func=pipeline_component, package_path=temp_file.name)
 
-    job = aiplatform.PipelineJob(
-        display_name=display_name,
-        template_path=temp_file.name,
-        parameter_values=pipeline_kwargs,
-    )
+    job_args = {
+        "display_name": display_name,
+        "template_path": temp_file.name,
+        "parameter_values": pipeline_kwargs,
+    }
+    
+    if pipeline_root_path:
+        job_args["pipeline_root"] = pipeline_root_path
+        
+    job = aiplatform.PipelineJob(**job_args)
 
-    job.submit(network=constants.NETWORK_NAME)
+    submit_kwargs = {}
+    if service_account:
+        submit_kwargs["service_account"] = service_account
+    
+    job.submit(**submit_kwargs)
     temp_file.close()
