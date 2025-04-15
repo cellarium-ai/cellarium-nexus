@@ -120,17 +120,37 @@ prompt_value "Enter Django superuser email" "DJANGO_SUPERUSER_EMAIL" "admin@exam
 # Prompt for environment
 echo -e "\n${YELLOW}Select environment (default: development):${NC}"
 echo "1) development"
-echo "2) staging"
+echo "2) local"
 echo "3) production"
-read -p "Enter choice [1-3]: " env_choice
+read -p "Enter choice [1-3] (default: 1): " env_choice
 
 case $env_choice in
-    2) ENVIRONMENT="staging" ;;
+    2) ENVIRONMENT="local" ;;
     3) ENVIRONMENT="production" ;;
-    *) ENVIRONMENT="development" ;;
+    ""|1) ENVIRONMENT="development" ;;
+    *) 
+        echo -e "${RED}Invalid choice. Please select 1, 2, or 3${NC}"
+        exit 1
+        ;;
 esac
 
 echo -e "\n${GREEN}Setting environment to: ${ENVIRONMENT}${NC}"
+
+# Set initial URL values based on environment
+if [ "$ENVIRONMENT" = "local" ]; then
+    SITE_URL="http://localhost:8000"
+    MAIN_HOST_ALLOWED="localhost"
+    echo -e "${GREEN}Using local development URLs:${NC}"
+else
+    # Set temporary values for non-local environments
+    # These will be updated after Cloud Run deployment
+    SITE_URL="http://pending-cloud-run-url"
+    MAIN_HOST_ALLOWED="pending-cloud-run-domain"
+    echo -e "${YELLOW}Using temporary URLs (will be updated after Cloud Run deployment):${NC}"
+fi
+
+echo -e "SITE_URL: ${SITE_URL}"
+echo -e "MAIN_HOST_ALLOWED: ${MAIN_HOST_ALLOWED}"
 
 # Create output file
 output_file=".env.generated"
@@ -350,6 +370,14 @@ declare -a backend_roles=(
 grant_roles "${PIPELINE_SA_NAME}" "${pipeline_roles[@]}"
 grant_roles "${BACKEND_SA_NAME}" "${backend_roles[@]}"
 
+# Grant backend service account permission to impersonate pipeline service account
+echo -e "\n${YELLOW}Granting pipeline service account impersonation to backend service account...${NC}"
+retry_operation "Granting serviceAccountUser role to backend service account" \
+    "gcloud iam service-accounts add-iam-policy-binding \
+    ${PIPELINE_SA_NAME}@${GCP_PROJECT_ID}.iam.gserviceaccount.com \
+    --member=serviceAccount:${BACKEND_SA_NAME}@${GCP_PROJECT_ID}.iam.gserviceaccount.com \
+    --role=roles/iam.serviceAccountUser"
+
 echo -e "\n${YELLOW}Creating Cloud SQL instance...${NC}"
 retry_operation "Creating Cloud SQL instance ${DB_INSTANCE_NAME}" \
     "gcloud sql instances create \"${DB_INSTANCE_NAME}\" \
@@ -432,29 +460,36 @@ retry_operation "Deploying Cloud Run service ${SERVICE_NAME}" \
     --allow-unauthenticated"
 
 # Get the service URL
+echo -e "\n${YELLOW}Getting service URL...${NC}"
 SERVICE_URL=$(gcloud run services describe "${SERVICE_NAME}" \
     --platform=managed \
     --region="${REPO_LOCATION}" \
     --project="${GCP_PROJECT_ID}" \
-    --format='value(status.url)')
+    --format='value(status.address.url)')
 
-# Extract domain from SERVICE_URL (remove https:// prefix)
-MAIN_HOST_ALLOWED=$(echo "${SERVICE_URL}" | sed 's|^https://||')
-echo -e "${GREEN}Extracted domain for ALLOWED_HOSTS: ${MAIN_HOST_ALLOWED}${NC}"
+if [ -z "$SERVICE_URL" ]; then
+    echo -e "${RED}Failed to get service URL, falling back to status.url...${NC}"
+    SERVICE_URL=$(gcloud run services describe "${SERVICE_NAME}" \
+        --platform=managed \
+        --region="${REPO_LOCATION}" \
+        --project="${GCP_PROJECT_ID}" \
+        --format='value(status.url)')
+fi
 
-# Update local env file with SITE_URL and MAIN_HOST_ALLOWED
-echo "export SITE_URL=\"${SERVICE_URL}\"" >> "$output_file"
-echo "export MAIN_HOST_ALLOWED=\"${MAIN_HOST_ALLOWED}\"" >> "$output_file"
+echo -e "${GREEN}Service URL: ${SERVICE_URL}${NC}"
 
-# Create temporary env file for secret update
-tmp_secret="/tmp/env_secret_$$"
+# Create a temporary file for the environment variables
+tmp_secret=$(mktemp)
 
 # First, get current secret content if it exists
 if gcloud secrets versions access latest --secret="${ENV_SECRET_NAME}" --project="${GCP_PROJECT_ID}" > "$tmp_secret" 2>/dev/null; then
     echo -e "${GREEN}Retrieved existing secret content${NC}"
 else
     echo -e "${YELLOW}No existing secret found, creating new one${NC}"
-    touch "$tmp_secret"
+    # Initialize with core environment variables
+    echo "ENVIRONMENT=\"${ENVIRONMENT}\"" > "$tmp_secret"
+    echo "SECRET_KEY=\"${SECRET_KEY}\"" >> "$tmp_secret"
+    echo "GCP_PROJECT_ID=\"${GCP_PROJECT_ID}\"" >> "$tmp_secret"
 fi
 
 # Add environment variables from the output file
@@ -469,11 +504,21 @@ while IFS= read -r line; do
     fi
 done < "$output_file"
 
-# Add or update SITE_URL and MAIN_HOST_ALLOWED in the secret file
-sed -i "/^SITE_URL=/d" "$tmp_secret"
-sed -i "/^MAIN_HOST_ALLOWED=/d" "$tmp_secret"
-echo "SITE_URL=${SERVICE_URL}" >> "$tmp_secret"
-echo "MAIN_HOST_ALLOWED=${MAIN_HOST_ALLOWED}" >> "$tmp_secret"
+if [ "$ENVIRONMENT" != "local" ]; then
+    # Update URLs with actual Cloud Run values
+    SITE_URL="${SERVICE_URL}"
+    MAIN_HOST_ALLOWED=$(echo "${SERVICE_URL}" | sed 's|^https://||')
+    echo -e "${GREEN}Updating URLs with Cloud Run values:${NC}"
+    echo -e "SITE_URL: ${SITE_URL}"
+    echo -e "MAIN_HOST_ALLOWED: ${MAIN_HOST_ALLOWED}"
+    
+    # Update the secret with new URLs
+    # Use temp files for sed on macOS
+    sed "/^SITE_URL=/d" "$tmp_secret" > "${tmp_secret}.tmp" && mv "${tmp_secret}.tmp" "$tmp_secret"
+    sed "/^MAIN_HOST_ALLOWED=/d" "$tmp_secret" > "${tmp_secret}.tmp" && mv "${tmp_secret}.tmp" "$tmp_secret"
+    echo "SITE_URL=${SITE_URL}" >> "$tmp_secret"
+    echo "MAIN_HOST_ALLOWED=${MAIN_HOST_ALLOWED}" >> "$tmp_secret"
+fi
 
 echo -e "${GREEN}Added SITE_URL and MAIN_HOST_ALLOWED to secret file${NC}"
 
