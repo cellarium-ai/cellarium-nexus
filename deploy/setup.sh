@@ -354,7 +354,7 @@ declare -a pipeline_roles=(
     "roles/aiplatform.user"
     "roles/bigquery.dataEditor"
     "roles/bigquery.jobUser"
-    "roles/storage.objectViewer"
+    "roles/storage.admin"
 )
 
 # Grant roles to Backend service account
@@ -362,7 +362,7 @@ declare -a backend_roles=(
     "roles/aiplatform.user"
     "roles/bigquery.dataEditor"
     "roles/bigquery.jobUser"
-    "roles/storage.objectAdmin"
+    "roles/storage.admin"
     "roles/secretmanager.secretAccessor"
 )
 
