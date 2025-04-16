@@ -48,6 +48,7 @@ from nexus.backend.app_modules.cell_management.utils.filters import (
     get_default_dataset,
 )
 from cellarium.nexus.shared import schemas, utils
+
 # from nexus.omics_datastore.controller import NexusDataController
 from nexus.omics_datastore.bq_ops import create_bq_tables
 from unfold.admin import ModelAdmin, TabularInline
@@ -117,12 +118,8 @@ class BigQueryDatasetAdmin(ModelAdmin):
                 # link_to_dataset = controller.create_bigquery_dataset(bigquery_dataset=obj.name, location="US")
                 from google.cloud import bigquery
 
-
                 link_to_dataset = create_bq_tables.create_bigquery_objects(
-                    client=bigquery.Client(),
-                    project=settings.GCP_PROJECT_ID,
-                    dataset=obj.name,
-                    location="US"
+                    client=bigquery.Client(), project=settings.GCP_PROJECT_ID, dataset=obj.name, location="US"
                 )
                 # Assign the link to the object's 'link' field for display in admin
                 obj.link = link_to_dataset
@@ -319,7 +316,7 @@ class CellInfoAdmin(ModelAdmin):
                 bucket_name=settings.BUCKET_NAME_PRIVATE,
                 extract_bucket_path=extract_bucket_path,
             )
-            
+
             extract_config = BQOpsExtract(
                 project_id=settings.GCP_PROJECT_ID,
                 nexus_backend_api_url=settings.SITE_URL,
@@ -331,13 +328,15 @@ class CellInfoAdmin(ModelAdmin):
                 obs_columns=obs_columns,
                 max_workers=10,
             )
-            
+
             # Save configs to GCS
             configs_stage_dir = f"gs://{settings.BUCKET_NAME_PRIVATE}/pipeline-configs"
-            
-            prepare_extract_config_path = utils.workflows_configs.dump_configs_to_bucket([prepare_extract_config], configs_stage_dir)[0]
+
+            prepare_extract_config_path = utils.workflows_configs.dump_configs_to_bucket(
+                [prepare_extract_config], configs_stage_dir
+            )[0]
             extract_config_paths = utils.workflows_configs.dump_configs_to_bucket([extract_config], configs_stage_dir)
-            
+
             # Submit pipeline
             submit_pipeline(
                 pipeline_component=extract_data_pipeline,
@@ -484,11 +483,11 @@ class IngestInfoAdmin(ModelAdmin):
                 file_path = row["gcs_file_path"]
                 file_name = os.path.basename(file_path)
                 file_name_without_ext = os.path.splitext(file_name)[0]
-                
+
                 # Create unique stage dir for this file
                 stage_dir = f"{base_stage_dir}/{timestamp}_{file_name_without_ext}"
-                stage_dirs.append(stage_dir)
-                
+                # stage_dirs.append(stage_dir)
+
                 tag = row["tag"] if "tag" in df.columns else None
                 create_ingest_configs.append(
                     CreateIngestFiles(
@@ -516,7 +515,9 @@ class IngestInfoAdmin(ModelAdmin):
             # Save configs to GCS
             configs_stage_dir = f"gs://{settings.BUCKET_NAME_PRIVATE}/pipeline-configs"
 
-            create_ingest_config_paths = utils.workflows_configs.dump_configs_to_bucket(create_ingest_configs, configs_stage_dir)
+            create_ingest_config_paths = utils.workflows_configs.dump_configs_to_bucket(
+                create_ingest_configs, configs_stage_dir
+            )
             # create_ingest_configs = [{"gcs_config_path": x} for x in create_ingest_config_paths]
 
             ingest_paths = utils.workflows_configs.dump_configs_to_bucket([ingest_config], configs_stage_dir)
