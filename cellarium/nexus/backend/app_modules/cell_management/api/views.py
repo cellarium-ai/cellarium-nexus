@@ -1,7 +1,7 @@
 from typing import Type
 
 from django.db.models import Model
-from google.cloud import storage
+from google.api_core import exceptions as google_exceptions
 from nexus.backend.app_modules.cell_management import models, services
 from nexus.backend.app_modules.cell_management.api import serializers
 from nexus.backend.app_modules.cell_management.services import import_from_avro
@@ -121,7 +121,7 @@ class IngestFromAvroView(APIView):
                 status=status.HTTP_201_CREATED,
             )
 
-        except storage.exceptions.NotFound:
+        except google_exceptions.NotFound:
             return Response({"error": "One or more files not found in GCS bucket"}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response(

@@ -39,7 +39,7 @@ from nexus.omics_datastore.bq_ops import constants
 # Default value for maximum batch size of avro files when they are being created by avro writer
 FLUSH_BATCH_SIZE_DEFAULT = 10000
 # Default value for count matrix multiprocessing batch size
-COUNT_MATRIX_MULTIPROCESSING_BATCH_SIZE_DEFAULT = 500
+COUNT_MATRIX_MULTIPROCESSING_BATCH_SIZE_DEFAULT = 5000
 # Default value for feature id lookup.
 ORIGINAL_FEATURE_ID_LOOKUP_DEFAULT = "index"
 

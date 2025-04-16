@@ -1,5 +1,6 @@
 import json
 import logging
+import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Iterator
@@ -59,12 +60,11 @@ def read_avro_records(file_path: str | Path) -> Iterator[dict]:
         raise
 
 
-def fetch_cell_info(stage_dir: str, ingest_uuid: str, file_name: str) -> Sequence[models.CellInfo]:
+def fetch_cell_info(stage_dir: str, file_name: str) -> Sequence[models.CellInfo]:
     """
     Fetch CellInfo records from an Avro file in GCS.
 
-    :param stage_dir: Base staging directory path
-    :param ingest_uuid: UUID of the ingest process
+    :param stage_dir: Staging directory path containing the files
     :param file_name: Name of the Avro file
 
     :raise storage.exceptions.NotFound: if file doesn't exist in bucket
@@ -73,20 +73,18 @@ def fetch_cell_info(stage_dir: str, ingest_uuid: str, file_name: str) -> Sequenc
     :return: A list of populated CellInfo models
     """
     try:
-        # Create temporary directory
-        temp_dir = Path("/tmp") / str(ingest_uuid)
-        temp_dir.mkdir(parents=True, exist_ok=True)
-        local_path = temp_dir / file_name
+        # Create a temporary directory that will be automatically cleaned up
+        with tempfile.TemporaryDirectory() as temp_dir:
+            local_path = Path(temp_dir) / file_name
 
-        # Download file from GCS using our utility
-        source_blob_name = f"{stage_dir}/{ingest_uuid}/{file_name}"
-        utils.gcp.download_file_from_bucket(
-            bucket_name=settings.BUCKET_NAME_PRIVATE,
-            source_blob_name=source_blob_name,
-            destination_file_name=local_path,
-        )
+            # Download file from GCS using our utility
+            source_blob_name = f"{stage_dir}/{file_name}"
+            utils.gcp.download_file_from_bucket(
+                bucket_name=settings.BUCKET_NAME_PRIVATE,
+                source_blob_name=source_blob_name,
+                destination_file_name=local_path,
+            )
 
-        try:
             cell_info_list = []
             for record in read_avro_records(local_path):
                 cell_info = models.CellInfo(
@@ -120,22 +118,16 @@ def fetch_cell_info(stage_dir: str, ingest_uuid: str, file_name: str) -> Sequenc
             logger.info(f"Fetched {len(cell_info_list)} CellInfo records from {source_blob_name}")
             return cell_info_list
 
-        finally:
-            # Clean up temporary file
-            local_path.unlink(missing_ok=True)
-            temp_dir.rmdir()
-
     except Exception as e:
-        logger.error(f"Error processing CellInfo records from {stage_dir}/{ingest_uuid}/{file_name}: {e}")
+        logger.error(f"Error processing CellInfo records from {stage_dir}/{file_name}: {e}")
         raise
 
 
-def fetch_feature_info(stage_dir: str, ingest_uuid: str, file_name: str) -> Sequence[models.CellFeatureInfo]:
+def fetch_feature_info(stage_dir: str, file_name: str) -> Sequence[models.CellFeatureInfo]:
     """
     Fetch FeatureInfo records from an Avro file in GCS.
 
-    :param stage_dir: Base staging directory path
-    :param ingest_uuid: UUID of the ingest process
+    :param stage_dir: Staging directory path containing the files
     :param file_name: Name of the Avro file
 
     :raise storage.exceptions.NotFound: if file doesn't exist in bucket
@@ -144,20 +136,18 @@ def fetch_feature_info(stage_dir: str, ingest_uuid: str, file_name: str) -> Sequ
     :return: A list of populated FeatureInfo models
     """
     try:
-        # Create temporary directory
-        temp_dir = Path("/tmp") / str(ingest_uuid)
-        temp_dir.mkdir(parents=True, exist_ok=True)
-        local_path = temp_dir / file_name
+        # Create a temporary directory that will be automatically cleaned up
+        with tempfile.TemporaryDirectory() as temp_dir:
+            local_path = Path(temp_dir) / file_name
 
-        # Download file from GCS using our utility
-        source_blob_name = f"{stage_dir}/{ingest_uuid}/{file_name}"
-        utils.gcp.download_file_from_bucket(
-            bucket_name=settings.BUCKET_NAME_PRIVATE,
-            source_blob_name=source_blob_name,
-            destination_file_name=local_path,
-        )
+            # Download file from GCS using our utility
+            source_blob_name = f"{stage_dir}/{file_name}"
+            utils.gcp.download_file_from_bucket(
+                bucket_name=settings.BUCKET_NAME_PRIVATE,
+                source_blob_name=source_blob_name,
+                destination_file_name=local_path,
+            )
 
-        try:
             feature_info_list = []
             for record in read_avro_records(local_path):
                 feature_info = models.CellFeatureInfo(
@@ -176,13 +166,8 @@ def fetch_feature_info(stage_dir: str, ingest_uuid: str, file_name: str) -> Sequ
             logger.info(f"Fetched {len(feature_info_list)} FeatureInfo records from {source_blob_name}")
             return feature_info_list
 
-        finally:
-            # Clean up temporary file
-            local_path.unlink(missing_ok=True)
-            temp_dir.rmdir()
-
     except Exception as e:
-        logger.error(f"Error processing FeatureInfo records from {stage_dir}/{ingest_uuid}/{file_name}: {e}")
+        logger.error(f"Error processing FeatureInfo records from {stage_dir}/{file_name}: {e}")
         raise
 
 
@@ -201,10 +186,12 @@ def ingest_files(stage_dir: str, ingest: models.IngestInfo) -> tuple[int, int]:
     with transaction.atomic():
         # Fetch records
         cell_infos = fetch_cell_info(
-            stage_dir=stage_dir, ingest_uuid=str(ingest.nexus_uuid), file_name=constants.INGEST_CELL_INFO_FILE_NAME
+            stage_dir=stage_dir,
+            file_name=constants.INGEST_CELL_INFO_FILE_NAME,
         )
         feature_infos = fetch_feature_info(
-            stage_dir=stage_dir, ingest_uuid=str(ingest.nexus_uuid), file_name=constants.INGEST_FEATURE_INFO_FILE_NAME
+            stage_dir=stage_dir,
+            file_name=constants.INGEST_FEATURE_INFO_FILE_NAME,
         )
 
         # Bulk insert into database

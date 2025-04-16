@@ -50,9 +50,9 @@ def ingest_data_to_bigquery_job(gcs_config_path: str):
         nexus_backend_api_url=params.nexus_backend_api_url,
         bigquery_dataset=params.bigquery_dataset,
     )
-    controller.ingest_data_to_bigquery(
+    controller.ingest_data_from_stage_dir(
         bucket_name=params.bucket_name,
-        bucket_stage_dir=params.ingest_bucket_path,
+        base_stage_dir=params.ingest_bucket_path,
     )
 
 

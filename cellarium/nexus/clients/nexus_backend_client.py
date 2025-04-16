@@ -166,19 +166,19 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
             batch_size=batch_size, reserve_model_type=ReserveIndexesModelType.FEATURE_INFO
         )
 
-    def ingest_from_avro(self, stage_dir: str, ingest_nexus_uuid: str) -> dict[str, int]:
+    def ingest_from_avro(self, stage_dir: str, ingest_id: int) -> dict[str, int]:
         """
         Trigger ingestion of CellInfo and FeatureInfo from Avro files.
 
         :param stage_dir: Base staging directory path where the Avro files are located
-        :param ingest_nexus_uuid: UUID of the ingest process
+        :param ingest_id: ID of the ingest process
 
         :raise HTTPError: if the request fails
         :raise ValueError: if the response is invalid
 
         :return: Dictionary containing counts of ingested records
         """
-        data = {"stage_dir": stage_dir, "ingest_nexus_uuid": ingest_nexus_uuid}
+        data = {"stage_dir": stage_dir, "ingest_id": ingest_id}
 
         api_out = self.post_json(endpoint=ApiEndpoints.INGEST_FROM_AVRO, data=data)
 

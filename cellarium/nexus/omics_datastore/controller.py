@@ -2,12 +2,16 @@
 Control and manage Nexus data operations.
 """
 
+import datetime
 import logging
 import os
 import pathlib
 import tempfile
-from datetime import datetime
+from pathlib import Path
 from typing import Any, Sequence
+
+import fastavro
+import smart_open
 
 from google.cloud import bigquery
 
@@ -147,7 +151,8 @@ class NexusDataController:
                 )
 
                 # Upload to staging bucket
-                ingest_stage_dir = f"{bucket_stage_dir}/{ingest_info_api_struct.nexus_uuid}"
+                # ingest_stage_dir = f"{bucket_stage_dir}/{ingest_info_api_struct.nexus_uuid}"
+                ingest_stage_dir = f"{bucket_stage_dir}"
                 utils.gcp.transfer_directory_to_bucket(
                     bucket_name=bucket_name, local_directory_path=local_output_dir, prefix=ingest_stage_dir
                 )
@@ -171,56 +176,96 @@ class NexusDataController:
         :param bucket_stage_dir: Directory in the bucket containing staged files
 
         :raise google.api_core.exceptions.GoogleAPIError: If ingestion fails
+        :raise Exception: If the ingest fails or status update fails
         """
-        self.bq_controller.ingest_data(
-            gcs_bucket_name=bucket_name,
-            gcs_stage_dir=bucket_stage_dir,
-        )
+        # Read ingest ID from avro file in GCS using smart_open
+        gcs_uri = f"gs://{bucket_name}/{bucket_stage_dir}/ingest-info.avro"
+        with smart_open.open(gcs_uri, 'rb') as f:
+            reader = fastavro.reader(f)
+            for record in reader:
+                ingest_id = record['id']
+                break
 
-    def create_ingest_files_and_ingest(
+        try:
+            self.bq_controller.ingest_data(
+                gcs_bucket_name=bucket_name,
+                gcs_stage_dir=bucket_stage_dir,
+            )
+            self.backend_client.ingest_from_avro(
+                stage_dir=bucket_stage_dir,
+                ingest_id=ingest_id,
+            )
+            self.backend_client.update_ingest_status(
+                ingest_id=ingest_id,
+                new_status="SUCCEEDED",
+                ingest_finish_timestamp=datetime.datetime.now(),
+            )
+        except Exception as e:
+            self.backend_client.update_ingest_status(
+                ingest_id=ingest_id,
+                new_status="FAILED",
+                ingest_finish_timestamp=datetime.datetime.now(),
+            )
+            # Re-raise the exception to stop execution
+            raise
+
+    def ingest_data_from_stage_dir(
         self,
         *,
-        input_file_path: str,
-        tag: str | None,
-        bigquery_dataset: str,
         bucket_name: str,
-        bucket_stage_dir: str,
-        column_mapping: dict[str, Any] | None = None,
+        base_stage_dir: str,
     ) -> None:
         """
-        Create ingest files and perform ingestion.
+        Validate and ingest data from all subdirectories under the base staging directory.
+        Each subdirectory must contain all necessary files for ingestion.
 
-        :param input_file_path: Path to input file
-        :param tag: Optional tag for the ingest
-        :param bigquery_dataset: Name of BigQuery dataset
-        :param bucket_name: Name of GCS bucket
-        :param bucket_stage_dir: Staging directory in bucket
-        :param column_mapping: Optional dictionary containing obs and var column mappings
+        :param bucket_name: GCS bucket name containing the data
+        :param base_stage_dir: Base directory containing timestamped subdirectories with staged files
 
-        :raise Exception: If ingestion fails
+        :raise ValueError: If any subdirectory is missing required files
+        :raise google.api_core.exceptions.GoogleAPIError: If ingestion fails
         """
-        ingest_id, ingest_uuid = self.create_ingest_files(
-            input_file_path=input_file_path,
-            tag=tag,
-            bigquery_dataset=bigquery_dataset,
-            bucket_name=bucket_name,
-            bucket_stage_dir=bucket_stage_dir,
-            column_mapping=column_mapping,
-        )
+        # List all blobs under base_stage_dir
+        all_blobs = utils.gcp.list_blobs(bucket_name=bucket_name, prefix=f"{base_stage_dir}/")
 
-        self.ingest_data_to_bigquery(
-            bucket_name=bucket_name,
-            ingest_uuid=ingest_uuid,
-            bucket_stage_dir=bucket_stage_dir,
-        )
+        # Get unique subdirectories
+        subdirs = {
+            os.path.dirname(blob.name).split("/")[-1]
+            for blob in all_blobs
+            if os.path.dirname(blob.name) != base_stage_dir
+        }
 
-        self.backend_client.ingest_from_avro(stage_dir=bucket_stage_dir, ingest_nexus_uuid=ingest_uuid)
+        if not subdirs:
+            raise ValueError(f"No subdirectories found in {base_stage_dir}")
 
-        self.backend_client.update_ingest_status(
-            ingest_id=ingest_id,
-            new_status="SUCCEEDED",
-            ingest_finish_timestamp=datetime.now(),
-        )
+        # Required base files that must be present in each subdirectory
+        required_base_files = {"ingest-info.avro", "cell-info.avro", "feature-info.avro"}
+
+        # Validate each subdirectory
+        for subdir in subdirs:
+            subdir_path = f"{base_stage_dir}/{subdir}"
+            subdir_blobs = utils.gcp.list_blobs(bucket_name=bucket_name, prefix=f"{subdir_path}/")
+            subdir_files = {os.path.basename(blob.name) for blob in subdir_blobs}
+
+            # Check for required base files
+            missing_base_files = required_base_files - subdir_files
+            if missing_base_files:
+                raise ValueError(
+                    f"Subdirectory {subdir_path} is missing required files: {', '.join(missing_base_files)}"
+                )
+
+            # Check for at least one raw-counts CSV file
+            if not any(f.startswith("raw-counts-") and f.endswith(".csv") for f in subdir_files):
+                raise ValueError(f"Subdirectory {subdir_path} is missing raw-counts CSV files")
+
+            # If validation passes, ingest the data from this subdirectory
+            logger.info(f"Ingesting data from {subdir_path}")
+            self.ingest_data_to_bigquery(
+                bucket_name=bucket_name,
+                bucket_stage_dir=subdir_path,
+            )
+
+        logger.info(f"Successfully ingested data from all {len(subdirs)} subdirectories")
 
     def create_bigquery_dataset(self, *, bigquery_dataset: str, location: str = "US") -> str:
         """

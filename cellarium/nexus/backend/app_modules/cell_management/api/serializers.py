@@ -122,7 +122,7 @@ class ReserveIndexesSerializer(serializers.Serializer):
 
 class IngestFromAvroSerializer(serializers.Serializer):
     stage_dir = serializers.CharField(help_text="Base staging directory path")
-    ingest_nexus_uuid = serializers.UUIDField(help_text="UUID of the ingest process")
+    ingest_id = serializers.IntegerField(help_text="ID of the ingest process")
 
     def validate(self, data):
         """
@@ -135,12 +135,12 @@ class IngestFromAvroSerializer(serializers.Serializer):
         :return: Validated data
         """
         try:
-            ingest = models.IngestInfo.objects.get(nexus_uuid=data["ingest_nexus_uuid"])
+            ingest = models.IngestInfo.objects.get(id=data["ingest_id"])
             if ingest.status != models.IngestInfo.STATUS_STARTED:
                 raise ValidationError(
-                    f"Ingest with UUID {data['ingest_nexus_uuid']} is in {ingest.status} state. Expected {models.IngestInfo.STATUS_STARTED}"
+                    f"Ingest with ID {data['ingest_id']} is in {ingest.status} state. Expected {models.IngestInfo.STATUS_STARTED}"
                 )
             data["ingest"] = ingest
             return data
         except models.IngestInfo.DoesNotExist:
-            raise ValidationError(f"Ingest with UUID {data['ingest_nexus_uuid']} does not exist")
+            raise ValidationError(f"Ingest with ID {data['ingest_id']} does not exist")

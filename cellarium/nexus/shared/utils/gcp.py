@@ -96,10 +96,13 @@ def upload_many_blobs_with_transfer_manager(bucket_name: str, file_paths: list[s
     bucket = storage_client.bucket(bucket_name)
 
     filenames_blob_pairs = []
+    
+    # Ensure prefix has a trailing slash
+    if not prefix.endswith('/'):
+        prefix = f"{prefix}/"
 
     for file_path in file_paths:
         file_name = file_path.split("/")[-1]
-        # Prefix already has a trailing slash from workflows_configs.dump_configs_to_bucket
         blob = storage.Blob(bucket=bucket, name=f"{prefix}{file_name}")
         filenames_blob_pairs.append((file_path, blob))
 
@@ -136,6 +139,11 @@ def transfer_directory_to_bucket(
     """
     directory = pathlib.Path(local_directory_path)
     file_paths = [str(file) for file in directory.rglob("*") if file.is_file()]
+    
+    # Ensure prefix has a trailing slash
+    if not prefix.endswith('/'):
+        prefix = f"{prefix}/"
+        
     upload_many_blobs_with_transfer_manager(
         bucket_name=bucket_name, file_paths=file_paths, prefix=prefix, workers=max_workers
     )
