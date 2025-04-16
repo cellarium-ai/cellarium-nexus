@@ -31,7 +31,6 @@ def dsl_component_job(
                 **custom_job_params,
             )(*args, **kwargs)
 
-            # print(f"Created job type: {type(job)}")  # Debugging line
             return job
 
         return wrapper
