@@ -15,6 +15,7 @@ class CreateIngestFiles(BaseModel):
     :param ingest_bucket_path: Path within bucket for staging files
     :param metadata_columns: Optional dictionary containing obs and var column mappings
     """
+
     project_id: str
     nexus_backend_api_url: str
     bigquery_dataset: str
@@ -35,6 +36,7 @@ class IngestDataToBigQuery(BaseModel):
     :param bucket_name: GCS bucket name containing the data
     :param ingest_bucket_path: Path within bucket containing staged files
     """
+
     project_id: str
     nexus_backend_api_url: str
     bigquery_dataset: str

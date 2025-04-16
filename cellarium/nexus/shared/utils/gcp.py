@@ -79,7 +79,9 @@ def list_blobs(bucket_name: str, prefix: str | None = None) -> list[storage.Blob
     return storage_client.list_blobs(bucket_name, prefix=prefix)
 
 
-def upload_many_blobs_with_transfer_manager(bucket_name: str, file_paths: list[str], prefix: str, workers: int = 8) -> None:
+def upload_many_blobs_with_transfer_manager(
+    bucket_name: str, file_paths: list[str], prefix: str, workers: int = 8
+) -> None:
     """
     Upload every file in a list to a bucket, concurrently in a process pool.
 
@@ -91,14 +93,14 @@ def upload_many_blobs_with_transfer_manager(bucket_name: str, file_paths: list[s
     :raise: google.cloud.exceptions.GoogleCloudError - If there's an error communicating with Google Cloud Storage.
     :raise: IOError - If there's an error reading from the local files.
     """
-    
+
     storage_client = storage.Client()
     bucket = storage_client.bucket(bucket_name)
 
     filenames_blob_pairs = []
-    
+
     # Ensure prefix has a trailing slash
-    if not prefix.endswith('/'):
+    if not prefix.endswith("/"):
         prefix = f"{prefix}/"
 
     for file_path in file_paths:
@@ -139,11 +141,11 @@ def transfer_directory_to_bucket(
     """
     directory = pathlib.Path(local_directory_path)
     file_paths = [str(file) for file in directory.rglob("*") if file.is_file()]
-    
+
     # Ensure prefix has a trailing slash
-    if not prefix.endswith('/'):
+    if not prefix.endswith("/"):
         prefix = f"{prefix}/"
-        
+
     upload_many_blobs_with_transfer_manager(
         bucket_name=bucket_name, file_paths=file_paths, prefix=prefix, workers=max_workers
     )

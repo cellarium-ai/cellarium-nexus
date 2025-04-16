@@ -60,7 +60,7 @@ def submit_pipeline(
                            service account will be used.
     :param pipeline_root_path: GCS path to use as the pipeline root directory. If None, the default
                              Vertex AI Pipelines location will be used.
-    
+
     :raise: google.api_core.exceptions.GoogleAPIError: If pipeline submission fails.
     """
     temp_file = tempfile.NamedTemporaryFile(suffix=".yaml")
@@ -75,15 +75,15 @@ def submit_pipeline(
         "template_path": temp_file.name,
         "parameter_values": pipeline_kwargs,
     }
-    
+
     if pipeline_root_path:
         job_args["pipeline_root"] = pipeline_root_path
-        
+
     job = aiplatform.PipelineJob(**job_args)
 
     submit_kwargs = {}
     if service_account:
         submit_kwargs["service_account"] = service_account
-    
+
     job.submit(**submit_kwargs)
     temp_file.close()

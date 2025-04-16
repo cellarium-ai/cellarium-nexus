@@ -180,10 +180,10 @@ class NexusDataController:
         """
         # Read ingest ID from avro file in GCS using smart_open
         gcs_uri = f"gs://{bucket_name}/{bucket_stage_dir}/ingest-info.avro"
-        with smart_open.open(gcs_uri, 'rb') as f:
+        with smart_open.open(gcs_uri, "rb") as f:
             reader = fastavro.reader(f)
             for record in reader:
-                ingest_id = record['id']
+                ingest_id = record["id"]
                 break
 
         try:

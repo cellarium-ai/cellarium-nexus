@@ -84,7 +84,9 @@ class DataExtractor:
         )
         sql = bq_sql.render(str(GET_FEATURES_TEMPLATE), template_data)
         result = self.execute_query(sql=sql)
-        return [schemas.FeatureSchema(id=row["id"], symbol=row["symbol"], ensemble_id=row["ensemble_id"]) for row in result]
+        return [
+            schemas.FeatureSchema(id=row["id"], symbol=row["symbol"], ensemble_id=row["ensemble_id"]) for row in result
+        ]
 
     def get_cells_in_bin_range(
         self,

@@ -23,9 +23,6 @@ CELL_INFO_TEMPLATE = TEMPLATE_DIR / "prepare_cell_info.sql.mako"
 DROP_CELL_INFO_RAND_TEMPLATE = TEMPLATE_DIR / "drop_prepare_cell_info_randomized.sql.mako"
 
 
-
-
-
 class ExtractTablePreparer:
     """
     Prepares BigQuery tables for efficient data extraction.
