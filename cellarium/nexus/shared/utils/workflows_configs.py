@@ -6,6 +6,7 @@ import datetime
 import os
 import tempfile
 from typing import TypeVar
+import secrets
 
 import yaml
 from pydantic import BaseModel
@@ -74,7 +75,7 @@ def dump_configs_to_bucket(
         for config in configs:
             model_name = config.__class__.__name__.lower()
             
-            filename = f"{model_name}_{timestamp}.yaml"
+            filename = f"{model_name}_{timestamp}_{secrets.token_hex(6)}.yaml"
             local_path = os.path.join(temp_dir, filename)
             
             with open(local_path, "w") as f:

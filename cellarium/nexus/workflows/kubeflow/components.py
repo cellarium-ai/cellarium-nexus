@@ -3,7 +3,13 @@ from cellarium.nexus.workflows.kubeflow.utils import job
 BASE_IMAGE = "us-central1-docker.pkg.dev/dsp-cellarium/nexus/nexus-pipelines:latest"
 SERVICE_ACCOUNT = "vertex-pipelines-sa@dsp-cellarium.iam.gserviceaccount.com"
 
-@job.dsl_component_job(base_image=BASE_IMAGE, machine_type="e2-standard-4", display_name="create_ingest_files", service_account=SERVICE_ACCOUNT)
+
+@job.dsl_component_job(
+    base_image=BASE_IMAGE,
+    machine_type="e2-standard-4",
+    display_name="create_ingest_files",
+    service_account=SERVICE_ACCOUNT,
+)
 def create_ingest_files_job(gcs_config_path: str):
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import CreateIngestFiles
@@ -26,7 +32,12 @@ def create_ingest_files_job(gcs_config_path: str):
     )
 
 
-@job.dsl_component_job(base_image=BASE_IMAGE, machine_type="e2-standard-16", display_name="ingest_data_to_bigquery", service_account=SERVICE_ACCOUNT)
+@job.dsl_component_job(
+    base_image=BASE_IMAGE,
+    machine_type="e2-standard-16",
+    display_name="ingest_data_to_bigquery",
+    service_account=SERVICE_ACCOUNT,
+)
 def ingest_data_to_bigquery_job(gcs_config_path: str):
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import IngestDataToBigQuery
@@ -45,7 +56,9 @@ def ingest_data_to_bigquery_job(gcs_config_path: str):
     )
 
 
-@job.dsl_component_job(base_image=BASE_IMAGE, machine_type="e2-standard-4", display_name="prepare_extract", service_account=SERVICE_ACCOUNT)
+@job.dsl_component_job(
+    base_image=BASE_IMAGE, machine_type="e2-standard-4", display_name="prepare_extract", service_account=SERVICE_ACCOUNT
+)
 def prepare_extract_job(gcs_config_path: str):
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import BQOpsPrepareExtract
@@ -69,7 +82,9 @@ def prepare_extract_job(gcs_config_path: str):
     )
 
 
-@job.dsl_component_job(base_image=BASE_IMAGE, machine_type="e2-standard-32", display_name="extract", service_account=SERVICE_ACCOUNT)
+@job.dsl_component_job(
+    base_image=BASE_IMAGE, machine_type="e2-standard-32", display_name="extract", service_account=SERVICE_ACCOUNT
+)
 def extract_job(gcs_config_path: str):
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import BQOpsExtract
