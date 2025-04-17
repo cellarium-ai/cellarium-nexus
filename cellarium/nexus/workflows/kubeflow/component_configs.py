@@ -50,7 +50,7 @@ class BQOpsPrepareExtract(BaseModel):
     bigquery_dataset: str
     extract_table_prefix: str
     features: list[schemas.FeatureSchema]
-    filters: dict[str, str]
+    filters: dict[str, Any]
     obs_columns: list[str]
     extract_bin_size: int
     bucket_name: str
