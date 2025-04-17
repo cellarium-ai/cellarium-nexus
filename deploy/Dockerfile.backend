@@ -2,7 +2,7 @@ FROM python:3.10-slim-bullseye
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    DJANGO_SETTINGS_MODULE=cellarium.nexus.backend.settings
+    DJANGO_SETTINGS_MODULE=cellarium.nexus.backend.application.settings
 
 WORKDIR /app
 
@@ -29,6 +29,5 @@ ENV PYTHONPATH=/app:/app/cellarium:/app/cellarium/nexus
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["gunicorn", "--bind", "0.0.0.0:8080", \
      "--workers", "3", "--timeout", "120", \
-     "--log-level", "info", "--error-logfile", "-", \
-     "--capture-output", "--chdir", "/app", \
+     "--log-level", "info", \
      "cellarium.nexus.backend.application.wsgi:application"]
