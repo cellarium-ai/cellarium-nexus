@@ -163,6 +163,18 @@ class NexusDataController:
                 self.__update_ingest_info_with_error(ingest_id=ingest_info_api_struct.id, error_message=str(e))
                 raise
 
+    def _read_gcs_avro_file(self, gcs_uri: str) -> list[dict]:
+        """
+        Read records from an Avro file in GCS.
+
+        :param gcs_uri: Full GCS URI to the Avro file
+        :return: List of records as dictionaries
+        :raise IOError: If file cannot be read
+        """
+        with smart_open.open(gcs_uri, "rb") as f:
+            avro_reader = fastavro.reader(f)
+            return [record for record in avro_reader]
+
     def ingest_data_to_bigquery(
         self,
         *,
@@ -178,13 +190,18 @@ class NexusDataController:
         :raise google.api_core.exceptions.GoogleAPIError: If ingestion fails
         :raise Exception: If the ingest fails or status update fails
         """
-        # Read ingest ID from avro file in GCS using smart_open
+        # Read ingest ID from avro file in GCS
         gcs_uri = f"gs://{bucket_name}/{bucket_stage_dir}/ingest-info.avro"
-        with smart_open.open(gcs_uri, "rb") as f:
-            reader = fastavro.reader(f)
-            for record in reader:
-                ingest_id = record["id"]
-                break
+        try:
+            records = self._read_gcs_avro_file(gcs_uri)
+            if not records:
+                raise ValueError("No records found in ingest-info.avro")
+            if "id" not in records[0]:
+                raise ValueError("No 'id' field found in ingest-info.avro record")
+            ingest_id = records[0]["id"]
+        except (IOError, ValueError) as e:
+            logger.error(f"Error reading ingest ID from {gcs_uri}: {e}")
+            raise
 
         try:
             self.bq_controller.ingest_data(
