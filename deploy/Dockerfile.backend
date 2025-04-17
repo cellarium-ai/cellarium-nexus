@@ -31,4 +31,4 @@ CMD ["gunicorn", "--bind", "0.0.0.0:8080", \
      "--workers", "3", "--timeout", "120", \
      "--log-level", "info", "--error-logfile", "-", \
      "--capture-output", "--chdir", "/app", \
-     "cellarium.nexus.backend.wsgi:application"]
+     "cellarium.nexus.backend.application.wsgi:application"]

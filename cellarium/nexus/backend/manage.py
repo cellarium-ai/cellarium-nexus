@@ -6,7 +6,7 @@ import sys
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault(key="DJANGO_SETTINGS_MODULE", value="nexus.backend.settings")
+    os.environ.setdefault(key="DJANGO_SETTINGS_MODULE", value="cellarium.nexus.backend.application.settings")
 
     try:
         from django.core.management import execute_from_command_line

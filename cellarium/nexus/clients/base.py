@@ -21,7 +21,7 @@ class BaseAPIHTTPClient:
 
     def _get_endpoint_url(self, endpoint: str) -> str:
         """
-        Configure a specific method endpoint from backend url and endpoint
+        Configure a specific method endpoint from cellarium.nexus.backend url and endpoint
 
         :param endpoint: Endpoint string without a leading slash
         :return: Full url with backend domains/subdomains and endpoint joined

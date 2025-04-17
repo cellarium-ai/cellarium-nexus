@@ -4,7 +4,7 @@ import typing as t
 import functools
 from kfp import compiler, dsl
 from kfp.components import BaseComponent
-from kfp.dsl.python_component import PythonComponent
+
 from google_cloud_pipeline_components.v1.custom_job import create_custom_training_job_from_component
 from google.cloud import aiplatform
 

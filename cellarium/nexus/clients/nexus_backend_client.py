@@ -12,13 +12,11 @@ from nexus.clients.base import BaseAPIHTTPClient
 
 
 class ApiEndpoints:
-    CREATE_INGEST_FILE: str = "api/cell_management/ingest/create"
-    UPDATE_INGEST_FILE_INFO: str = "api/cell_management/ingest/{id}"
-    CREATE_CELL_INFO_BULK: str = "api/cell_management/cell-info/create-bulk"
-    CREATE_FEATURE_INFO_BULK: str = "api/cell_management/feature-info/create-bulk"
-    CELL_INFO_RESERVE_INDEXES: str = "api/cell_management/cell-info/reserve-indexes"
-    FEATURE_INFO_RESERVE_INDEXES: str = "api/cell_management/feature-info/reserve-indexes"
-    INGEST_FROM_AVRO: str = "api/cell_management/ingest-from-avro/"
+    CREATE_INGEST_FILE: str = "api/ingest-management/ingest/create"
+    UPDATE_INGEST_FILE_INFO: str = "api/ingest-management/ingest/{id}"
+    CELL_INFO_RESERVE_INDEXES: str = "api/ingest-management/reserve-indexes/cell-info/"
+    FEATURE_INFO_RESERVE_INDEXES: str = "api/ingest-management/reserve-indexes/feature-info/"
+    INGEST_FROM_AVRO: str = "api/ingest-management/ingest-from-avro/"
     REGISTER_CURRICULUM: str = "api/curriculum/curriculums/"
 
 
@@ -86,30 +84,6 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
 
         api_out = self.patch_json(endpoint=endpoint, data=data)
         return IngestInfoAPISchema(**api_out)
-
-    def create_cell_info_bulk(self, cell_info_api_schema_objects: list[CellInfoAPISchema]) -> None:
-        """
-        Create multiple cell info records in bulk.
-
-        :param cell_info_api_schema_objects: List of cell info objects to create
-
-        :raise HTTPError: if the request fails
-        :raise ValueError: if the request data is invalid
-        """
-        data = [obj.model_dump() for obj in cell_info_api_schema_objects]
-        _ = self.post_json(endpoint=ApiEndpoints.CREATE_CELL_INFO_BULK, data=data)
-
-    def create_feature_info_bulk(self, feature_info_api_schema_objects: list[FeatureInfoAPISchema]) -> None:
-        """
-        Create multiple feature info records in bulk.
-
-        :param feature_info_api_schema_objects: List of feature info objects to create
-
-        :raise HTTPError: if the request fails
-        :raise ValueError: if the request data is invalid
-        """
-        data = [obj.model_dump() for obj in feature_info_api_schema_objects]
-        _ = self.post_json(endpoint=ApiEndpoints.CREATE_CELL_INFO_BULK, data=data)
 
     def __reserve_indexes_for_model(
         self, batch_size: int, reserve_model_type: ReserveIndexesModelType
