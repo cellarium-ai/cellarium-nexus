@@ -27,7 +27,7 @@ print_usage() {
 REPO_LOCATION="us-central1"
 BACKEND_SA_NAME="cellarium-backend-sa"
 ENV_SECRET_NAME="cellarium-nexus"
-ENV_FILE=".env"
+REMOTE_ENV_FILE="/app/conf/.env"
 SERVICE_NAME="cellarium-nexus"
 MIN_INSTANCES=1
 MAX_INSTANCES=10
@@ -78,8 +78,7 @@ fi
 echo -e "${GREEN}Welcome to Cellarium Nexus Cloud Run Deployment Script${NC}\n"
 echo -e "${YELLOW}This script will deploy Cellarium Nexus to Google Cloud Run.${NC}"
 echo -e "${YELLOW}You will be prompted for necessary configuration values.${NC}\n"
-
-echo -e "\n${YELLOW}Creating Cloud Run job for Django deployment preparation...${NC}"
+echo -e "${YELLOW}Creating Cloud Run job for Django deployment preparation...${NC}"
 
 # Define job name
 JOB_NAME="django-prepare-deploy"
@@ -94,9 +93,10 @@ if gcloud run jobs describe "${JOB_NAME}" --region="${REPO_LOCATION}" --project=
         --project="${PROJECT_ID}" \
         --service-account="${BACKEND_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
         --set-cloudsql-instances="${SQL_CONNECTION_NAME}" \
-        --set-secrets="/app/conf/.env=${ENV_SECRET_NAME}:latest" \
+        --set-secrets="${REMOTE_ENV_FILE}=${ENV_SECRET_NAME}:latest" \
         --command="/bin/bash" \
-        --args="-c,/app/deploy/backend/django_prepare_deploy.sh --env-file /app/conf/.env"
+        --args="-c,/app/deploy/backend/django_prepare_deploy.sh --env-file ${REMOTE_ENV_FILE}"
+    check_command
 else
     echo -e "${YELLOW}Creating new Cloud Run job...${NC}"
     # Create a new job
@@ -106,11 +106,11 @@ else
         --project="${PROJECT_ID}" \
         --service-account="${BACKEND_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
         --set-cloudsql-instances="${SQL_CONNECTION_NAME}" \
-        --set-secrets="/app/conf/.env=${ENV_SECRET_NAME}:latest" \
+        --set-secrets="${REMOTE_ENV_FILE}=${ENV_SECRET_NAME}:latest" \
         --command="/bin/bash" \
-        --args="-c,/app/deploy/backend/django_prepare_deploy.sh --env-file /app/conf/.env"
+        --args="-c,/app/deploy/backend/django_prepare_deploy.sh --env-file ${REMOTE_ENV_FILE}"
+    check_command
 fi
-check_command
 
 echo -e "\n${YELLOW}Executing Django deployment preparation job...${NC}"
 gcloud run jobs execute "${JOB_NAME}" \
@@ -134,10 +134,10 @@ gcloud run deploy "${SERVICE_NAME}" \
     --cpu="${CPU}" \
     --memory="${MEMORY}Gi" \
     --timeout="${TIMEOUT}s" \
-    --port=8000 \
+    --port=8080 \
     --service-account="${BACKEND_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
     --add-cloudsql-instances="${SQL_CONNECTION_NAME}" \
-    --set-secrets="/app/conf/.env=${ENV_SECRET_NAME}:latest" \
+    --set-secrets="${REMOTE_ENV_FILE}=${ENV_SECRET_NAME}:latest" \
     --allow-unauthenticated
 check_command
 
@@ -148,37 +148,10 @@ SERVICE_URL=$(gcloud run services describe "${SERVICE_NAME}" \
     --project="${PROJECT_ID}" \
     --format='value(status.url)')
 
-# Update local env file with SITE_URL
-echo "export SITE_URL=\"${SERVICE_URL}\"" >> "$ENV_FILE"
-
-# Create temporary env file for secret update
-tmp_secret="/tmp/env_secret_$$"
-while IFS= read -r line; do
-    # Remove 'export' and keep the rest
-    clean_line="${line#export }"
-    echo "${clean_line}" >> "$tmp_secret"
-done < "$ENV_FILE"
-
-# Add SITE_URL to secret manager
-echo "SITE_URL=${SERVICE_URL}" >> "$tmp_secret"
-
-# Update secret with new environment variables
-echo -e "\n${YELLOW}Updating environment secret with SITE_URL...${NC}"
-gcloud secrets versions add "${ENV_SECRET_NAME}" \
-    --data-file="${tmp_secret}" \
-    --project="${PROJECT_ID}"
-check_command
-
-# Clean up temporary file
-rm "$tmp_secret"
-
-# Note: We don't need to update the Django deployment preparation job with SITE_URL
-# as the job has already completed its tasks before we get the service URL
-
 echo -e "\n${GREEN}Deployment completed successfully!${NC}"
 echo -e "${YELLOW}Service URL:${NC} ${SERVICE_URL}"
 echo -e "\n${YELLOW}Next steps:${NC}"
 echo -e "1. Access your application at: ${SERVICE_URL}"
 echo -e "2. Monitor the service in Cloud Console"
 echo -e "3. Set up custom domain if needed"
-echo -e "\nLocal environment file and Secret Manager have been updated with SITE_URL"
+echo -e "\nLocal env & secret updates are handled externally"

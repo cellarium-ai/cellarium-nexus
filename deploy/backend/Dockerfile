@@ -13,9 +13,8 @@ RUN apt-get update && apt-get install -y gcc python3-dev libpq-dev \
 # copy code and install it
 COPY . /app
 
-# Copy entrypoint script and make it executable
-COPY deploy/backend/docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+# Make entrypoint script executable in its original path
+RUN chmod +x deploy/backend/docker-entrypoint.sh
 
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
  && pip install --no-cache-dir -r requirements/backend.txt \
@@ -26,4 +25,4 @@ EXPOSE 8080
 
 ENV PYTHONPATH=/app:/app/cellarium:/app/cellarium/nexus
 
-ENTRYPOINT ["docker-entrypoint.sh"]
+ENTRYPOINT ["deploy/backend/docker-entrypoint.sh"]

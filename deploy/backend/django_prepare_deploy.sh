@@ -2,11 +2,15 @@
 
 set -e
 
-# Color codes for better readability
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+# Color codes (enable only if output is a TTY)
+if [ -t 1 ]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    NC='\033[0m'
+else
+    RED=''; GREEN=''; YELLOW=''; NC=''
+fi
 
 # Function to check command status
 check_command() {
