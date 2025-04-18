@@ -226,63 +226,63 @@ class NexusDataController:
             # Re-raise the exception to stop execution
             raise
 
-    def ingest_data_from_stage_dir(
-        self,
-        *,
-        bucket_name: str,
-        base_stage_dir: str,
-    ) -> None:
-        """
-        Validate and ingest data from all subdirectories under the base staging directory.
-        Each subdirectory must contain all necessary files for ingestion.
+    # def ingest_data_from_stage_dir(
+    #     self,
+    #     *,
+    #     bucket_name: str,
+    #     base_stage_dir: str,
+    # ) -> None:
+    #     """
+    #     Validate and ingest data from all subdirectories under the base staging directory.
+    #     Each subdirectory must contain all necessary files for ingestion.
 
-        :param bucket_name: GCS bucket name containing the data
-        :param base_stage_dir: Base directory containing timestamped subdirectories with staged files
+    #     :param bucket_name: GCS bucket name containing the data
+    #     :param base_stage_dir: Base directory containing timestamped subdirectories with staged files
 
-        :raise ValueError: If any subdirectory is missing required files
-        :raise google.api_core.exceptions.GoogleAPIError: If ingestion fails
-        """
-        # List all blobs under base_stage_dir
-        all_blobs = utils.gcp.list_blobs(bucket_name=bucket_name, prefix=f"{base_stage_dir}/")
+    #     :raise ValueError: If any subdirectory is missing required files
+    #     :raise google.api_core.exceptions.GoogleAPIError: If ingestion fails
+    #     """
+    #     # List all blobs under base_stage_dir
+    #     all_blobs = utils.gcp.list_blobs(bucket_name=bucket_name, prefix=f"{base_stage_dir}/")
 
-        # Get unique subdirectories
-        subdirs = {
-            os.path.dirname(blob.name).split("/")[-1]
-            for blob in all_blobs
-            if os.path.dirname(blob.name) != base_stage_dir
-        }
+    #     # Get unique subdirectories
+    #     subdirs = {
+    #         os.path.dirname(blob.name).split("/")[-1]
+    #         for blob in all_blobs
+    #         if os.path.dirname(blob.name) != base_stage_dir
+    #     }
 
-        if not subdirs:
-            raise ValueError(f"No subdirectories found in {base_stage_dir}")
+    #     if not subdirs:
+    #         raise ValueError(f"No subdirectories found in {base_stage_dir}")
 
-        # Required base files that must be present in each subdirectory
-        required_base_files = {"ingest-info.avro", "cell-info.avro", "feature-info.avro"}
+    #     # Required base files that must be present in each subdirectory
+    #     required_base_files = {"ingest-info.avro", "cell-info.avro", "feature-info.avro"}
 
-        # Validate each subdirectory
-        for subdir in subdirs:
-            subdir_path = f"{base_stage_dir}/{subdir}"
-            subdir_blobs = utils.gcp.list_blobs(bucket_name=bucket_name, prefix=f"{subdir_path}/")
-            subdir_files = {os.path.basename(blob.name) for blob in subdir_blobs}
+    #     # Validate each subdirectory
+    #     for subdir in subdirs:
+    #         subdir_path = f"{base_stage_dir}/{subdir}"
+    #         subdir_blobs = utils.gcp.list_blobs(bucket_name=bucket_name, prefix=f"{subdir_path}/")
+    #         subdir_files = {os.path.basename(blob.name) for blob in subdir_blobs}
 
-            # Check for required base files
-            missing_base_files = required_base_files - subdir_files
-            if missing_base_files:
-                raise ValueError(
-                    f"Subdirectory {subdir_path} is missing required files: {', '.join(missing_base_files)}"
-                )
+    #         # Check for required base files
+    #         missing_base_files = required_base_files - subdir_files
+    #         if missing_base_files:
+    #             raise ValueError(
+    #                 f"Subdirectory {subdir_path} is missing required files: {', '.join(missing_base_files)}"
+    #             )
 
-            # Check for at least one raw-counts CSV file
-            if not any(f.startswith("raw-counts-") and f.endswith(".csv") for f in subdir_files):
-                raise ValueError(f"Subdirectory {subdir_path} is missing raw-counts CSV files")
+    #         # Check for at least one raw-counts CSV file
+    #         if not any(f.startswith("raw-counts-") and f.endswith(".csv") for f in subdir_files):
+    #             raise ValueError(f"Subdirectory {subdir_path} is missing raw-counts CSV files")
 
-            # If validation passes, ingest the data from this subdirectory
-            logger.info(f"Ingesting data from {subdir_path}")
-            self.ingest_data_to_bigquery(
-                bucket_name=bucket_name,
-                bucket_stage_dir=subdir_path,
-            )
+    #         # If validation passes, ingest the data from this subdirectory
+    #         logger.info(f"Ingesting data from {subdir_path}")
+    #         self.ingest_data_to_bigquery(
+    #             bucket_name=bucket_name,
+    #             bucket_stage_dir=subdir_path,
+    #         )
 
-        logger.info(f"Successfully ingested data from all {len(subdirs)} subdirectories")
+    #     logger.info(f"Successfully ingested data from all {len(subdirs)} subdirectories")
 
     def create_bigquery_dataset(self, *, bigquery_dataset: str, location: str = "US") -> str:
         """

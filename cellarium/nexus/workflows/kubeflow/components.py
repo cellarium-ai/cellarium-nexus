@@ -1,6 +1,6 @@
 from cellarium.nexus.workflows.kubeflow.utils import job
 
-BASE_IMAGE = "us-central1-docker.pkg.dev/dsp-cellarium/nexus/nexus-pipelines:latest"
+BASE_IMAGE = "us-central1-docker.pkg.dev/dsp-cellarium/nexus/nexus-workflows:latest"
 SERVICE_ACCOUNT = "vertex-pipelines-sa@dsp-cellarium.iam.gserviceaccount.com"
 
 
@@ -12,10 +12,10 @@ SERVICE_ACCOUNT = "vertex-pipelines-sa@dsp-cellarium.iam.gserviceaccount.com"
 )
 def create_ingest_files_job(gcs_config_path: str):
     from cellarium.nexus.shared import utils
-    from cellarium.nexus.workflows.kubeflow.component_configs import CreateIngestFiles
+    from cellarium.nexus.workflows.kubeflow.component_configs import IngestTaskConfig
     from cellarium.nexus.omics_datastore.controller import NexusDataController
 
-    params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=CreateIngestFiles)
+    params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=IngestTaskConfig)
 
     controller = NexusDataController(
         project_id=params.project_id,
@@ -40,19 +40,19 @@ def create_ingest_files_job(gcs_config_path: str):
 )
 def ingest_data_to_bigquery_job(gcs_config_path: str):
     from cellarium.nexus.shared import utils
-    from cellarium.nexus.workflows.kubeflow.component_configs import IngestDataToBigQuery
+    from cellarium.nexus.workflows.kubeflow.component_configs import IngestTaskConfig
     from cellarium.nexus.omics_datastore.controller import NexusDataController
 
-    params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=IngestDataToBigQuery)
+    params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=IngestTaskConfig)
 
     controller = NexusDataController(
         project_id=params.project_id,
         nexus_backend_api_url=params.nexus_backend_api_url,
         bigquery_dataset=params.bigquery_dataset,
     )
-    controller.ingest_data_from_stage_dir(
+    controller.ingest_data_to_bigquery(
         bucket_name=params.bucket_name,
-        base_stage_dir=params.ingest_bucket_path,
+        bucket_stage_dir=params.ingest_bucket_path,
     )
 
 

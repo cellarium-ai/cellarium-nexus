@@ -3,19 +3,20 @@ from typing import Dict, Any, Optional
 from cellarium.nexus.shared import schemas
 
 
-class CreateIngestFiles(BaseModel):
+class IngestTaskConfig(BaseModel):
     """
-    Configuration for the create_ingest_files job.
+    Combined configuration for a single create_ingest_files and
+    ingest_data_to_bigquery task pair.
 
     :param project_id: GCP project ID
     :param nexus_backend_api_url: URL of the Nexus backend API
     :param bigquery_dataset: BigQuery dataset name
-    :param data_source_path: Path to the input file
+    :param data_source_path: Path to the input file for creation
     :param bucket_name: GCS bucket name for staging files
-    :param ingest_bucket_path: Path within bucket for staging files
+    :param ingest_bucket_path: Specific path within bucket for staging files for this task
+    :param tag: Tag associated with the data source
     :param metadata_columns: Optional dictionary containing obs and var column mappings
     """
-
     project_id: str
     nexus_backend_api_url: str
     bigquery_dataset: str
@@ -24,24 +25,6 @@ class CreateIngestFiles(BaseModel):
     ingest_bucket_path: str
     tag: str
     metadata_columns: Optional[Dict[str, Any]] = None
-
-
-class IngestDataToBigQuery(BaseModel):
-    """
-    Configuration for the ingest_data_to_bigquery job.
-
-    :param project_id: GCP project ID
-    :param nexus_backend_api_url: URL of the Nexus backend API
-    :param bigquery_dataset: BigQuery dataset name
-    :param bucket_name: GCS bucket name containing the data
-    :param ingest_bucket_path: Path within bucket containing staged files
-    """
-
-    project_id: str
-    nexus_backend_api_url: str
-    bigquery_dataset: str
-    bucket_name: str
-    ingest_bucket_path: str
 
 
 class BQOpsPrepareExtract(BaseModel):

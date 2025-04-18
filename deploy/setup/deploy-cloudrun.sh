@@ -28,7 +28,7 @@ REPO_LOCATION="us-central1"
 BACKEND_SA_NAME="cellarium-backend-sa"
 ENV_SECRET_NAME="cellarium-nexus"
 REMOTE_ENV_FILE="/app/conf/.env"
-SERVICE_NAME="cellarium-nexus"
+SERVICE_NAME="nexus"
 MIN_INSTANCES=1
 MAX_INSTANCES=10
 CPU=2
@@ -77,11 +77,10 @@ fi
 
 echo -e "${GREEN}Welcome to Cellarium Nexus Cloud Run Deployment Script${NC}\n"
 echo -e "${YELLOW}This script will deploy Cellarium Nexus to Google Cloud Run.${NC}"
-echo -e "${YELLOW}You will be prompted for necessary configuration values.${NC}\n"
 echo -e "${YELLOW}Creating Cloud Run job for Django deployment preparation...${NC}"
 
 # Define job name
-JOB_NAME="django-prepare-deploy"
+JOB_NAME="nexus-backend-prepare-deploy"
 
 # Check if the Cloud Run job already exists
 if gcloud run jobs describe "${JOB_NAME}" --region="${REPO_LOCATION}" --project="${PROJECT_ID}" &>/dev/null; then
@@ -112,14 +111,14 @@ else
     check_command
 fi
 
-echo -e "\n${YELLOW}Executing Django deployment preparation job...${NC}"
+echo -e "\n${YELLOW}Executing Nexus backend deployment preparation job...${NC}"
 gcloud run jobs execute "${JOB_NAME}" \
     --region="${REPO_LOCATION}" \
     --project="${PROJECT_ID}" \
     --wait
 check_command
 
-echo -e "\n${GREEN}Django deployment preparation completed successfully!${NC}"
+echo -e "\n${GREEN}Nexus backend deployment preparation completed successfully!${NC}"
 
 echo -e "\n${YELLOW}Deploying to Cloud Run...${NC}"
 
