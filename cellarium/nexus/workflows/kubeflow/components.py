@@ -6,7 +6,7 @@ SERVICE_ACCOUNT = "vertex-pipelines-sa@dsp-cellarium.iam.gserviceaccount.com"
 
 @job.dsl_component_job(
     base_image=BASE_IMAGE,
-    machine_type="e2-standard-4",
+    machine_type="e2-standard-8",
     display_name="create_ingest_files",
     service_account=SERVICE_ACCOUNT,
 )
@@ -34,7 +34,7 @@ def create_ingest_files_job(gcs_config_path: str):
 
 @job.dsl_component_job(
     base_image=BASE_IMAGE,
-    machine_type="e2-standard-16",
+    machine_type="e2-standard-4",
     display_name="ingest_data_to_bigquery",
     service_account=SERVICE_ACCOUNT,
 )

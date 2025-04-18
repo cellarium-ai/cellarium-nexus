@@ -19,16 +19,12 @@ generate_secret() {
 prompt_secret() {
     local prompt_text=$1
     local var_name=$2
-
-    echo -e "${YELLOW}$prompt_text${NC}"
-    echo -e "Leave blank for random generated secret"
-    read -r value
-
+    read -rp "$(echo -e "${YELLOW}${prompt_text} (leave blank for random):${NC} ")" value
     if [ -z "$value" ]; then
         value=$(generate_secret)
         echo -e "${GREEN}Generated secret: $value${NC}"
     fi
-
+    echo ""  # single blank line separation
     eval "$var_name=\"$value\""
 }
 
@@ -39,24 +35,21 @@ prompt_value() {
     local default_value=${3:-}
 
     if [ -n "$default_value" ]; then
-        echo -e "${YELLOW}$prompt_text${NC} [default: $default_value]"
-        echo -e "Leave blank for default"
+        read -rp "$(echo -e "${YELLOW}${prompt_text} [default: ${default_value}]:${NC} ")" value
+        if [ -z "$value" ]; then
+            value=$default_value
+            echo -e "${GREEN}Using default: $value${NC}"
+        fi
     else
-        echo -e "${YELLOW}$prompt_text${NC}"
-    fi
-
-    read -r value
-
-    if [ -z "$value" ] && [ -n "$default_value" ]; then
-        value=$default_value
-        echo -e "${GREEN}Using default: $value${NC}"
+        read -rp "$(echo -e "${YELLOW}${prompt_text}:${NC} ")" value
     fi
 
     while [ -z "$value" ]; do
         echo -e "${RED}This value is required. Please enter a value:${NC}"
-        read -r value
+        read -rp "$(echo -e "${YELLOW}${prompt_text}:${NC} ")" value
     done
 
+    echo ""  # single blank line separation
     eval "$var_name=\"$value\""
 }
 
@@ -75,7 +68,9 @@ prompt_value "Enter storage size in GB" "DB_STORAGE" "10"
 # Database settings
 prompt_value "Enter the region for the database instance" "DB_REGION" "us-central1"
 DB_INSTANCE_CONNECTION_NAME="${GCP_PROJECT_ID}:${DB_REGION}:${DB_INSTANCE_NAME}"
-echo -e "${GREEN}Constructed DB Instance Connection Name: ${DB_INSTANCE_CONNECTION_NAME}${NC}"
+
+echo "Constructed DB Instance Connection Name: ${DB_INSTANCE_CONNECTION_NAME}"
+echo 
 prompt_value "Enter database name" "DB_NAME" "cellarium-nexus-db"
 prompt_value "Enter database user" "DB_USER" "cellarium-nexus-db-user"
 prompt_secret "Enter database password" "DB_PASSWORD"
@@ -89,33 +84,42 @@ prompt_value "Enter Vertex AI Pipelines service account display name" "PIPELINE_
 prompt_value "Enter Backend service account name" "BACKEND_SA_NAME" "cellarium-backend-sa"
 prompt_value "Enter Backend service account display name" "BACKEND_SA_DISPLAY_NAME" "Cellarium Backend Service Account"
 
-# Vertex AI Pipelines settings
-PIPELINE_BUCKET="${GCP_PROJECT_ID}-pipeline-root"
-echo -e "${GREEN}Pipeline bucket will be: $PIPELINE_BUCKET${NC}"
+# GCS bucket settings
+# Generate unique 6-character suffixes for buckets
+PIPELINE_SUFFIX=$(uuidgen | tr -d '-' | tr '[:upper:]' '[:lower:]' | head -c6)
+PRIVATE_SUFFIX=$(uuidgen | tr -d '-' | tr '[:upper:]' '[:lower:]' | head -c6)
+PUBLIC_SUFFIX=$(uuidgen | tr -d '-' | tr '[:upper:]' '[:lower:]' | head -c6)
+
+prompt_value "Enter pipeline bucket name" "PIPELINE_BUCKET" "${GCP_PROJECT_ID}-pipeline-root-${PIPELINE_SUFFIX}"
+prompt_value "Enter private bucket name" "BUCKET_NAME_PRIVATE" "cellarium-nexus-file-system-${PRIVATE_SUFFIX}"
+prompt_value "Enter public bucket name" "BUCKET_NAME_PUBLIC" "cellarium-nexus-public-files-${PUBLIC_SUFFIX}"
 
 # Artifact Registry settings
 prompt_value "Enter repository name" "REPO_NAME" "cellarium-images"
 prompt_value "Enter repository location" "REPO_LOCATION" "us-central1"
 
 # Cloud Run settings
-prompt_value "Enter Cloud Run service name" "SERVICE_NAME" "cellarium-nexus"
+prompt_value "Enter Cloud Run service name" "SERVICE_NAME" "nexus"
 prompt_value "Enter minimum number of instances" "MIN_INSTANCES" "1"
 prompt_value "Enter maximum number of instances" "MAX_INSTANCES" "10"
 prompt_value "Enter CPU limit" "CPU" "2"
 prompt_value "Enter memory limit (in GB)" "MEMORY" "4"
 prompt_value "Enter request timeout (in seconds)" "TIMEOUT" "3600"
 
-# GCS bucket settings
-prompt_value "Enter private bucket name" "BUCKET_NAME_PRIVATE" "cellarium-nexus-file-system"
-prompt_value "Enter public bucket name" "BUCKET_NAME_PUBLIC" "cellarium-nexus-public-files"
-
 # Generate Django secret key
 prompt_secret "Enter Django secret key" "SECRET_KEY"
 
 # Django superuser settings
 prompt_value "Enter Django superuser username" "DJANGO_SUPERUSER_USERNAME" "admin"
-prompt_secret "Enter Django superuser password" "DJANGO_SUPERUSER_PASSWORD"
 prompt_value "Enter Django superuser email" "DJANGO_SUPERUSER_EMAIL" "admin@example.com"
+
+# Prompt for Django superuser password with 8-character random default
+echo -e "${YELLOW}Enter Django superuser password (leave blank for random 8-char):${NC}"
+read -r DJANGO_SUPERUSER_PASSWORD
+if [ -z "$DJANGO_SUPERUSER_PASSWORD" ]; then
+    DJANGO_SUPERUSER_PASSWORD=$(openssl rand -hex 4)
+    echo -e "${GREEN}Generated superuser password: $DJANGO_SUPERUSER_PASSWORD${NC}"
+fi
 
 # Prompt for environment
 echo -e "\n${YELLOW}Select environment (default: development):${NC}"
@@ -442,22 +446,20 @@ SQL_CONNECTION_NAME=$(gcloud sql instances describe "${DB_INSTANCE_NAME}" \
     --project="${GCP_PROJECT_ID}" \
     --format="value(connectionName)")
 
-retry_operation "Deploying Cloud Run service ${SERVICE_NAME}" \
-    "gcloud run deploy \"${SERVICE_NAME}\" \
-    --image=\"${IMAGE_PATH}\" \
-    --platform=managed \
-    --region=\"${REPO_LOCATION}\" \
-    --project=\"${GCP_PROJECT_ID}\" \
-    --min-instances=\"${MIN_INSTANCES}\" \
-    --max-instances=\"${MAX_INSTANCES}\" \
-    --cpu=\"${CPU}\" \
-    --memory=\"${MEMORY}Gi\" \
-    --timeout=\"${TIMEOUT}s\" \
-    --port=8080 \
-    --service-account=\"${BACKEND_SA_NAME}@${GCP_PROJECT_ID}.iam.gserviceaccount.com\" \
-    --add-cloudsql-instances=\"${SQL_CONNECTION_NAME}\" \
-    --set-secrets=\"/app/conf/.env=${ENV_SECRET_NAME}:latest\" \
-    --allow-unauthenticated"
+bash "$(dirname "$0")/deploy-cloudrun.sh" \
+    --image-path "${IMAGE_PATH}" \
+    --project-id "${GCP_PROJECT_ID}" \
+    --sql-connection-name "${SQL_CONNECTION_NAME}" \
+    --repo-location "${REPO_LOCATION}" \
+    --backend-sa-name "${BACKEND_SA_NAME}" \
+    --env-secret-name "${ENV_SECRET_NAME}" \
+    --service-name "${SERVICE_NAME}" \
+    --min-instances "${MIN_INSTANCES}" \
+    --max-instances "${MAX_INSTANCES}" \
+    --cpu "${CPU}" \
+    --memory "${MEMORY}" \
+    --timeout "${TIMEOUT}"
+check_command
 
 # Get the service URL
 echo -e "\n${YELLOW}Getting service URL...${NC}"
@@ -480,21 +482,27 @@ echo -e "${GREEN}Service URL: ${SERVICE_URL}${NC}"
 
 # Create a temporary file for the environment variables
 tmp_secret=$(mktemp)
+# Add header to temp secret to ensure comments at top
+echo "# Generated environment variables for Cellarium Nexus" > "$tmp_secret"
+echo "# Generated on: $(date)" >> "$tmp_secret"
+echo "" >> "$tmp_secret"
 
 # First, get current secret content if it exists
-if gcloud secrets versions access latest --secret="${ENV_SECRET_NAME}" --project="${GCP_PROJECT_ID}" > "$tmp_secret" 2>/dev/null; then
+if gcloud secrets versions access latest --secret="${ENV_SECRET_NAME}" --project="${GCP_PROJECT_ID}" >> "$tmp_secret" 2>/dev/null; then
     echo -e "${GREEN}Retrieved existing secret content${NC}"
 else
     echo -e "${YELLOW}No existing secret found, creating new one${NC}"
-    # Initialize with core environment variables
-    echo "ENVIRONMENT=\"${ENVIRONMENT}\"" > "$tmp_secret"
+    echo "ENVIRONMENT=\"${ENVIRONMENT}\"" >> "$tmp_secret"
     echo "SECRET_KEY=\"${SECRET_KEY}\"" >> "$tmp_secret"
     echo "GCP_PROJECT_ID=\"${GCP_PROJECT_ID}\"" >> "$tmp_secret"
 fi
 
 # Add environment variables from the output file
 while IFS= read -r line; do
-    # Remove 'export' and keep the rest
+    # Skip comment and blank lines
+    [[ "$line" =~ ^# ]] && continue
+    [[ -z "$line" ]] && continue
+    # Remove 'export ' prefix and keep the rest
     clean_line="${line#export }"
     # Extract variable name before the equals sign
     var_name="${clean_line%%=*}"
