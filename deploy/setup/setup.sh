@@ -19,16 +19,16 @@ generate_secret() {
 prompt_secret() {
     local prompt_text=$1
     local var_name=$2
-    
+
     echo -e "${YELLOW}$prompt_text${NC}"
     echo -e "Leave blank for random generated secret"
     read -r value
-    
+
     if [ -z "$value" ]; then
         value=$(generate_secret)
         echo -e "${GREEN}Generated secret: $value${NC}"
     fi
-    
+
     eval "$var_name=\"$value\""
 }
 
@@ -37,26 +37,26 @@ prompt_value() {
     local prompt_text=$1
     local var_name=$2
     local default_value=${3:-}
-    
+
     if [ -n "$default_value" ]; then
         echo -e "${YELLOW}$prompt_text${NC} [default: $default_value]"
         echo -e "Leave blank for default"
     else
         echo -e "${YELLOW}$prompt_text${NC}"
     fi
-    
+
     read -r value
-    
+
     if [ -z "$value" ] && [ -n "$default_value" ]; then
         value=$default_value
         echo -e "${GREEN}Using default: $value${NC}"
     fi
-    
+
     while [ -z "$value" ]; do
         echo -e "${RED}This value is required. Please enter a value:${NC}"
         read -r value
     done
-    
+
     eval "$var_name=\"$value\""
 }
 
@@ -222,7 +222,7 @@ check_command() {
 retry_operation() {
     local operation_name=$1
     local cmd=$2
-    
+
     while true; do
         echo -e "\n${YELLOW}Attempting: ${operation_name}${NC}"
         if eval "$cmd"; then
@@ -234,7 +234,7 @@ retry_operation() {
             echo "1) Skip this operation (resource may already exist)"
             echo "2) Retry the operation"
             read -r choice
-            
+
             case $choice in
                 1)
                     echo -e "${YELLOW}Skipping operation - assuming resource exists${NC}"
@@ -256,7 +256,7 @@ retry_operation() {
 create_service_account() {
     local sa_name=$1
     local sa_display_name=$2
-    
+
     retry_operation "Creating service account ${sa_name}" \
         "gcloud iam service-accounts create \"${sa_name}\" \
         --display-name=\"${sa_display_name}\" \
@@ -295,7 +295,7 @@ retry_operation "Creating public bucket ${BUCKET_NAME_PUBLIC}" \
 
 echo -e "\n${YELLOW}Configuring CORS for public bucket...${NC}"
 gcloud storage buckets update "gs://${BUCKET_NAME_PUBLIC}" \
-    --cors-file=deploy/cors.json \
+    --cors-file=deploy/setup/cors.json \
     --project="${GCP_PROJECT_ID}"
 check_command
 
@@ -331,7 +331,7 @@ grant_roles() {
     local sa_name=$1
     shift
     local roles=($@)
-    
+
     for role in "${roles[@]}"; do
         retry_operation "Granting ${role} to ${sa_name}" \
             "gcloud projects add-iam-policy-binding \"${GCP_PROJECT_ID}\" \
@@ -511,7 +511,7 @@ if [ "$ENVIRONMENT" != "local" ]; then
     echo -e "${GREEN}Updating URLs with Cloud Run values:${NC}"
     echo -e "SITE_URL: ${SITE_URL}"
     echo -e "MAIN_HOST_ALLOWED: ${MAIN_HOST_ALLOWED}"
-    
+
     # Update the secret with new URLs
     # Use temp files for sed on macOS
     sed "/^SITE_URL=/d" "$tmp_secret" > "${tmp_secret}.tmp" && mv "${tmp_secret}.tmp" "$tmp_secret"

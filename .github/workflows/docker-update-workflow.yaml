@@ -3,14 +3,14 @@ on:
   workflow_dispatch:
     inputs:
       image-types:
-        description: 'Image types to build. Can be `backend`, `pipelines` or `both`. Default is `both`.'
+        description: 'Image types to build. Can be `backend`, `workflows` or `both`. Default is `both`.'
         required: false
         default: 'both'
         type: choice
         options:
           - both
           - backend
-          - pipelines
+          - workflows
       image-tag:
         description: 'Docker image tag. Will use the short hash of the last commit in the branch if nothing is passed in.'
         required: false
@@ -32,12 +32,12 @@ jobs:
 
     strategy:
       matrix:
-        image-type: [ 'backend', 'pipelines' ]
+        image-type: [ 'backend', 'workflows' ]
 
     env:
       DOCKER_REGISTRY_NAME: us-central1-docker.pkg.dev
       BACKEND_IMAGE_NAME: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/nexus/nexus-backend
-      PIPELINES_IMAGE_NAME: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/nexus/nexus-pipelines
+      WORKFLOWS_IMAGE_NAME: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/nexus/nexus-workflows
     steps:
       - uses: actions/checkout@v4
 
@@ -62,12 +62,12 @@ jobs:
           gcp-service-account-email: ${{ secrets.GCP_SERVICE_ACCOUNT_EMAIL }}
           add-latest-tag: ${{ inputs.add-latest-tag }}
 
-      - id: build-pipelines
+      - id: build-workflows
         uses: ./.github/actions/docker-build
-        if: matrix.image-type == 'pipelines' && (inputs.image-types == 'pipelines' || inputs.image-types == 'both')
+        if: matrix.image-type == 'workflows' && (inputs.image-types == 'workflows' || inputs.image-types == 'both')
         with:
           docker-registry-name: ${{ env.DOCKER_REGISTRY_NAME }}
-          image-name: ${{ env.PIPELINES_IMAGE_NAME }}
+          image-name: ${{ env.WORKFLOWS_IMAGE_NAME }}
           image-tag: ${{ env.IMAGE_TAG }}
           image-type: ${{ matrix.image-type }}
           gcp-provider-id: ${{ secrets.GCP_PROVIDER_ID }}

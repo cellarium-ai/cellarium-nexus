@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y gcc python3-dev libpq-dev \
 COPY . /app
 
 # Copy entrypoint script and make it executable
-COPY deploy/docker-entrypoint.sh /usr/local/bin/
+COPY deploy/backend/docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
@@ -27,7 +27,3 @@ EXPOSE 8080
 ENV PYTHONPATH=/app:/app/cellarium:/app/cellarium/nexus
 
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", \
-     "--workers", "3", "--timeout", "120", \
-     "--log-level", "info", \
-     "cellarium.nexus.backend.application.wsgi:application"]

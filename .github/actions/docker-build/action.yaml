@@ -18,7 +18,7 @@ inputs:
     description: Tag for the created image
   image-type:
     required: true
-    description: Image types to build (backend, pipelines)
+    description: Image types to build (backend, workflows)
   add-latest-tag:
     required: true
     description: Push a `latest` tag to the artifact registry
@@ -34,9 +34,9 @@ runs:
       name: Get Dockerfile
       run: |
         if [[ "${{ inputs.image-type }}" == "backend" ]]; then
-          echo "DOCKERFILE=Dockerfile.backend" >> $GITHUB_ENV
-        elif [[ "${{ inputs.image-type }}" == "pipelines" ]]; then
-          echo "DOCKERFILE=Dockerfile.pipelines" >> $GITHUB_ENV
+          echo "DOCKERFILE=backend/Dockerfile" >> $GITHUB_ENV
+        elif [[ "${{ inputs.image-type }}" == "workflows" ]]; then
+          echo "DOCKERFILE=workflows/Dockerfile" >> $GITHUB_ENV
         fi
       shell: bash
     - id: google-login
