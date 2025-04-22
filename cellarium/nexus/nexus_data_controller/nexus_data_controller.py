@@ -7,7 +7,7 @@ import logging
 import os
 import pathlib
 import tempfile
-from pathlib import Path
+
 from typing import Any, Sequence
 
 import fastavro
@@ -151,7 +151,6 @@ class NexusDataController:
                 )
 
                 # Upload to staging bucket
-                # ingest_stage_dir = f"{bucket_stage_dir}/{ingest_info_api_struct.nexus_uuid}"
                 ingest_stage_dir = f"{bucket_stage_dir}"
                 utils.gcp.transfer_directory_to_bucket(
                     bucket_name=bucket_name, local_directory_path=local_output_dir, prefix=ingest_stage_dir
@@ -225,64 +224,6 @@ class NexusDataController:
             )
             # Re-raise the exception to stop execution
             raise
-
-    # def ingest_data_from_stage_dir(
-    #     self,
-    #     *,
-    #     bucket_name: str,
-    #     base_stage_dir: str,
-    # ) -> None:
-    #     """
-    #     Validate and ingest data from all subdirectories under the base staging directory.
-    #     Each subdirectory must contain all necessary files for ingestion.
-
-    #     :param bucket_name: GCS bucket name containing the data
-    #     :param base_stage_dir: Base directory containing timestamped subdirectories with staged files
-
-    #     :raise ValueError: If any subdirectory is missing required files
-    #     :raise google.api_core.exceptions.GoogleAPIError: If ingestion fails
-    #     """
-    #     # List all blobs under base_stage_dir
-    #     all_blobs = utils.gcp.list_blobs(bucket_name=bucket_name, prefix=f"{base_stage_dir}/")
-
-    #     # Get unique subdirectories
-    #     subdirs = {
-    #         os.path.dirname(blob.name).split("/")[-1]
-    #         for blob in all_blobs
-    #         if os.path.dirname(blob.name) != base_stage_dir
-    #     }
-
-    #     if not subdirs:
-    #         raise ValueError(f"No subdirectories found in {base_stage_dir}")
-
-    #     # Required base files that must be present in each subdirectory
-    #     required_base_files = {"ingest-info.avro", "cell-info.avro", "feature-info.avro"}
-
-    #     # Validate each subdirectory
-    #     for subdir in subdirs:
-    #         subdir_path = f"{base_stage_dir}/{subdir}"
-    #         subdir_blobs = utils.gcp.list_blobs(bucket_name=bucket_name, prefix=f"{subdir_path}/")
-    #         subdir_files = {os.path.basename(blob.name) for blob in subdir_blobs}
-
-    #         # Check for required base files
-    #         missing_base_files = required_base_files - subdir_files
-    #         if missing_base_files:
-    #             raise ValueError(
-    #                 f"Subdirectory {subdir_path} is missing required files: {', '.join(missing_base_files)}"
-    #             )
-
-    #         # Check for at least one raw-counts CSV file
-    #         if not any(f.startswith("raw-counts-") and f.endswith(".csv") for f in subdir_files):
-    #             raise ValueError(f"Subdirectory {subdir_path} is missing raw-counts CSV files")
-
-    #         # If validation passes, ingest the data from this subdirectory
-    #         logger.info(f"Ingesting data from {subdir_path}")
-    #         self.ingest_data_to_bigquery(
-    #             bucket_name=bucket_name,
-    #             bucket_stage_dir=subdir_path,
-    #         )
-
-    #     logger.info(f"Successfully ingested data from all {len(subdirs)} subdirectories")
 
     def create_bigquery_dataset(self, *, bigquery_dataset: str, location: str = "US") -> str:
         """
@@ -390,48 +331,3 @@ class NexusDataController:
                 local_directory_path=temp_dir_path,
                 prefix=f"{extract_bucket_path}/extract_files",
             )
-
-    def check_missing_bins(
-        self,
-        *,
-        expected_bins: list[int],
-        bucket_name: str,
-        extract_bucket_path: str,
-    ) -> list[int]:
-        """
-        Check which bins are missing from the extract path.
-
-        :param expected_bins: List of bin numbers that should be present
-        :param bucket_name: GCS bucket name
-        :param extract_bucket_path: Path within bucket
-
-        :raise google.api_core.exceptions.GoogleAPIError: If bucket operations fail
-
-        :return: List of missing bin numbers
-        """
-        extract_path = f"{extract_bucket_path}/extract_files"
-        existing_files = utils.gcp.list_blobs(
-            bucket_name=bucket_name,
-            prefix=extract_path,
-        )
-
-        # Extract bin numbers from filenames
-        existing_bins = set()
-        for blob in existing_files:
-            if blob.name.endswith(".h5ad"):
-                try:
-                    bin_num = int(blob.name.split("_")[-1].replace(".h5ad", ""))
-                    existing_bins.add(bin_num)
-                except (ValueError, IndexError):
-                    logger.warning(f"Could not parse bin number from filename: {blob.name}")
-                    continue
-
-        # Find missing bins
-        missing_bins = [bin_num for bin_num in expected_bins if bin_num not in existing_bins]
-
-        if missing_bins:
-            logger.warning(f"Found {len(missing_bins)} missing bins: {missing_bins}")
-        else:
-            logger.info("All expected bins are present")
-
-        return missing_bins

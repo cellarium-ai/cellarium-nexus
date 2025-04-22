@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from google.cloud import bigquery
+from nexus.omics_datastore import bq_sql
+from nexus.omics_datastore.bq_ops import constants
 from nexus.omics_datastore.bq_ops.create_bq_tables import create_bigquery_objects
 from nexus.omics_datastore.bq_ops.extract.extract import extract_bins
 from nexus.omics_datastore.bq_ops.extract.metadata_extractor import MetadataExtractor
@@ -250,3 +252,40 @@ class BQDatastoreController:
             obs_columns=obs_columns,
             max_workers=max_workers,
         )
+
+    def count_cells(self, *, filter_statements: dict[str, Any] | None = None, dataset: str | None = None) -> int:
+        """
+        Count the number of cells in the cell_info table matching the given filters.
+
+        :param filter_statements: Optional dictionary of filters to apply (column_name: value)
+        :param dataset: Optional BigQuery dataset name to query (defaults to controller's dataset)
+
+        :raise google.api_core.exceptions.GoogleAPIError: If query execution fails
+
+        :return: The total count of matching cells
+        """
+        target_dataset = dataset if dataset else self.dataset
+        template_path = (
+            Path(__file__).parent.parent / "sql_templates" / "general" / "count_cells.sql.mako"
+        )
+
+        template_data = bq_sql.TemplateData(
+            project=self.project,
+            dataset=target_dataset,
+            table_name=constants.BQ_CELL_INFO_TABLE_NAME,
+            filter_statements=filter_statements,
+        )
+
+        sql = bq_sql.render(str(template_path), template_data)
+        logger.info(f"Executing cell count query on {target_dataset}...")
+        query_job = self.client.query(sql)
+        results = query_job.result()  # Waits for the query to finish
+
+        # Extract the single count value
+        count = 0
+        for row in results:
+            count = row.total_cells
+            break  # Should only be one row
+
+        logger.info(f"Found {count} matching cells.")
+        return count

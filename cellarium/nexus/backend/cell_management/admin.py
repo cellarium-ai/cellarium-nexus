@@ -1,5 +1,6 @@
 import csv
 import logging
+import math
 from typing import Sequence
 
 import pandas as pd
@@ -38,8 +39,8 @@ from cellarium.nexus.backend.cell_management.utils.filters import (
 )
 from cellarium.nexus.shared import schemas, utils
 
-# from nexus.omics_datastore.controller import NexusDataController
-from nexus.omics_datastore.bq_ops import create_bq_tables
+from google.cloud import bigquery
+from cellarium.nexus.omics_datastore.bq_ops import create_bq_tables, bq_datastore_controller
 from unfold.admin import ModelAdmin
 from unfold.contrib.filters.admin import (
     ChoicesDropdownFilter,
@@ -96,19 +97,9 @@ class BigQueryDatasetAdmin(ModelAdmin):
 
         if is_new:
             try:
-                # Initialize the controller first
-                # controller = NexusDataController(
-                #     project_id=settings.GCP_PROJECT_ID,
-                #     nexus_backend_api_url=settings.SITE_URL,
-                #     bigquery_dataset=obj.name,
-                # )
-
-                # Create the BigQuery dataset and get the link
-                # link_to_dataset = controller.create_bigquery_dataset(bigquery_dataset=obj.name, location="US")
-                from google.cloud import bigquery
-
+                bq_client = bigquery.Client()
                 link_to_dataset = create_bq_tables.create_bigquery_objects(
-                    client=bigquery.Client(), project=settings.GCP_PROJECT_ID, dataset=obj.name, location="US"
+                    client=bq_client, project=settings.GCP_PROJECT_ID, dataset=obj.name, location="US"
                 )
                 # Assign the link to the object's 'link' field for display in admin
                 obj.link = link_to_dataset
@@ -256,6 +247,45 @@ class CellInfoAdmin(ModelAdmin):
             extract_bin_size = form.cleaned_data["extract_bin_size"]
             filters = form.cleaned_data["filters"] or {}
 
+            # === Get total cell count for bin calculation ===
+            try:
+                bq_client = bigquery.Client(project=settings.GCP_PROJECT_ID)
+                controller = bq_datastore_controller.BQDatastoreController(
+                    client=bq_client, project=settings.GCP_PROJECT_ID, dataset=bigquery_dataset.name
+                )
+                total_cells = controller.count_cells(filter_statements=filters)
+                logger.info(f"Total cells matching filters in {bigquery_dataset.name}: {total_cells}")
+            except Exception as e:
+                messages.error(request=request, message=f"Failed to count cells in BigQuery: {e}")
+                return redirect("admin:cell_management_cellinfo_changelist")
+
+            if total_cells == 0:
+                messages.warning(request=request, message="No cells match the provided filters. No extraction started.")
+                return redirect("admin:cell_management_cellinfo_changelist")
+
+            if not extract_bin_size or extract_bin_size <= 0:
+                messages.error(request=request, message="Extract Bin Size must be a positive integer.")
+                # Assuming form validation catches this, but added for safety
+                return render(
+                    request,
+                    CHANGELIST_ACTION_FORM,
+                    {
+                        "form": form,
+                        "title": PREPARE_EXTRACT_TABLES_TITLE,
+                        "submit_button_title": PREPARE_BUTTON_TITLE,
+                        "selected_dataset": bigquery_dataset,
+                        "action_name": "extract_data_action",
+                    },
+                )
+
+            num_bins = math.ceil(total_cells / extract_bin_size)
+            logger.info(f"Calculated {num_bins} extract bins based on {total_cells} cells and bin size {extract_bin_size}.")
+            # =================================================
+
+            # === Define worker configuration ===
+            BINS_PER_WORKER = 32 # Each worker (config) handles up to 32 bins
+            # ===================================
+
             # Use the pre-selected dataset instead of getting it from the form
             # since we've already validated its existence
 
@@ -305,17 +335,30 @@ class CellInfoAdmin(ModelAdmin):
                 extract_bucket_path=extract_bucket_path,
             )
 
-            extract_config = BQOpsExtract(
-                project_id=settings.GCP_PROJECT_ID,
-                nexus_backend_api_url=settings.SITE_URL,
-                bigquery_dataset=bigquery_dataset.name,
-                extract_table_prefix=extract_table_prefix,
-                bins=[0],  # Extract only bin 0 for now
-                bucket_name=settings.BUCKET_NAME_PRIVATE,
-                extract_bucket_path=extract_bucket_path,
-                obs_columns=obs_columns,
-                max_workers=10,
-            )
+            # === Create extract configs, grouping bins per worker ===
+            extract_configs = []
+            for start_bin in range(0, num_bins, BINS_PER_WORKER):
+                end_bin = min(start_bin + BINS_PER_WORKER, num_bins)
+                worker_bins = list(range(start_bin, end_bin))
+
+                if not worker_bins: # Should not happen with correct num_bins calc, but safeguard
+                    continue
+
+                logger.info(f"Creating extract config for bins: {worker_bins[0]} to {worker_bins[-1]}")
+                extract_configs.append(
+                    BQOpsExtract(
+                        project_id=settings.GCP_PROJECT_ID,
+                        nexus_backend_api_url=settings.SITE_URL,
+                        bigquery_dataset=bigquery_dataset.name,
+                        extract_table_prefix=extract_table_prefix,
+                        bins=worker_bins,  # Assign the list of bins for this worker
+                        bucket_name=settings.BUCKET_NAME_PRIVATE,
+                        extract_bucket_path=extract_bucket_path,
+                        obs_columns=obs_columns,
+                        max_workers=len(worker_bins), # Set process workers = number of bins for this VM
+                    )
+                )
+            # ========================================================
 
             # Save configs to GCS
             configs_stage_dir = f"gs://{settings.BUCKET_NAME_PRIVATE}/pipeline-configs"
@@ -323,7 +366,8 @@ class CellInfoAdmin(ModelAdmin):
             prepare_extract_config_path = utils.workflows_configs.dump_configs_to_bucket(
                 [prepare_extract_config], configs_stage_dir
             )[0]
-            extract_config_paths = utils.workflows_configs.dump_configs_to_bucket([extract_config], configs_stage_dir)
+            # Pass the list of extract configs
+            extract_config_paths = utils.workflows_configs.dump_configs_to_bucket(extract_configs, configs_stage_dir)
 
             # Submit pipeline
             submit_pipeline(

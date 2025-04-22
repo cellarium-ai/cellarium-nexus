@@ -13,7 +13,7 @@ SERVICE_ACCOUNT = "vertex-pipelines-sa@dsp-cellarium.iam.gserviceaccount.com"
 def create_ingest_files_job(gcs_config_path: str):
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import IngestTaskConfig
-    from cellarium.nexus.omics_datastore.controller import NexusDataController
+    from cellarium.nexus.nexus_data_controller import NexusDataController
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=IngestTaskConfig)
 
@@ -41,7 +41,7 @@ def create_ingest_files_job(gcs_config_path: str):
 def ingest_data_to_bigquery_job(gcs_config_path: str):
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import IngestTaskConfig
-    from cellarium.nexus.omics_datastore.controller import NexusDataController
+    from cellarium.nexus.nexus_data_controller import NexusDataController
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=IngestTaskConfig)
 
@@ -62,7 +62,7 @@ def ingest_data_to_bigquery_job(gcs_config_path: str):
 def prepare_extract_job(gcs_config_path: str):
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import BQOpsPrepareExtract
-    from cellarium.nexus.omics_datastore.controller import NexusDataController
+    from cellarium.nexus.nexus_data_controller import NexusDataController
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=BQOpsPrepareExtract)
 
@@ -88,7 +88,7 @@ def prepare_extract_job(gcs_config_path: str):
 def extract_job(gcs_config_path: str):
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import BQOpsExtract
-    from cellarium.nexus.omics_datastore.controller import NexusDataController
+    from cellarium.nexus.nexus_data_controller import NexusDataController
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=BQOpsExtract)
 
