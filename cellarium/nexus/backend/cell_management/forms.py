@@ -94,7 +94,12 @@ class PrepareExtractTablesForm(forms.Form):
         help_text=_("Prefix for the extract tables"),
         widget=UnfoldAdminTextInputWidget,
     )
-
+    extract_bin_size = forms.IntegerField(
+        label=_("Extract Bin Size"),
+        min_value=1,
+        max_value=100_000,
+        help_text=_("Bin size for the extract tables"),
+    )
     bigquery_dataset = forms.ModelChoiceField(
         label=_("BigQuery Dataset"),
         queryset=BigQueryDataset.objects.all(),

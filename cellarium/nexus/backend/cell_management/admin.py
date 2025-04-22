@@ -3,6 +3,7 @@ import logging
 from typing import Sequence
 
 import pandas as pd
+from urllib.parse import parse_qs, urlparse
 from django import forms
 from django.conf import settings
 from django.contrib import admin, messages
@@ -227,8 +228,6 @@ class CellInfoAdmin(ModelAdmin):
         original_filters = {}
         referer = request.META.get("HTTP_REFERER", "")
         if referer and "?" in referer:
-            from urllib.parse import parse_qs, urlparse
-
             query_params = parse_qs(urlparse(referer).query)
             # Convert query params to a flat dictionary
             original_filters = {k: v[0] for k, v in query_params.items()}
@@ -240,7 +239,7 @@ class CellInfoAdmin(ModelAdmin):
             request.GET.update(original_filters)
 
             # Re-extract filters with updated request.GET
-            filters, _ = extract_filters_from_django_admin_request(request)
+            filters, bq_dataset_unused = extract_filters_from_django_admin_request(request)
 
         # Create initial form data with extracted filters and dataset
         initial_data = {
@@ -254,6 +253,7 @@ class CellInfoAdmin(ModelAdmin):
             # Get form data
             feature_schema = form.cleaned_data["feature_schema"]
             extract_table_prefix = form.cleaned_data["extract_table_prefix"]
+            extract_bin_size = form.cleaned_data["extract_bin_size"]
             filters = form.cleaned_data["filters"] or {}
 
             # Use the pre-selected dataset instead of getting it from the form
@@ -289,7 +289,7 @@ class CellInfoAdmin(ModelAdmin):
             ]
 
             # Construct extract bucket path
-            extract_bucket_path = f"{settings.BACKEND_PIPELINE_DIR}/data_extracts/{extract_table_prefix}"
+            extract_bucket_path = f"{settings.BACKEND_PIPELINE_DIR}/data-extracts/{extract_table_prefix}"
 
             # Create configs for the pipeline
             prepare_extract_config = BQOpsPrepareExtract(
@@ -300,7 +300,7 @@ class CellInfoAdmin(ModelAdmin):
                 features=features,
                 filters=filters,
                 obs_columns=obs_columns,
-                extract_bin_size=10000,
+                extract_bin_size=extract_bin_size,
                 bucket_name=settings.BUCKET_NAME_PRIVATE,
                 extract_bucket_path=extract_bucket_path,
             )
