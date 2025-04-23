@@ -7,15 +7,15 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from google.cloud import bigquery
-from nexus.omics_datastore import bq_sql
-from nexus.omics_datastore.bq_ops import constants
-from nexus.omics_datastore.bq_ops.create_bq_tables import create_bigquery_objects
-from nexus.omics_datastore.bq_ops.extract.extract import extract_bins
-from nexus.omics_datastore.bq_ops.extract.metadata_extractor import MetadataExtractor
+from cellarium.nexus.omics_datastore import bq_sql
+from cellarium.nexus.omics_datastore.bq_ops import constants
+from cellarium.nexus.omics_datastore.bq_ops.create_bq_tables import create_bigquery_objects
+from cellarium.nexus.omics_datastore.bq_ops.extract.extract import extract_bins
+from cellarium.nexus.omics_datastore.bq_ops.extract.metadata_extractor import MetadataExtractor
 from cellarium.nexus.shared import schemas
-from nexus.omics_datastore.bq_ops.extract.prepare_extract import prepare_extract_tables
-from nexus.omics_datastore.bq_ops.ingest.create_ingest_files import create_ingest_files
-from nexus.omics_datastore.bq_ops.ingest.ingest_data_to_bigquery import ingest_data_to_bigquery
+from cellarium.nexus.omics_datastore.bq_ops.extract.prepare_extract import prepare_extract_tables
+from cellarium.nexus.omics_datastore.bq_ops.ingest.create_ingest_files import create_ingest_files
+from cellarium.nexus.omics_datastore.bq_ops.ingest.ingest_data_to_bigquery import ingest_data_to_bigquery
 
 logger = logging.getLogger(__name__)
 

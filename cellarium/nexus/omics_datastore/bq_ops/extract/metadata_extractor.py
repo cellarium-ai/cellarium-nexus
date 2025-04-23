@@ -13,9 +13,10 @@ from typing import Any
 import certifi
 import numpy as np
 import pandas as pd
-from google.cloud import bigquery
-from nexus.omics_datastore import bq_sql
 from smart_open import open
+from google.cloud import bigquery
+
+from cellarium.nexus.omics_datastore import bq_sql
 
 # Configure SSL context for aiohttp
 ssl_context = ssl.create_default_context(cafile=certifi.where())

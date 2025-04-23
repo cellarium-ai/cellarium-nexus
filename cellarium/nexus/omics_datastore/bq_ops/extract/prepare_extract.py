@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from google.cloud import bigquery
-from pydantic import BaseModel
-from nexus.omics_datastore import bq_sql
-from nexus.omics_datastore.bq_ops.extract.metadata_extractor import MetadataExtractor
+
+from cellarium.nexus.omics_datastore import bq_sql
+from cellarium.nexus.omics_datastore.bq_ops.extract.metadata_extractor import MetadataExtractor
 from cellarium.nexus.shared import schemas
 
 logger = logging.getLogger(__name__)

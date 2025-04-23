@@ -13,9 +13,9 @@ import numpy as np
 import pandas as pd
 from google.cloud import bigquery
 from google.cloud.bigquery_storage import BigQueryReadClient, types
-from nexus.omics_datastore import bq_sql
-from nexus.omics_datastore.bq_ops import constants
-from nexus.omics_datastore.bq_ops.extract.metadata_extractor import MetadataExtractor
+from cellarium.nexus.omics_datastore import bq_sql
+from cellarium.nexus.omics_datastore.bq_ops import constants
+from cellarium.nexus.omics_datastore.bq_ops.extract.metadata_extractor import MetadataExtractor
 from cellarium.nexus.shared import schemas
 from scipy.sparse import coo_matrix
 from tenacity import retry, stop_after_attempt, wait_exponential, before_log
