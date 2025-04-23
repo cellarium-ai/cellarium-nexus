@@ -7,6 +7,7 @@ import logging
 from typing import Any
 
 from django.http import HttpRequest
+
 from cellarium.nexus.backend.cell_management.models import BigQueryDataset
 
 logger = logging.getLogger(__name__)
@@ -112,23 +113,6 @@ def extract_filters_from_django_admin_request(
     logger.info(f"Extracted filters: {filters}")
 
     return filters, bigquery_dataset
-
-
-def get_default_dataset() -> BigQueryDataset | None:
-    """
-    Get the default BigQuery dataset if only one exists.
-
-    :return: The default BigQuery dataset or None if none or multiple exist
-    """
-    dataset_count = BigQueryDataset.objects.count()
-
-    if dataset_count == 1:
-        bigquery_dataset = BigQueryDataset.objects.first()
-        if bigquery_dataset:
-            logger.info(f"Using default dataset: {bigquery_dataset.name}")
-            return bigquery_dataset
-
-    return None
 
 
 def serialize_filters_to_json(filters: dict[str, Any]) -> str:

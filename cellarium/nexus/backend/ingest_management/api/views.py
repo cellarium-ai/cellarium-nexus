@@ -10,8 +10,8 @@ from rest_framework.views import APIView
 
 from cellarium.nexus.backend.cell_management import models as cell_models
 from cellarium.nexus.backend.ingest_management import models
-from cellarium.nexus.backend.ingest_management.services import import_from_avro, index_tracking
 from cellarium.nexus.backend.ingest_management.api import serializers
+from cellarium.nexus.backend.ingest_management.services import import_from_avro, index_tracking
 
 
 class IngestCreateAPIView(CreateAPIView):

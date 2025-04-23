@@ -8,11 +8,11 @@ from typing import Iterator
 import fastavro
 from django.conf import settings
 from django.db import transaction
+from nexus.omics_datastore.bq_ops import constants
 
-from cellarium.nexus.shared import utils
 from cellarium.nexus.backend.cell_management import models as cell_models
 from cellarium.nexus.backend.ingest_management import models as ingest_models
-from nexus.omics_datastore.bq_ops import constants
+from cellarium.nexus.shared import utils
 
 # Configure logging
 logger = logging.getLogger(__name__)

@@ -3,6 +3,7 @@ import uuid
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+
 from cellarium.nexus.backend.ingest_management.utils.column_mapping import (
     get_obs_column_choices,
     get_var_column_choices,

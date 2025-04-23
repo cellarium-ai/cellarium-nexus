@@ -1,4 +1,5 @@
 from django.urls import path
+
 from cellarium.nexus.backend.ingest_management.api import views
 
 urlpatterns = [

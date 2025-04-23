@@ -6,10 +6,30 @@ def default_empty_dict():
     return {}
 
 
+class BigQueryDatasetQuerySet(models.QuerySet):
+
+    def get_default_dataset(self) -> models.Model | None:
+        """
+        Get the default BigQuery dataset if only one exists.
+
+        :return: The default BigQuery dataset or None if none or multiple exist
+        """
+        dataset_count = self.model.objects.count()
+
+        if dataset_count == 1:
+            bigquery_dataset = self.model.objects.first()
+            if bigquery_dataset:
+                # logger.info(f"Using default dataset: {bigquery_dataset.name}")
+                return bigquery_dataset
+
+        return None
+
+
 class BigQueryDataset(models.Model):
     name = models.CharField(max_length=256, verbose_name=_("name"), unique=True)
     description = models.TextField(verbose_name=_("description"), null=True, blank=True)
     link = models.CharField(max_length=512, verbose_name=_("link"), unique=True, null=True, blank=True)
+    objects = BigQueryDatasetQuerySet.as_manager()
 
     class Meta:
         verbose_name = _("BigQuery dataset")

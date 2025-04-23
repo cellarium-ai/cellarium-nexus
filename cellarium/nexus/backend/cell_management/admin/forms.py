@@ -1,8 +1,9 @@
+import json
+
 from django import forms
 from django.utils.translation import gettext_lazy as _
-from unfold.widgets import UnfoldAdminFileFieldWidget, UnfoldAdminSelectWidget, UnfoldAdminTextInputWidget
 from django_json_widget.widgets import JSONEditorWidget as BaseJSONEditorWidget
-import json
+from unfold.widgets import UnfoldAdminFileFieldWidget, UnfoldAdminSelectWidget, UnfoldAdminTextInputWidget
 
 from cellarium.nexus.backend.cell_management.models import BigQueryDataset, FeatureSchema
 
