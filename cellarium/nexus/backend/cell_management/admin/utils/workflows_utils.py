@@ -26,9 +26,9 @@ def get_total_cell_in_bq_number(bigquery_dataset: models.BigQueryDataset, filter
 
     :return: Total number of cells matching the filters
     """
-    bq_client = bigquery.Client(project=bigquery_dataset.project_id)
+    bq_client = bigquery.Client(project=settings.GCP_PROJECT_ID)
     controller = bq_datastore_controller.BQDatastoreController(
-        client=bq_client, project=bigquery_dataset.project_id, dataset=bigquery_dataset.name
+        client=bq_client, project=settings.GCP_PROJECT_ID, dataset=bigquery_dataset.name
     )
     return controller.count_cells(filter_statements=filters)
 
