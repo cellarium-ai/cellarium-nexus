@@ -1,9 +1,9 @@
 import typing as t
 from typing import Any
 
-from nexus.omics_datastore.bq_sql import exceptions
-from nexus.omics_datastore.bq_sql.constants import ComparisonOperators
-from nexus.omics_datastore.bq_sql.validation.template_data_validator import validate_column_name
+from cellarium.nexus.omics_datastore.bq_sql import exceptions
+from cellarium.nexus.omics_datastore.bq_sql.constants import ComparisonOperators
+from cellarium.nexus.omics_datastore.bq_sql.validation.template_data_validator import validate_column_name
 
 
 def _string_value_processor(v: str) -> str:
