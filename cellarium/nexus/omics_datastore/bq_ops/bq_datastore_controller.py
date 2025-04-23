@@ -7,15 +7,16 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from google.cloud import bigquery
+
 from cellarium.nexus.omics_datastore import bq_sql
 from cellarium.nexus.omics_datastore.bq_ops import constants
 from cellarium.nexus.omics_datastore.bq_ops.create_bq_tables import create_bigquery_objects
 from cellarium.nexus.omics_datastore.bq_ops.extract.extract import extract_bins
 from cellarium.nexus.omics_datastore.bq_ops.extract.metadata_extractor import MetadataExtractor
-from cellarium.nexus.shared import schemas
 from cellarium.nexus.omics_datastore.bq_ops.extract.prepare_extract import prepare_extract_tables
 from cellarium.nexus.omics_datastore.bq_ops.ingest.create_ingest_files import create_ingest_files
 from cellarium.nexus.omics_datastore.bq_ops.ingest.ingest_data_to_bigquery import ingest_data_to_bigquery
+from cellarium.nexus.shared import schemas
 
 logger = logging.getLogger(__name__)
 
@@ -265,9 +266,7 @@ class BQDatastoreController:
         :return: The total count of matching cells
         """
         target_dataset = dataset if dataset else self.dataset
-        template_path = (
-            Path(__file__).parent.parent / "sql_templates" / "general" / "count_cells.sql.mako"
-        )
+        template_path = Path(__file__).parent.parent / "sql_templates" / "general" / "count_cells.sql.mako"
 
         template_data = bq_sql.TemplateData(
             project=self.project,

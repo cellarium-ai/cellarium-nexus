@@ -13,8 +13,8 @@ from typing import Any
 import certifi
 import numpy as np
 import pandas as pd
-from smart_open import open
 from google.cloud import bigquery
+from smart_open import open
 
 from cellarium.nexus.omics_datastore import bq_sql
 

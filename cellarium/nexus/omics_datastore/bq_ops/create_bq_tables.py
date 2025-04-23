@@ -2,6 +2,7 @@ import logging
 
 from google.api_core.exceptions import Conflict
 from google.cloud import bigquery
+
 from cellarium.nexus.omics_datastore.bq_avro_schemas import cell_management, converter
 from cellarium.nexus.omics_datastore.bq_ops import constants
 

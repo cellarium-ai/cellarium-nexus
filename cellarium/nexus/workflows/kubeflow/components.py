@@ -11,9 +11,9 @@ SERVICE_ACCOUNT = "vertex-pipelines-sa@dsp-cellarium.iam.gserviceaccount.com"
     service_account=SERVICE_ACCOUNT,
 )
 def create_ingest_files_job(gcs_config_path: str):
+    from cellarium.nexus.nexus_data_controller import NexusDataController
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import IngestTaskConfig
-    from cellarium.nexus.nexus_data_controller import NexusDataController
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=IngestTaskConfig)
 
@@ -39,9 +39,9 @@ def create_ingest_files_job(gcs_config_path: str):
     service_account=SERVICE_ACCOUNT,
 )
 def ingest_data_to_bigquery_job(gcs_config_path: str):
+    from cellarium.nexus.nexus_data_controller import NexusDataController
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import IngestTaskConfig
-    from cellarium.nexus.nexus_data_controller import NexusDataController
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=IngestTaskConfig)
 
@@ -60,9 +60,9 @@ def ingest_data_to_bigquery_job(gcs_config_path: str):
     base_image=BASE_IMAGE, machine_type="e2-standard-4", display_name="prepare_extract", service_account=SERVICE_ACCOUNT
 )
 def prepare_extract_job(gcs_config_path: str):
+    from cellarium.nexus.nexus_data_controller import NexusDataController
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import BQOpsPrepareExtract
-    from cellarium.nexus.nexus_data_controller import NexusDataController
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=BQOpsPrepareExtract)
 
@@ -86,9 +86,9 @@ def prepare_extract_job(gcs_config_path: str):
     base_image=BASE_IMAGE, machine_type="e2-standard-32", display_name="extract", service_account=SERVICE_ACCOUNT
 )
 def extract_job(gcs_config_path: str):
+    from cellarium.nexus.nexus_data_controller import NexusDataController
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import BQOpsExtract
-    from cellarium.nexus.nexus_data_controller import NexusDataController
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=BQOpsExtract)
 

@@ -7,18 +7,16 @@ import logging
 import os
 import pathlib
 import tempfile
-
 from typing import Any, Sequence
 
 import fastavro
 import smart_open
-
 from google.cloud import bigquery
-
-from cellarium.nexus.shared import schemas, utils
 from nexus.clients import NexusBackendAPIClient
 from nexus.omics_datastore.bq_ops.bq_datastore_controller import BQDatastoreController
 from nexus.omics_datastore.bq_ops.ingest.create_ingest_files import optimized_read_anndata
+
+from cellarium.nexus.shared import schemas, utils
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)

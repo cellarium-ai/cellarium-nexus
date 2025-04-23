@@ -1,12 +1,12 @@
-import tempfile
-import os
-import typing as t
 import functools
+import os
+import tempfile
+import typing as t
+
+from google.cloud import aiplatform
+from google_cloud_pipeline_components.v1.custom_job import create_custom_training_job_from_component
 from kfp import compiler, dsl
 from kfp.components import BaseComponent
-
-from google_cloud_pipeline_components.v1.custom_job import create_custom_training_job_from_component
-from google.cloud import aiplatform
 
 from cellarium.nexus.workflows.kubeflow.utils import constants
 

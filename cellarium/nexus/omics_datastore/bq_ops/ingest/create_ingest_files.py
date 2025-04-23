@@ -28,6 +28,7 @@ from anndata._core.anndata import AnnData
 from anndata._io.h5ad import _clean_uns, _read_raw
 from anndata._io.specs import read_elem
 from fastavro import parse_schema, writer
+
 from cellarium.nexus.omics_datastore.bq_avro_schemas import converter
 from cellarium.nexus.omics_datastore.bq_avro_schemas.cell_management import (
     CellInfoBQAvroSchema,

@@ -13,8 +13,8 @@ from unfold.admin import ModelAdmin
 from unfold.contrib.filters.admin import RangeNumericFilter, RelatedDropdownFilter
 from unfold.decorators import action
 
-from cellarium.nexus.backend.cell_management.admin import constants, forms, utils as admin_utils
-
+from cellarium.nexus.backend.cell_management.admin import constants, forms
+from cellarium.nexus.backend.cell_management.admin import utils as admin_utils
 from cellarium.nexus.backend.cell_management.admin.filters import MultiValueTextFilter, OntologyTermFilter
 from cellarium.nexus.backend.cell_management.models import BigQueryDataset, CellInfo
 

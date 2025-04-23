@@ -1,5 +1,7 @@
+from typing import Any, Dict, Optional
+
 from pydantic import BaseModel
-from typing import Dict, Any, Optional
+
 from cellarium.nexus.shared import schemas
 
 
@@ -17,6 +19,7 @@ class IngestTaskConfig(BaseModel):
     :param tag: Tag associated with the data source
     :param metadata_columns: Optional dictionary containing obs and var column mappings
     """
+
     project_id: str
     nexus_backend_api_url: str
     bigquery_dataset: str

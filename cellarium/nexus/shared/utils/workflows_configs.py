@@ -4,9 +4,9 @@ Utility functions for handling workflow configurations.
 
 import datetime
 import os
+import secrets
 import tempfile
 from typing import TypeVar
-import secrets
 
 import yaml
 from pydantic import BaseModel

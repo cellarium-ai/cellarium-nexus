@@ -10,8 +10,8 @@ from cellarium.nexus.backend.cell_management.admin.cell_info_admin import CellIn
 from cellarium.nexus.backend.cell_management.admin.feature_schema_admin import FeatureSchemaAdmin
 
 __all__ = [
-    'BigQueryDatasetAdmin',
-    'CellInfoAdmin',
-    'CellFeatureInfoAdmin',
-    'FeatureSchemaAdmin',
+    "BigQueryDatasetAdmin",
+    "CellInfoAdmin",
+    "CellFeatureInfoAdmin",
+    "FeatureSchemaAdmin",
 ]

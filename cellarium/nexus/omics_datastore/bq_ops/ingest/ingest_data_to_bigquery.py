@@ -5,10 +5,11 @@ from typing import List, Tuple
 
 from google.api_core.exceptions import NotFound
 from google.cloud import bigquery
+from tenacity import before_log, retry, stop_after_attempt, wait_exponential
+
 from cellarium.nexus.omics_datastore.bq_avro_schemas import cell_management, converter
 from cellarium.nexus.omics_datastore.bq_ops import constants
 from cellarium.nexus.omics_datastore.bq_ops.create_bq_tables import create_staging_table
-from tenacity import retry, stop_after_attempt, wait_exponential, before_log
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
