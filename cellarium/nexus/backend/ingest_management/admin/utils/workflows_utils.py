@@ -14,7 +14,21 @@ from cellarium.nexus.workflows.kubeflow.utils.job import submit_pipeline
 
 def submit_ingest_pipeline(
     df_ingest_file_info: pd.DataFrame, bigquery_dataset: BigQueryDataset, column_mapping: dict
-) -> None:
+) -> str:
+    """
+    Submit a Kubeflow pipeline for data ingestion with the provided configurations.
+    
+    Create task configs for each file in the dataframe, save them to GCS, and submit the pipeline.
+    
+    :param df_ingest_file_info: DataFrame containing information about files to ingest, must include gcs_file_path column
+    :param bigquery_dataset: BigQuery dataset where data will be ingested
+    :param column_mapping: Dictionary mapping input columns to schema columns
+    
+    :raise IOError: If there's an error writing configs to GCS
+    :raise google.api_core.exceptions.GoogleAPIError: If pipeline submission fails
+    
+    :return: URL to the Vertex AI Pipeline dashboard for the submitted job
+    """
     timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
     base_stage_dir = f"{settings.BACKEND_PIPELINE_DIR}/data-ingests/{timestamp}_{secrets.token_hex(12)}"
 
@@ -51,8 +65,8 @@ def submit_ingest_pipeline(
 
     task_config_paths = utils.workflows_configs.dump_configs_to_bucket(task_configs, configs_stage_dir)
 
-    # Submit pipeline
-    submit_pipeline(
+    # Submit pipeline and return the pipeline URL
+    return submit_pipeline(
         pipeline_component=ingest_data_pipeline,
         display_name=f"Nexus Ingest Data - {bigquery_dataset.name}",
         gcp_project=settings.GCP_PROJECT_ID,

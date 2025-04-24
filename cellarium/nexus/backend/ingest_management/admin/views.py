@@ -103,11 +103,14 @@ class IngestInfoAdmin(ModelAdmin):
                 raise ValidationError(f"CSV must contain columns: {', '.join(constants.REQUIRED_CSV_FILE_COLUMNS)}")
 
             column_mapping = admin_utils.create_column_mapping(column_mapping_obj=column_mapping_obj)
-            admin_utils.submit_ingest_pipeline(
+            pipeline_url = admin_utils.submit_ingest_pipeline(
                 df_ingest_file_info=df, column_mapping=column_mapping, bigquery_dataset=bigquery_dataset
             )
 
-            messages.success(request=request, message=_("Data ingestion pipeline started successfully"))
+            messages.success(
+                request=request, 
+                message=constants.INGEST_PIPELINE_SUCCESS_MESSAGE.format(pipeline_url)
+            )
             return redirect("admin:ingest_management_ingestinfo_changelist")
 
         return render(

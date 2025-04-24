@@ -122,7 +122,7 @@ class CellInfoAdmin(ModelAdmin):
             extract_bin_size = form.cleaned_data["extract_bin_size"]
             filters = form.cleaned_data["filters"] or {}
 
-            admin_utils.submit_extract_pipeline(
+            pipeline_url = admin_utils.submit_extract_pipeline(
                 feature_schema=feature_schema,
                 extract_table_prefix=extract_name,
                 extract_bin_size=extract_bin_size,
@@ -131,7 +131,10 @@ class CellInfoAdmin(ModelAdmin):
                 creator_id=request.user.id,
             )
 
-            messages.success(request=request, message=constants.EXTRACT_SUCCESS_MESSAGE)
+            messages.success(
+                request=request, 
+                message=constants.EXTRACT_PIPELINE_SUCCESS_MESSAGE.format(pipeline_url)
+            )
             return redirect("admin:cell_management_cellinfo_changelist")
 
         return render(
