@@ -3,9 +3,15 @@ import json
 from django import forms
 from django.utils.translation import gettext_lazy as _
 from django_json_widget.widgets import JSONEditorWidget as BaseJSONEditorWidget
-from unfold.widgets import UnfoldAdminFileFieldWidget, UnfoldAdminSelectWidget, UnfoldAdminTextInputWidget
+from unfold.widgets import (
+    UnfoldAdminFileFieldWidget,
+    UnfoldAdminIntegerFieldWidget,
+    UnfoldAdminSelectWidget,
+    UnfoldAdminTextInputWidget,
+)
 
 from cellarium.nexus.backend.cell_management.models import BigQueryDataset, FeatureSchema
+from cellarium.nexus.backend.curriculum.models import Curriculum
 
 
 class CustomJSONEditorWidget(BaseJSONEditorWidget):
@@ -77,9 +83,9 @@ class CreateSchemaFromCSVForm(forms.Form):
     )
 
 
-class PrepareExtractTablesForm(forms.Form):
+class ExtractCurriculumForm(forms.Form):
     """
-    Form for preparing extract tables.
+    Form for submitting extract curriculum job.
     """
 
     feature_schema = forms.ModelChoiceField(
@@ -88,11 +94,10 @@ class PrepareExtractTablesForm(forms.Form):
         widget=UnfoldAdminSelectWidget,
         help_text=_("Feature schema to use for extraction"),
     )
-
-    extract_name = forms.CharField(
-        label=_("Extract Table Prefix"),
+    name = forms.CharField(
+        label=_("Curriculum Name"),
         max_length=255,
-        help_text=_("Prefix for the extract tables"),
+        help_text=_("Name for the new curriculum"),
         widget=UnfoldAdminTextInputWidget,
     )
     extract_bin_size = forms.IntegerField(
@@ -100,6 +105,7 @@ class PrepareExtractTablesForm(forms.Form):
         min_value=1,
         max_value=100_000,
         help_text=_("Bin size for the extract tables"),
+        widget=UnfoldAdminIntegerFieldWidget,
     )
     bigquery_dataset = forms.ModelChoiceField(
         label=_("BigQuery Dataset"),
@@ -167,11 +173,24 @@ class PrepareExtractTablesForm(forms.Form):
 
         return cleaned_data
 
+    def clean_name(self):
+        """
+        Validate that no curriculum with this name exists.
+
+        :raise: forms.ValidationError
+
+        :return: Validated name
+        """
+        name = self.cleaned_data.get("name")
+        if Curriculum.objects.filter(name=name).exists():
+            raise forms.ValidationError(_("A curriculum with this name already exists"))
+        return name
+
     def clean_filters(self):
         """
         Validate the filters JSON field.
 
-        :raise forms.ValidationError: If JSON is invalid
+        :raise: forms.ValidationError
 
         :return: Parsed JSON filters or empty dict
         """

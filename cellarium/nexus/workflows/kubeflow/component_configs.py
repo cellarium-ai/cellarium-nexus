@@ -32,6 +32,7 @@ class IngestTaskConfig(BaseModel):
 
 class BQOpsPrepareExtract(BaseModel):
     name: str
+    creator_id: int
     project_id: str
     nexus_backend_api_url: str
     bigquery_dataset: str
@@ -41,7 +42,6 @@ class BQOpsPrepareExtract(BaseModel):
     extract_bin_size: int
     bucket_name: str
     extract_bucket_path: str
-    creator_id: int
 
 
 class BQOpsExtract(BaseModel):

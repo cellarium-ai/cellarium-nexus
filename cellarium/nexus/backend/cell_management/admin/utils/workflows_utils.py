@@ -35,10 +35,10 @@ def get_total_cell_in_bq_number(bigquery_dataset: models.BigQueryDataset, filter
 
 def compose_extract_curriculum_configs(
     name: str,
+    creator_id: int,
     feature_schema: models.FeatureSchema,
     bigquery_dataset: models.BigQueryDataset,
     extract_bin_size: int,
-    creator_id: int,
     filters: dict | None = None,
 ) -> tuple[component_configs.BQOpsPrepareExtract, list[component_configs.BQOpsExtract]]:
     """
@@ -113,34 +113,37 @@ def compose_extract_curriculum_configs(
 
 def compose_and_dump_configs(
     feature_schema: models.FeatureSchema,
+    creator_id: int,
     bigquery_dataset: models.BigQueryDataset,
-    extract_table_prefix: str,
+    name: str,
     extract_bin_size: int,
     filters: dict | None = None,
 ) -> tuple[str, list[str]]:
     """
     Compose extract pipeline configs and dump them to GCS bucket.
-    
+
     Create prepare extract and extract configs based on the provided parameters,
     then save them to GCS and return their paths.
-    
+
     :param feature_schema: Feature schema containing gene features to extract
+    :param creator_id: ID of a user who initiated the extract.
     :param bigquery_dataset: BigQuery dataset to extract data from
-    :param extract_table_prefix: Prefix for extract table names
+    :param name: Name for the extract
     :param extract_bin_size: Number of cells per extract bin
     :param filters: Optional dictionary of filter statements to apply
-    
+
     :raise ValueError: If extract_bin_size <= 0
     :raise exceptions.ZeroCellsReturnedError: If no cells match the filters
     :raise IOError: If there's an error writing configs to GCS
     :raise google.api_core.exceptions.GoogleAPIError: If BigQuery operations fail
-    
+
     :return: Tuple containing the prepare extract config path and a list of extract config paths
     """
     prepare_extract_config, extract_configs = compose_extract_curriculum_configs(
         feature_schema=feature_schema,
+        creator_id=creator_id,
         bigquery_dataset=bigquery_dataset,
-        name=extract_table_prefix,
+        name=name,
         extract_bin_size=extract_bin_size,
         filters=filters,
     )
@@ -158,33 +161,36 @@ def compose_and_dump_configs(
 
 def submit_extract_pipeline(
     feature_schema: models.FeatureSchema,
+    creator_id: int,
     bigquery_dataset: models.BigQueryDataset,
-    extract_table_prefix: str,
+    name: str,
     extract_bin_size: int,
     filters: dict | None = None,
 ) -> str:
     """
     Submit a Kubeflow pipeline for data extraction with the provided configurations.
-    
+
     Generate extract configs, save them to GCS, and submit the pipeline for execution.
-    
+
     :param feature_schema: Feature schema containing gene features to extract
+    :param creator_id: ID of a user who initiated the extract.
     :param bigquery_dataset: BigQuery dataset to extract data from
-    :param extract_table_prefix: Prefix for extract table names
+    :param name: Name for the extract
     :param extract_bin_size: Number of cells per extract bin
     :param filters: Optional dictionary of filter statements to apply
-    
+
     :raise ValueError: If extract_bin_size <= 0
     :raise exceptions.ZeroCellsReturnedError: If no cells match the filters
     :raise IOError: If there's an error writing configs to GCS
     :raise google.api_core.exceptions.GoogleAPIError: If pipeline submission fails
-    
+
     :return: URL to the Vertex AI Pipeline dashboard for the submitted job
     """
     prepare_extract_config_path, extract_config_paths = compose_and_dump_configs(
         feature_schema=feature_schema,
+        creator_id=creator_id,
         bigquery_dataset=bigquery_dataset,
-        extract_table_prefix=extract_table_prefix,
+        name=name,
         extract_bin_size=extract_bin_size,
         filters=filters,
     )

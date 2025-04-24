@@ -24,7 +24,9 @@ MULTIPLE_DATASETS_ERROR = _("Multiple BigQuery datasets exist. Please select a B
 EXTRACT_SUCCESS_MESSAGE = _("Extract tables prepared successfully")
 
 # Pipeline success messages
-EXTRACT_PIPELINE_SUCCESS_MESSAGE = _("Extract tables prepared successfully. <a href=\"{0}\" target=\"_blank\">Vertex AI Dashboard</a>")
+EXTRACT_PIPELINE_SUCCESS_MESSAGE = _(
+    'Extract tables prepared successfully. <a href="{0}" target="_blank">Vertex AI Dashboard</a>'
+)
 
 # Workflows related constants
 BINS_PER_WORKER = 32

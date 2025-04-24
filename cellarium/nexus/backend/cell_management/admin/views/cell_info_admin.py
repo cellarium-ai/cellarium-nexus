@@ -71,10 +71,10 @@ class CellInfoAdmin(ModelAdmin):
     )
     ordering = ("-id",)
     readonly_fields = ("id",)
-    actions_list = ["extract_data_action"]
+    actions_list = ["extract_curriculum_action"]
 
-    @action(description=_("Extract Data"), url_path="extract-data")
-    def extract_data_action(self, request: HttpRequest) -> HttpResponse:
+    @action(description=_("Extract Curriculum"), url_path="extract-curriculum")
+    def extract_curriculum_action(self, request: HttpRequest) -> HttpResponse:
         """
         Prepare extract tables for data extraction.
 
@@ -113,28 +113,25 @@ class CellInfoAdmin(ModelAdmin):
         # Create initial form data with extracted filters and dataset
         initial_data = {"filters": filters, "bigquery_dataset": bigquery_dataset}
 
-        form = forms.PrepareExtractTablesForm(request.POST or None, initial=initial_data)
+        form = forms.ExtractCurriculumForm(request.POST or None, initial=initial_data)
 
         if request.method == "POST" and form.is_valid():
             # Get form data
             feature_schema = form.cleaned_data["feature_schema"]
-            extract_name = form.cleaned_data["extract_name"]
+            name = form.cleaned_data["name"]
             extract_bin_size = form.cleaned_data["extract_bin_size"]
             filters = form.cleaned_data["filters"] or {}
 
             pipeline_url = admin_utils.submit_extract_pipeline(
                 feature_schema=feature_schema,
-                extract_table_prefix=extract_name,
+                name=name,
                 extract_bin_size=extract_bin_size,
                 filters=filters,
                 bigquery_dataset=bigquery_dataset,
                 creator_id=request.user.id,
             )
 
-            messages.success(
-                request=request, 
-                message=constants.EXTRACT_PIPELINE_SUCCESS_MESSAGE.format(pipeline_url)
-            )
+            messages.success(request=request, message=constants.EXTRACT_PIPELINE_SUCCESS_MESSAGE.format(pipeline_url))
             return redirect("admin:cell_management_cellinfo_changelist")
 
         return render(

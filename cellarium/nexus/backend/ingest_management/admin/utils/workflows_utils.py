@@ -17,16 +17,16 @@ def submit_ingest_pipeline(
 ) -> str:
     """
     Submit a Kubeflow pipeline for data ingestion with the provided configurations.
-    
+
     Create task configs for each file in the dataframe, save them to GCS, and submit the pipeline.
-    
+
     :param df_ingest_file_info: DataFrame containing information about files to ingest, must include gcs_file_path column
     :param bigquery_dataset: BigQuery dataset where data will be ingested
     :param column_mapping: Dictionary mapping input columns to schema columns
-    
+
     :raise IOError: If there's an error writing configs to GCS
     :raise google.api_core.exceptions.GoogleAPIError: If pipeline submission fails
-    
+
     :return: URL to the Vertex AI Pipeline dashboard for the submitted job
     """
     timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")

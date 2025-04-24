@@ -62,7 +62,7 @@ def submit_pipeline(
                              Vertex AI Pipelines location will be used.
 
     :raise: google.api_core.exceptions.GoogleAPIError: If pipeline submission fails.
-    
+
     :return: URL link to the Vertex AI Pipeline dashboard for the submitted job
     """
     temp_file = tempfile.NamedTemporaryFile(suffix=".yaml")
@@ -89,7 +89,7 @@ def submit_pipeline(
 
     job.submit(**submit_kwargs)
     temp_file.close()
-    
+
     # Generate the Vertex AI Pipeline dashboard URL
     pipeline_url = f"https://console.cloud.google.com/vertex-ai/locations/{pipeline_location}/pipelines/runs/{job.name}?project={gcp_project}"
     return pipeline_url
