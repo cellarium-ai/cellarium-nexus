@@ -68,6 +68,7 @@ class CurriculumAPISchema(BaseModel):
     """
     API schema for Curriculum model.
     """
+
     id: int
     creator_id: int
     created_at: datetime

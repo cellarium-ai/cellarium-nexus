@@ -337,7 +337,15 @@ class NexusDataController:
 
         :raise google.api_core.exceptions.GoogleAPIError: If extraction fails
         :raise IOError: If file operations fail
+        :raise ValueError: If extract metadata is invalid
         """
+        # Load extract metadata from GCS
+        metadata_path = f"gs://{bucket_name}/{extract_bucket_path}/{constants.EXTRACT_METADATA_FILE_NAME}"
+        with smart_open.open(metadata_path, "r") as f:
+            metadata_dict = json.load(f)
+            extract_metadata = schemas.ExtractMetadata(**metadata_dict)
+        logger.info(f"Loaded extract metadata from `{metadata_path}`")
+
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_dir_path = pathlib.Path(temp_dir)
             logger.info(f"Created temporary directory `{temp_dir_path}`")
@@ -347,6 +355,7 @@ class NexusDataController:
                 extract_table_prefix=extract_name,
                 bins=bins,
                 output_dir=temp_dir_path,
+                extract_metadata=extract_metadata,
                 obs_columns=obs_columns,
                 max_workers=max_workers,
             )
