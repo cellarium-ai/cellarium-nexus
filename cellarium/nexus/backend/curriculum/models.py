@@ -31,14 +31,12 @@ class Curriculum(models.Model):
     cell_count = models.IntegerField(verbose_name=_("cell count"), null=True, blank=True)
     extract_bin_size = models.IntegerField(verbose_name=_("extract bin size"), null=True, blank=True)
     extract_bin_count = models.IntegerField(verbose_name=_("extract bin count"), null=True, blank=True)
-    extract_files_dir = models.CharField(
-        max_length=512,
+    extract_files_path = models.FilePathField(
         verbose_name=_("extract files directory"),
         null=True,
         blank=True,
     )
-    metadata_file_path = models.CharField(
-        max_length=512,
+    metadata_file_path = models.FileField(
         verbose_name=_("metadata file path"),
         null=True,
         blank=True,

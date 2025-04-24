@@ -75,7 +75,7 @@ class CurriculumAPISchema(BaseModel):
     cell_count: int | None = None
     name: str | None = None
     description: str | None = None
-    extract_files_dir: str | None = None
+    extract_files_path: str | None = None
     metadata_file_path: str | None = None
     extract_bin_size: int | None = None
     filters_json: dict[str, Any] | None = None

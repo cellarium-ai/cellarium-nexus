@@ -23,9 +23,10 @@ class CurriculumSerializer(serializers.ModelSerializer):
             "creator_id",
             "cell_count",
             "extract_bin_size",
-            "extract_files_dir",
+            "extract_files_path",
             "metadata_file_path",
             "created_at",
             "filters_json",
+            "status"
         ]
         read_only_fields = ["id", "created_at"]

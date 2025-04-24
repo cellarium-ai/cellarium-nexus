@@ -388,7 +388,7 @@ class NexusDataController:
         :raise Exception: If any error occurs during the process (after marking curriculum as failed)
         """
         # Define paths
-        extract_files_dir = f"gs://{bucket_name}/{extract_bucket_path}/extract_files"
+        extract_files_path = f"{extract_bucket_path}/extract_files"
         metadata_path = f"{extract_bucket_path}/{constants.EXTRACT_METADATA_FILE_NAME}"
         gcs_metadata_path = f"gs://{bucket_name}/{metadata_path}"
 
@@ -414,7 +414,7 @@ class NexusDataController:
                 name=extract_name,
                 cell_count=cell_count,
                 extract_bin_count=total_bins,
-                extract_files_dir=extract_files_dir,
+                extract_files_path=extract_files_path,
                 metadata_file_path=metadata_path,
                 status="SUCCEEDED",
             )

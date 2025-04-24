@@ -296,8 +296,8 @@ STORAGES = {
         "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
         "OPTIONS": {
             "project_id": GCP_PROJECT_ID,
-            "bucket_name": BUCKET_NAME_PUBLIC,
-            "location": STATIC_LOCATION,
+            "bucket_name": BUCKET_NAME_PRIVATE,
+            "location": "",
             "querystring_auth": False,
         },
     },

@@ -197,7 +197,7 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
         status: Literal["EXTRACTING", "SUCCEEDED", "FAILED"] | None = None,
         cell_count: int | None = None,
         extract_bin_count: int | None = None,
-        extract_files_dir: str | None = None,
+        extract_files_path: str | None = None,
         metadata_file_path: str | None = None,
     ) -> CurriculumAPISchema:
         """
@@ -207,7 +207,7 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
         :param status: New status to set (either "EXTRACTING", "SUCCEEDED", or "FAILED")
         :param cell_count: Total number of cells in the extract
         :param extract_bin_count: Number of extract bins
-        :param extract_files_dir: Directory containing the extract files
+        :param extract_files_path: Directory containing the extract files
         :param metadata_file_path: Path to the metadata file
 
         :raise: HTTPError, ValueError
@@ -221,8 +221,8 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
             data["cell_count"] = cell_count
         if extract_bin_count is not None:
             data["extract_bin_count"] = extract_bin_count
-        if extract_files_dir is not None:
-            data["extract_files_dir"] = extract_files_dir
+        if extract_files_path is not None:
+            data["extract_files_path"] = extract_files_path
         if metadata_file_path is not None:
             data["metadata_file_path"] = metadata_file_path
 
