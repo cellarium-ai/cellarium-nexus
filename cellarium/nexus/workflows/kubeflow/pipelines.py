@@ -72,3 +72,5 @@ def extract_data_pipeline(prepare_extract_config: str, extract_configs: t.List[s
 
     extract_op = run_extracts_pipeline(extract_configs=extract_configs)
     extract_op.after(prepare_op)
+    mark_curriculum_as_finished_op = components.mark_curriculum_as_finished_job(gcs_config_path=prepare_extract_config)
+    mark_curriculum_as_finished_op.after(extract_op)

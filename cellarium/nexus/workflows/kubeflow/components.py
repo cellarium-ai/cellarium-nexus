@@ -72,7 +72,7 @@ def prepare_extract_job(gcs_config_path: str):
         bigquery_dataset=params.bigquery_dataset,
     )
     controller.prepare_extract_tables(
-        extract_table_prefix=params.extract_table_prefix,
+        extract_name=params.name,
         features=params.features,
         filters=params.filters,
         obs_columns=params.obs_columns,
@@ -98,10 +98,46 @@ def extract_job(gcs_config_path: str):
         bigquery_dataset=params.bigquery_dataset,
     )
     controller.extract_data(
-        extract_table_prefix=params.extract_table_prefix,
+        extract_name=params.name,
         bins=params.bins,
         bucket_name=params.bucket_name,
         extract_bucket_path=params.extract_bucket_path,
         obs_columns=params.obs_columns,
         max_workers=params.max_workers,
+    )
+
+
+@job.dsl_component_job(
+    base_image=BASE_IMAGE,
+    machine_type="e2-standard-4",
+    display_name="mark_curriculum_as_finished",
+    service_account=SERVICE_ACCOUNT,
+)
+def mark_curriculum_as_finished_job(gcs_config_path: str):
+    """
+    Mark a curriculum as finished and succeeded, including extract metadata.
+
+    Retrieves metadata information from the metadata file and updates the curriculum
+    with this information, including the number of bins, extract files path, and
+    metadata file path.
+
+    :param gcs_config_path: Path to the configuration file in GCS
+
+    :raise Exception: If any error occurs during the process
+    """
+    from cellarium.nexus.nexus_data_controller import NexusDataController
+    from cellarium.nexus.shared import utils
+    from cellarium.nexus.workflows.kubeflow.component_configs import BQOpsPrepareExtract
+
+    params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=BQOpsPrepareExtract)
+
+    controller = NexusDataController(
+        project_id=params.project_id,
+        nexus_backend_api_url=params.nexus_backend_api_url,
+        bigquery_dataset=params.bigquery_dataset,
+    )
+    controller.mark_curriculum_as_finished(
+        extract_name=params.name,
+        bucket_name=params.bucket_name,
+        extract_bucket_path=params.extract_bucket_path,
     )

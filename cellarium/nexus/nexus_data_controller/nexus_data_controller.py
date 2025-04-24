@@ -3,6 +3,7 @@ Control and manage Nexus data operations.
 """
 
 import datetime
+import json
 import logging
 import os
 import pathlib
@@ -16,7 +17,9 @@ from nexus.clients import NexusBackendAPIClient
 from nexus.omics_datastore.bq_ops.bq_datastore_controller import BQDatastoreController
 from nexus.omics_datastore.bq_ops.ingest.create_ingest_files import optimized_read_anndata
 
+from cellarium.nexus.nexus_data_controller import constants
 from cellarium.nexus.shared import schemas, utils
+from cellarium.nexus.shared.schemas.omics_datastore import ExtractMetadata
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -239,58 +242,83 @@ class NexusDataController:
     def prepare_extract_tables(
         self,
         *,
-        extract_table_prefix: str,
+        extract_name: str,
         features: Sequence[schemas.FeatureSchema],
-        filters: dict[str, Any] | None = None,
-        obs_columns: list[str] | None = None,
+        creator_id: int,
+        bucket_name: str,
+        extract_bucket_path: str,
         extract_bin_size: int = 10000,
         assign_bin_by_category: bool = False,
         extract_bin_category_column_name: str | None = None,
         random_seed_offset: int = 0,
         partition_bin_count: int = 40000,
         partition_size: int = 10,
-        bucket_name: str | None = None,
-        extract_bucket_path: str | None = None,
+        filters: dict[str, Any] | None = None,
+        obs_columns: list[str] | None = None,
     ) -> None:
         """
         Prepare extract tables for data extraction.
 
-        :param extract_table_prefix: Prefix for extract table names
+        :param extract_name: Prefix for extract table names
         :param features: Sequence of feature schema objects
-        :param filters: Optional query filters to apply
-        :param obs_columns: Optional list of observation columns to include
+        :param creator_id: ID of the curriculum creator
+        :param bucket_name: GCS bucket name for metadata storage
+        :param extract_bucket_path: Path within bucket for metadata storage
         :param extract_bin_size: Size of cell bins
         :param assign_bin_by_category: Whether to bin by category
         :param extract_bin_category_column_name: Column name for category binning
         :param random_seed_offset: Offset for randomization
         :param partition_bin_count: Number of partitions
         :param partition_size: Size of each partition
-        :param bucket_name: GCS bucket name for metadata storage
-        :param extract_bucket_path: Path within bucket for metadata storage
+        :param filters: Optional query filters to apply
+        :param obs_columns: Optional list of observation columns to include
 
         :raise ValueError: If binning parameters are invalid
         :raise google.api_core.exceptions.GoogleAPIError: If table creation fails
         :raise IOError: If metadata file operations fail
         """
-        self.bq_controller.prepare_extract_tables(
-            extract_table_prefix=extract_table_prefix,
-            features=features,
-            filters=filters,
-            obs_columns=obs_columns,
-            extract_bin_size=extract_bin_size,
-            assign_bin_by_category=assign_bin_by_category,
-            extract_bin_category_column_name=extract_bin_category_column_name,
-            random_seed_offset=random_seed_offset,
-            partition_bin_count=partition_bin_count,
-            partition_size=partition_size,
-            bucket_name=bucket_name,
-            extract_bucket_path=extract_bucket_path,
+        backend_client = NexusBackendAPIClient(api_url=self.backend_client.api_url)
+        backend_client.register_curriculum(
+            name=extract_name, creator_id=creator_id, extract_bin_size=extract_bin_size, filters_json=filters
         )
+        try:
+            extract_metadata = self.bq_controller.prepare_extract_tables(
+                extract_table_prefix=extract_name,
+                features=features,
+                extract_bin_size=extract_bin_size,
+                assign_bin_by_category=assign_bin_by_category,
+                extract_bin_category_column_name=extract_bin_category_column_name,
+                random_seed_offset=random_seed_offset,
+                partition_bin_count=partition_bin_count,
+                partition_size=partition_size,
+                filters=filters,
+                obs_columns=obs_columns,
+            )
+
+            # Save metadata to GCS
+            metadata_path = f"{extract_bucket_path}/{constants.EXTRACT_METADATA_FILE_NAME}"
+
+            # Create a temporary local file
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as temp_file:
+                json.dump(extract_metadata.model_dump(), temp_file, indent=2)
+                temp_file.flush()
+
+                # Upload to GCS
+                logger.info(f"Uploading metadata to GCS")
+                utils.gcp.upload_file_to_bucket(
+                    local_file_path=temp_file.name, bucket_name=bucket_name, blob_name=metadata_path
+                )
+
+            # Update curriculum with metadata file path
+            backend_client.update_curriculum(name=extract_name, metadata_file_path=metadata_path, status="EXTRACTING")
+        except Exception:
+            backend_client.update_curriculum(name=extract_name, status="FAILED")
+            raise
 
     def extract_data(
         self,
         *,
-        extract_table_prefix: str,
+        extract_name: str,
         bins: list[int],
         bucket_name: str,
         extract_bucket_path: str,
@@ -300,7 +328,7 @@ class NexusDataController:
         """
         Extract data from prepared extract tables into AnnData files and upload to GCS.
 
-        :param extract_table_prefix: Prefix for extract table names
+        :param extract_name: Prefix for extract table names
         :param bins: List of bin numbers to extract
         :param bucket_name: GCS bucket name
         :param extract_bucket_path: Path within bucket
@@ -316,7 +344,7 @@ class NexusDataController:
 
             # Extract data locally
             self.bq_controller.extract_data(
-                extract_table_prefix=extract_table_prefix,
+                extract_table_prefix=extract_name,
                 bins=bins,
                 output_dir=temp_dir_path,
                 obs_columns=obs_columns,
@@ -329,3 +357,74 @@ class NexusDataController:
                 local_directory_path=temp_dir_path,
                 prefix=f"{extract_bucket_path}/extract_files",
             )
+
+    def mark_curriculum_as_finished(
+        self,
+        *,
+        extract_name: str,
+        bucket_name: str,
+        extract_bucket_path: str,
+    ) -> None:
+        """
+        Mark a curriculum as finished and succeeded, including extract metadata.
+
+        Retrieves metadata information from the metadata file and updates the curriculum
+        with this information, including the number of bins, extract files path, and
+        metadata file path. If any error occurs during the process, the curriculum is marked as failed.
+
+        :param extract_name: Name of the curriculum to mark as finished
+        :param bucket_name: GCS bucket name containing the extract files
+        :param extract_bucket_path: Path within bucket for the extract
+
+        :raise Exception: If any error occurs during the process (after marking curriculum as failed)
+        """
+        # Define paths
+        extract_files_dir = f"gs://{bucket_name}/{extract_bucket_path}/extract_files"
+        metadata_path = f"{extract_bucket_path}/{constants.EXTRACT_METADATA_FILE_NAME}"
+        gcs_metadata_path = f"gs://{bucket_name}/{metadata_path}"
+
+        try:
+            # Read metadata from the JSON file
+            logger.info(f"Reading metadata from {gcs_metadata_path}")
+            with smart_open.open(gcs_metadata_path, "r") as f:
+                metadata_dict = json.load(f)
+
+            # Parse metadata using the Pydantic model
+            extract_metadata = ExtractMetadata.model_validate(metadata_dict)
+
+            # Get required information
+            total_bins = extract_metadata.total_bins
+
+            # Calculate cell count using the model's method
+            cell_count = extract_metadata.calculate_cell_count()
+
+            logger.info(f"Curriculum {extract_name} has {total_bins} bins and {cell_count} cells")
+
+            # Update curriculum with metadata and mark as succeeded
+            self.backend_client.update_curriculum(
+                name=extract_name,
+                cell_count=cell_count,
+                extract_bin_count=total_bins,
+                extract_files_dir=extract_files_dir,
+                metadata_file_path=metadata_path,
+                status="SUCCEEDED",
+            )
+
+            logger.info(f"Successfully marked curriculum {extract_name} as finished")
+
+        except Exception as e:
+            error_message = f"Failed to mark curriculum {extract_name} as finished: {e}"
+            logger.error(error_message)
+
+            # Mark the curriculum as failed
+            try:
+                self.backend_client.update_curriculum(
+                    name=extract_name,
+                    status="FAILED",
+                )
+                logger.info(f"Marked curriculum {extract_name} as failed")
+            except Exception as api_error:
+                logger.error(f"Failed to mark curriculum as failed: {api_error}")
+
+            # Re-raise the original exception
+            raise

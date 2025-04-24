@@ -118,16 +118,17 @@ class CellInfoAdmin(ModelAdmin):
         if request.method == "POST" and form.is_valid():
             # Get form data
             feature_schema = form.cleaned_data["feature_schema"]
-            extract_table_prefix = form.cleaned_data["extract_table_prefix"]
+            extract_name = form.cleaned_data["extract_name"]
             extract_bin_size = form.cleaned_data["extract_bin_size"]
             filters = form.cleaned_data["filters"] or {}
 
             admin_utils.submit_extract_pipeline(
                 feature_schema=feature_schema,
-                extract_table_prefix=extract_table_prefix,
+                extract_table_prefix=extract_name,
                 extract_bin_size=extract_bin_size,
                 filters=filters,
                 bigquery_dataset=bigquery_dataset,
+                creator_id=request.user.id,
             )
 
             messages.success(request=request, message=constants.EXTRACT_SUCCESS_MESSAGE)

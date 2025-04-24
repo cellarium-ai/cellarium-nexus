@@ -34,18 +34,20 @@ def get_total_cell_in_bq_number(bigquery_dataset: models.BigQueryDataset, filter
 
 
 def compose_extract_curriculum_configs(
+    name: str,
     feature_schema: models.FeatureSchema,
     bigquery_dataset: models.BigQueryDataset,
-    extract_table_prefix: str,
     extract_bin_size: int,
+    creator_id: int,
     filters: dict | None = None,
 ) -> tuple[component_configs.BQOpsPrepareExtract, list[component_configs.BQOpsExtract]]:
     """
     Compose extract curriculum configs for the Kubeflow pipeline.
 
+    :param name: Prefix for extract table names
+    :param creator_id: ID of a user who initiated the extract.
     :param feature_schema: Feature schema containing gene features
     :param bigquery_dataset: BigQuery dataset to extract from
-    :param extract_table_prefix: Prefix for extract table names
     :param extract_bin_size: Number of cells per extract bin
     :param filters: Optional dictionary of filter statements to apply
 
@@ -69,19 +71,20 @@ def compose_extract_curriculum_configs(
 
     obs_columns = constants.CELL_INFO_EXTRACT_COLUMNS
 
-    extract_bucket_path = f"{settings.BACKEND_PIPELINE_DIR}/data-extracts/{extract_table_prefix}"
+    extract_bucket_path = f"{settings.BACKEND_PIPELINE_DIR}/data-extracts/{name}"
 
     prepare_extract_config = component_configs.BQOpsPrepareExtract(
+        name=name,
         project_id=settings.GCP_PROJECT_ID,
         nexus_backend_api_url=settings.SITE_URL,
         bigquery_dataset=bigquery_dataset.name,
-        extract_table_prefix=extract_table_prefix,
         features=features,
         filters=filters,
         obs_columns=obs_columns,
         extract_bin_size=extract_bin_size,
         bucket_name=settings.BUCKET_NAME_PRIVATE,
         extract_bucket_path=extract_bucket_path,
+        creator_id=creator_id,
     )
 
     extract_configs = []
@@ -94,10 +97,10 @@ def compose_extract_curriculum_configs(
 
         extract_configs.append(
             component_configs.BQOpsExtract(
+                name=name,
                 project_id=settings.GCP_PROJECT_ID,
                 nexus_backend_api_url=settings.SITE_URL,
                 bigquery_dataset=bigquery_dataset.name,
-                extract_table_prefix=extract_table_prefix,
                 bins=worker_bins,
                 bucket_name=settings.BUCKET_NAME_PRIVATE,
                 extract_bucket_path=extract_bucket_path,
@@ -118,7 +121,7 @@ def compose_and_dump_configs(
     prepare_extract_config, extract_configs = compose_extract_curriculum_configs(
         feature_schema=feature_schema,
         bigquery_dataset=bigquery_dataset,
-        extract_table_prefix=extract_table_prefix,
+        name=extract_table_prefix,
         extract_bin_size=extract_bin_size,
         filters=filters,
     )

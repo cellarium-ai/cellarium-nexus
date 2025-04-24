@@ -152,12 +152,14 @@ class BQDatastoreController:
         self,
         *,
         extract_table_prefix: str,
+        extract_bin_size: int,
         filters: dict[str, Any] | None = None,
     ) -> MetadataExtractor:
         """
         Create a metadata extractor for the given extract tables.
 
         :param extract_table_prefix: Prefix for extract table names
+        :param extract_bin_size: Size for extract bins
         :param filters: Optional filters to apply during extraction
 
         :return: Initialized metadata extractor
@@ -168,6 +170,7 @@ class BQDatastoreController:
             dataset=self.dataset,
             extract_table_prefix=extract_table_prefix,
             filters=filters,
+            extract_bin_size=extract_bin_size,
         )
 
     def prepare_extract_tables(
@@ -183,9 +186,7 @@ class BQDatastoreController:
         partition_size: int = 10,
         filters: dict[str, Any] | None = None,
         obs_columns: list[str] | None = None,
-        bucket_name: str | None = None,
-        extract_bucket_path: str | None = None,
-    ) -> None:
+    ) -> schemas.ExtractMetadata:
         """
         Prepare BigQuery tables for efficient data extraction.
 
@@ -199,12 +200,12 @@ class BQDatastoreController:
         :param partition_size: Size of each partition
         :param filters: Optional filters to apply during preparation
         :param obs_columns: Optional list of observation columns to include
-        :param bucket_name: Optional GCS bucket name for metadata
-        :param extract_bucket_path: Optional GCS path for metadata
 
         :raise google.api_core.exceptions.GoogleAPIError: If table preparation fails
+
+        :return: The complete ExtractMetadata object
         """
-        prepare_extract_tables(
+        return prepare_extract_tables(
             client=self.client,
             project=self.project,
             dataset=self.dataset,
@@ -218,8 +219,6 @@ class BQDatastoreController:
             partition_size=partition_size,
             filters=filters,
             obs_columns=obs_columns,
-            bucket_name=bucket_name,
-            extract_bucket_path=extract_bucket_path,
         )
 
     def extract_data(
@@ -228,6 +227,7 @@ class BQDatastoreController:
         extract_table_prefix: str,
         bins: list[int],
         output_dir: Path,
+        extract_metadata: schemas.ExtractMetadata,
         obs_columns: list[str] | None = None,
         max_workers: int | None = None,
     ) -> None:
@@ -237,6 +237,7 @@ class BQDatastoreController:
         :param extract_table_prefix: Prefix for extract table names
         :param bins: List of bin numbers to extract
         :param output_dir: Local directory to save AnnData files
+        :param extract_metadata: ExtractMetadata instance with metadata for the extract
         :param obs_columns: Optional list of observation columns to include
         :param max_workers: Maximum number of parallel workers
 
@@ -252,6 +253,7 @@ class BQDatastoreController:
             output_dir=output_dir,
             obs_columns=obs_columns,
             max_workers=max_workers,
+            extract_metadata=extract_metadata,
         )
 
     def count_cells(self, *, filter_statements: dict[str, Any] | None = None, dataset: str | None = None) -> int:

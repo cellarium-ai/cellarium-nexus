@@ -89,7 +89,7 @@ class PrepareExtractTablesForm(forms.Form):
         help_text=_("Feature schema to use for extraction"),
     )
 
-    extract_table_prefix = forms.CharField(
+    extract_name = forms.CharField(
         label=_("Extract Table Prefix"),
         max_length=255,
         help_text=_("Prefix for the extract tables"),

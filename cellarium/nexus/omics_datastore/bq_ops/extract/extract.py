@@ -18,7 +18,6 @@ from tenacity import before_log, retry, stop_after_attempt, wait_exponential
 
 from cellarium.nexus.omics_datastore import bq_sql
 from cellarium.nexus.omics_datastore.bq_ops import constants
-from cellarium.nexus.omics_datastore.bq_ops.extract.metadata_extractor import MetadataExtractor
 from cellarium.nexus.shared import schemas
 
 logger = logging.getLogger(__name__)
@@ -205,6 +204,7 @@ class DataExtractor:
         *,
         bin_number: int,
         output_path: Path,
+        extract_metadata: schemas.ExtractMetadata,
         obs_columns: list[str] | None = None,
     ) -> None:
         """
@@ -212,6 +212,7 @@ class DataExtractor:
 
         :param bin_number: Bin number to extract
         :param output_path: Local path to save AnnData file
+        :param extract_metadata: ExtractMetadata instance with metadata for the extract
         :param obs_columns: Optional observation columns to include
 
         :raise google.api_core.exceptions.GoogleAPIError: If queries fail
@@ -277,14 +278,11 @@ class DataExtractor:
                 # Replace None with empty string for string columns
                 adata.obs[obs_column] = series.fillna("")
 
-        # Update categorical columns
-        metadata_extractor = MetadataExtractor(
-            client=self.client,
-            project=self.project,
-            dataset=self.dataset,
-            extract_table_prefix=self.prefix,
-        )
-        categorical_columns = metadata_extractor.get_categorical_columns()
+        # Use the categorical columns from the provided metadata
+        categorical_columns = extract_metadata.category_metadata
+        logger.info(f"Using provided metadata with {len(categorical_columns)} categorical columns")
+
+        # Apply categorical columns to the AnnData object
         for column, categories in categorical_columns.items():
             if column in adata.obs:
                 adata.obs[column] = pd.Categorical(values=pd.Series(adata.obs[column]), categories=categories)
@@ -317,6 +315,7 @@ def perform_extraction(
     extractor: DataExtractor,
     bin_number: int,
     output_path: Path,
+    extract_metadata: schemas.ExtractMetadata,
     obs_columns: list[str] | None = None,
 ) -> None:
     """
@@ -326,12 +325,14 @@ def perform_extraction(
     :param bin_number: Bin number to extract
     :param output_path: Local path to save AnnData file
     :param obs_columns: Optional observation columns to include
+    :param extract_metadata: Optional pre-loaded ExtractMetadata instance
 
     :raise: Will raise any exception after retry attempts are exhausted
     """
     extractor.extract_bin_to_anndata(
         bin_number=bin_number,
         output_path=output_path,
+        extract_metadata=extract_metadata,
         obs_columns=obs_columns,
     )
 
@@ -343,6 +344,7 @@ def extract_bin_to_anndata_worker(
     extract_table_prefix: str,
     bin_number: int,
     output_path: Path,
+    extract_metadata: schemas.ExtractMetadata,
     obs_columns: list[str] | None = None,
 ) -> None:
     """
@@ -354,6 +356,7 @@ def extract_bin_to_anndata_worker(
     :param extract_table_prefix: Prefix for extract table names
     :param bin_number: Bin number to extract
     :param output_path: Local path to save AnnData file
+    :param extract_metadata: ExtractMetadata instance with metadata for the extract
     :param obs_columns: Optional observation columns to include
 
     :raise google.api_core.exceptions.GoogleAPIError: If queries fail
@@ -373,6 +376,7 @@ def extract_bin_to_anndata_worker(
             extractor=extractor,
             bin_number=bin_number,
             output_path=output_path,
+            extract_metadata=extract_metadata,
             obs_columns=obs_columns,
         )
     finally:
@@ -387,6 +391,7 @@ def extract_bins(
     extract_table_prefix: str,
     bins: list[int],
     output_dir: Path,
+    extract_metadata: schemas.ExtractMetadata,
     obs_columns: list[str] | None = None,
     max_workers: int | None = None,
 ) -> None:
@@ -399,6 +404,7 @@ def extract_bins(
     :param extract_table_prefix: Prefix for extract table names
     :param bins: List of bin numbers to extract
     :param output_dir: Local directory to save AnnData files
+    :param extract_metadata: ExtractMetadata instance with metadata for the extract
     :param obs_columns: Optional observation columns to include
     :param max_workers: Maximum number of parallel workers
 
@@ -421,6 +427,7 @@ def extract_bins(
                 extract_table_prefix=extract_table_prefix,
                 bin_number=bin_num,
                 output_path=output_path,
+                extract_metadata=extract_metadata,
                 obs_columns=obs_columns,
             )
             futures.append(future)

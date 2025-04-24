@@ -18,6 +18,7 @@ class ApiEndpoints:
     FEATURE_INFO_RESERVE_INDEXES: str = "api/ingest-management/reserve-indexes/feature-info/"
     INGEST_FROM_AVRO: str = "api/ingest-management/ingest-from-avro/"
     REGISTER_CURRICULUM: str = "api/curriculum/curriculums/"
+    UPDATE_CURRICULUM: str = "api/curriculum/curriculums/{name}"
 
 
 class ReserveIndexesModelType(Enum):
@@ -161,34 +162,69 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
     def register_curriculum(
         self,
         *,
-        cell_count: int,
+        name: str,
+        creator_id: int,
         extract_bin_size: int,
-        extract_files_dir: str,
-        metadata_file_path: str,
         filters_json: dict[str, Any] | None = None,
     ) -> CurriculumAPISchema:
         """
         Register a new curriculum.
 
-        :param cell_count: Number of cells to extract
+        :param name: Name of the curriculum
+        :param creator_id: ID of the creator
         :param extract_bin_size: Size of extraction bins
-        :param extract_files_dir: Directory path for extract files
-        :param metadata_file_path: Path to metadata file
-        :param filters_json: Optional JSON filters for cell selection
+        :param filters_json: Optional filters in JSON format
 
-        :raise HTTPError: if the request fails
-        :raise ValueError: if the request data is invalid
+        :raise: HTTPError, ValueError
 
         :return: Registered curriculum object
         """
         data = {
-            "cell_count": cell_count,
+            "name": name,
+            "creator_id": creator_id,
             "extract_bin_size": extract_bin_size,
-            "extract_files_dir": extract_files_dir,
-            "metadata_file_path": metadata_file_path,
         }
+
         if filters_json is not None:
             data["filters_json"] = filters_json
-
         api_out = self.post_json(endpoint=ApiEndpoints.REGISTER_CURRICULUM, data=data)
+        return CurriculumAPISchema(**api_out)
+
+    def update_curriculum(
+        self,
+        *,
+        name: str,
+        status: Literal["EXTRACTING", "SUCCEEDED", "FAILED"] | None = None,
+        cell_count: int | None = None,
+        extract_bin_count: int | None = None,
+        extract_files_dir: str | None = None,
+        metadata_file_path: str | None = None,
+    ) -> CurriculumAPISchema:
+        """
+        Update curriculum information including status and extract metadata.
+
+        :param name: Name of the curriculum to update
+        :param status: New status to set (either "EXTRACTING", "SUCCEEDED", or "FAILED")
+        :param cell_count: Total number of cells in the extract
+        :param extract_bin_count: Number of extract bins
+        :param extract_files_dir: Directory containing the extract files
+        :param metadata_file_path: Path to the metadata file
+
+        :raise: HTTPError, ValueError
+
+        :return: Updated curriculum object
+        """
+        data = {}
+        if status is not None:
+            data["status"] = status
+        if cell_count is not None:
+            data["cell_count"] = cell_count
+        if extract_bin_count is not None:
+            data["extract_bin_count"] = extract_bin_count
+        if extract_files_dir is not None:
+            data["extract_files_dir"] = extract_files_dir
+        if metadata_file_path is not None:
+            data["metadata_file_path"] = metadata_file_path
+
+        api_out = self.patch_json(endpoint=ApiEndpoints.UPDATE_CURRICULUM.format(name=name), data=data)
         return CurriculumAPISchema(**api_out)

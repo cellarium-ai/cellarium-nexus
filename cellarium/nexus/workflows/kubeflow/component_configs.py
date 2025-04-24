@@ -31,16 +31,17 @@ class IngestTaskConfig(BaseModel):
 
 
 class BQOpsPrepareExtract(BaseModel):
+    name: str
     project_id: str
     nexus_backend_api_url: str
     bigquery_dataset: str
-    extract_table_prefix: str
     features: list[schemas.FeatureSchema]
     filters: dict[str, Any]
     obs_columns: list[str]
     extract_bin_size: int
     bucket_name: str
     extract_bucket_path: str
+    creator_id: int
 
 
 class BQOpsExtract(BaseModel):
@@ -50,7 +51,7 @@ class BQOpsExtract(BaseModel):
     :param project_id: GCP project ID
     :param nexus_backend_api_url: URL of the Nexus backend API
     :param bigquery_dataset: BigQuery dataset name
-    :param extract_table_prefix: Prefix for extract table names
+    :param name: Prefix for extract table names
     :param bins: List of bin numbers to extract
     :param bucket_name: GCS bucket name for output files
     :param extract_bucket_path: Path within bucket for output files
@@ -58,10 +59,10 @@ class BQOpsExtract(BaseModel):
     :param max_workers: Optional maximum number of parallel workers
     """
 
+    name: str
     project_id: str
     nexus_backend_api_url: str
     bigquery_dataset: str
-    extract_table_prefix: str
     bins: list[int]
     bucket_name: str
     extract_bucket_path: str

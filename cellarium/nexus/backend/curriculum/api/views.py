@@ -1,5 +1,6 @@
+from typing import override
+
 from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated
 
 from cellarium.nexus.backend.curriculum.api.serializers import CurriculumSerializer
 from cellarium.nexus.backend.curriculum.models import Curriculum
@@ -14,15 +15,6 @@ class CurriculumViewSet(viewsets.ModelViewSet):
     """
 
     serializer_class = CurriculumSerializer
-    permission_classes = [IsAuthenticated]
     queryset = Curriculum.objects.all()
-
-    def perform_create(self, serializer: CurriculumSerializer) -> None:
-        """
-        Create a new Curriculum instance.
-
-        Set the creator to the authenticated user.
-
-        :param serializer: Validated serializer instance
-        """
-        serializer.save(creator=self.request.user)
+    lookup_field = "name"
+    lookup_url_kwarg = "name"

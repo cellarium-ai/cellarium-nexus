@@ -206,9 +206,7 @@ def prepare_extract_tables(
     partition_size: int = 10,
     filters: dict[str, Any] | None = None,
     obs_columns: list[str] | None = None,
-    bucket_name: str | None = None,
-    extract_bucket_path: str | None = None,
-) -> None:
+) -> schemas.ExtractMetadata:
     """
     Prepare all necessary tables for data extraction.
 
@@ -225,12 +223,11 @@ def prepare_extract_tables(
     :param partition_size: Size of each partition
     :param filters: Query filters to apply
     :param obs_columns: Observation columns to include
-    :param bucket_name: GCS bucket name for metadata storage
-    :param extract_bucket_path: Path within bucket for metadata storage
 
     :raise ValueError: If binning parameters are invalid
     :raise google.api_core.exceptions.GoogleAPIError: If table creation fails
-    :raise IOError: If metadata file operations fail
+
+    :return: The complete ExtractMetadata object
     """
     preparer = ExtractTablePreparer(
         client=client,
@@ -266,18 +263,16 @@ def prepare_extract_tables(
     )
     logger.info("Extract table preparation completed successfully")
 
-    # Step 4: Extract and save metadata if storage location provided
-    if bucket_name and extract_bucket_path:
-        logger.info("Extracting and saving metadata...")
-        metadata_extractor = MetadataExtractor(
-            client=client,
-            project=project,
-            dataset=dataset,
-            extract_table_prefix=extract_table_prefix,
-            filters=filters,
-        )
-        metadata_extractor.save_metadata(
-            bucket_name=bucket_name,
-            extract_bucket_path=extract_bucket_path,
-        )
-        logger.info("Metadata extraction completed successfully")
+    # Step 4: Extract metadata
+    logger.info("Extracting metadata...")
+    metadata_extractor = MetadataExtractor(
+        client=client,
+        project=project,
+        dataset=dataset,
+        extract_table_prefix=extract_table_prefix,
+        filters=filters,
+        extract_bin_size=extract_bin_size,
+    )
+
+    # Compose the extract metadata
+    return metadata_extractor.compose_extract_metadata()

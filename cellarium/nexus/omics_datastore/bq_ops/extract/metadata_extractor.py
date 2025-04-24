@@ -6,7 +6,6 @@ import json
 import logging
 import os
 import ssl
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +16,7 @@ from google.cloud import bigquery
 from smart_open import open
 
 from cellarium.nexus.omics_datastore import bq_sql
+from cellarium.nexus.shared.schemas.omics_datastore import ExtractMetadata
 
 # Configure SSL context for aiohttp
 ssl_context = ssl.create_default_context(cafile=certifi.where())
@@ -32,21 +32,6 @@ EXTRACT_METADATA_TEMPLATE = TEMPLATE_DIR / "extract_metadata.sql.mako"
 MEASURED_GENES_TEMPLATE = TEMPLATE_DIR / "measured_genes.sql.mako"
 
 COLUMNS_TO_IGNORE = ["id", "extract_bin", "original_id", "metadata_extra"]
-
-
-@dataclass
-class ExtractMetadata:
-    """
-    Store metadata about the extract.
-
-    :param total_bins: Total number of extract bins
-    :param last_bin_size: Size of the last bin
-    :param filters: Filters used for the extract
-    """
-
-    total_bins: int
-    last_bin_size: int
-    filters: dict[str, Any] | None
 
 
 class MetadataExtractor:
@@ -67,12 +52,14 @@ class MetadataExtractor:
         dataset: str,
         extract_table_prefix: str,
         filters: dict[str, Any] | None = None,
+        extract_bin_size: int | None = None,
     ) -> None:
         self.client = client
         self.project = project
         self.dataset = dataset
         self.prefix = extract_table_prefix
         self.filters = filters
+        self.extract_bin_size = extract_bin_size
 
     def execute_query(self, sql: str) -> Any:
         """
@@ -103,7 +90,14 @@ class MetadataExtractor:
         sql = bq_sql.render(str(EXTRACT_METADATA_TEMPLATE), template_data)
         result = list(self.execute_query(sql))[0]
 
-        return ExtractMetadata(total_bins=result.total_bins, last_bin_size=result.last_bin_size, filters=self.filters)
+        # Create ExtractMetadata instance with the basic information
+        return ExtractMetadata(
+            total_bins=result.total_bins,
+            last_bin_size=result.last_bin_size,
+            total_cells=result.total_cells,
+            filters=self.filters,
+            extract_bin_size=self.extract_bin_size,
+        )
 
     def get_categorical_columns(self) -> dict[str, list[str]]:
         """
@@ -181,25 +175,14 @@ class MetadataExtractor:
 
         return pd.DataFrame(data=gene_expression_mask, index=pd.Index(tags, name="tag"), columns=feature_labels)
 
-    def save_metadata(
-        self,
-        bucket_name: str,
-        extract_bucket_path: str,
-        metadata_dir: str = "shared_metadata",
-    ) -> None:
+    def compose_extract_metadata(self) -> ExtractMetadata:
         """
-        Save all extract metadata to a single JSON file in GCS bucket.
-
-        :param bucket_name: GCS bucket name
-        :param extract_bucket_path: Path within bucket for extract
-        :param metadata_dir: Directory name for metadata files
+        Create and return a complete ExtractMetadata object with all metadata.
 
         :raise google.api_core.exceptions.GoogleAPIError: If BigQuery operations fail
-        :raise IOError: If file operations fail
-        """
-        base_path = f"gs://{bucket_name}/{extract_bucket_path}/{metadata_dir}"
 
-        # Collect all metadata
+        :return: The complete ExtractMetadata object
+        """
         logger.info("Extracting extract metadata...")
         extract_meta = self.get_extract_metadata()
 
@@ -209,14 +192,8 @@ class MetadataExtractor:
         logger.info("Extracting measured genes info...")
         genes_info = self.get_measured_genes_info()
 
-        # Combine all metadata into a single dictionary
-        combined_metadata = {
-            "general_info": extract_meta.__dict__,
-            "category_metadata": categorical_meta,
-            "measured_genes_mask": genes_info.to_dict(orient="records"),
-        }
+        # Update the extract_meta with additional attributes
+        extract_meta.category_metadata = categorical_meta
+        extract_meta.measured_genes_mask = genes_info.to_dict(orient="records")
 
-        # Save combined metadata to a single file
-        logger.info("Saving combined metadata...")
-        with open(f"{base_path}/extract_metadata.json", "w") as f:
-            json.dump(combined_metadata, f, indent=2)
+        return extract_meta
