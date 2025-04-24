@@ -132,7 +132,9 @@ class CellInfoAdmin(ModelAdmin):
                 creator_id=request.user.id,
             )
 
-            messages.success(request=request, message=mark_safe(constants.EXTRACT_PIPELINE_SUCCESS_MESSAGE.format(pipeline_url)))
+            messages.success(
+                request=request, message=mark_safe(constants.EXTRACT_PIPELINE_SUCCESS_MESSAGE.format(pipeline_url))
+            )
             return redirect("admin:cell_management_cellinfo_changelist")
 
         return render(
