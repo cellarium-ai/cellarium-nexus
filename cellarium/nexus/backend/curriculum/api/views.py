@@ -1,5 +1,3 @@
-from typing import override
-
 from rest_framework import viewsets
 
 from cellarium.nexus.backend.curriculum.api.serializers import CurriculumSerializer
