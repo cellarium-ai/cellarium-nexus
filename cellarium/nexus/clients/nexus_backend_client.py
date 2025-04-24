@@ -18,7 +18,7 @@ class ApiEndpoints:
     FEATURE_INFO_RESERVE_INDEXES: str = "api/ingest-management/reserve-indexes/feature-info/"
     INGEST_FROM_AVRO: str = "api/ingest-management/ingest-from-avro/"
     REGISTER_CURRICULUM: str = "api/curriculum/curriculums/"
-    UPDATE_CURRICULUM: str = "api/curriculum/curriculums/{name}"
+    UPDATE_CURRICULUM: str = "api/curriculum/curriculums/{name}/"
 
 
 class ReserveIndexesModelType(Enum):
