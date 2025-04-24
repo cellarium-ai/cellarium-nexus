@@ -8,6 +8,7 @@ from urllib.parse import parse_qs, urlparse
 from django.contrib import admin, messages
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin
 from unfold.contrib.filters.admin import RangeNumericFilter, RelatedDropdownFilter
@@ -76,7 +77,7 @@ class CellInfoAdmin(ModelAdmin):
     @action(description=_("Extract Curriculum"), url_path="extract-curriculum")
     def extract_curriculum_action(self, request: HttpRequest) -> HttpResponse:
         """
-        Prepare extract tables for data extraction.
+        Submit extract curriculum job
 
         :param request: The HTTP request
 
@@ -131,7 +132,7 @@ class CellInfoAdmin(ModelAdmin):
                 creator_id=request.user.id,
             )
 
-            messages.success(request=request, message=constants.EXTRACT_PIPELINE_SUCCESS_MESSAGE.format(pipeline_url))
+            messages.success(request=request, message=mark_safe(constants.EXTRACT_PIPELINE_SUCCESS_MESSAGE.format(pipeline_url)))
             return redirect("admin:cell_management_cellinfo_changelist")
 
         return render(

@@ -17,15 +17,14 @@ CHANGELIST_ACTION_FORM = "admin/custom_templates/changelist_action_with_form.htm
 REQUIRED_CSV_FILE_COLUMNS = ["gcs_file_path"]
 
 # Form titles and messages
-PREPARE_EXTRACT_TABLES_TITLE = _("Prepare Extract Tables")
-PREPARE_BUTTON_TITLE = _("Prepare")
+PREPARE_EXTRACT_TABLES_TITLE = _("Extract Curriculum Job")
+PREPARE_BUTTON_TITLE = _("Submit")
 NO_DATASETS_ERROR = _("No BigQuery datasets available. You need to create one to be able to extract data.")
 MULTIPLE_DATASETS_ERROR = _("Multiple BigQuery datasets exist. Please select a BigQuery dataset for extraction.")
-EXTRACT_SUCCESS_MESSAGE = _("Extract tables prepared successfully")
 
 # Pipeline success messages
 EXTRACT_PIPELINE_SUCCESS_MESSAGE = _(
-    'Extract tables prepared successfully. <a href="{0}" target="_blank">Vertex AI Dashboard</a>'
+    'Extract curriculum job started successfully. <a href="{0}" target="_blank">Vertex AI Dashboard</a>'
 )
 
 # Workflows related constants
