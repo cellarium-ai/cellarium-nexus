@@ -3,6 +3,7 @@ from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import action
@@ -107,7 +108,7 @@ class IngestInfoAdmin(ModelAdmin):
                 df_ingest_file_info=df, column_mapping=column_mapping, bigquery_dataset=bigquery_dataset
             )
 
-            messages.success(request=request, message=constants.INGEST_PIPELINE_SUCCESS_MESSAGE.format(pipeline_url))
+            messages.success(request=request, message=mark_safe(constants.INGEST_PIPELINE_SUCCESS_MESSAGE.format(pipeline_url)))
             return redirect("admin:ingest_management_ingestinfo_changelist")
 
         return render(

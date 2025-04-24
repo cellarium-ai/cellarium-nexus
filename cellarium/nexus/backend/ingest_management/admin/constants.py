@@ -16,5 +16,5 @@ EXTRACT_SUCCESS_MESSAGE = _("Extract tables prepared successfully")
 
 # Pipeline success messages
 INGEST_PIPELINE_SUCCESS_MESSAGE = _(
-    'Data ingestion pipeline started successfully. <a href="{0}" target="_blank">Vertex AI Dashboard</a>'
+    'Data ingestion pipeline started successfully. <a href="{0}" target="_blank" style="text-decoration: underline;">Vertex AI Dashboard</a>'
 )

@@ -24,7 +24,7 @@ MULTIPLE_DATASETS_ERROR = _("Multiple BigQuery datasets exist. Please select a B
 
 # Pipeline success messages
 EXTRACT_PIPELINE_SUCCESS_MESSAGE = _(
-    'Extract curriculum job started successfully. <a href="{0}" target="_blank">Vertex AI Dashboard</a>'
+    'Extract curriculum job started successfully. <a href="{0}" target="_blank" style="text-decoration: underline;">Vertex AI Dashboard</a>'
 )
 
 # Workflows related constants
