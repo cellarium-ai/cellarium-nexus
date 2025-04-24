@@ -74,6 +74,7 @@ def prepare_extract_job(gcs_config_path: str):
     controller.prepare_extract_tables(
         extract_name=params.name,
         features=params.features,
+        creator_id=params.creator_id,
         filters=params.filters,
         obs_columns=params.obs_columns,
         extract_bin_size=params.extract_bin_size,
