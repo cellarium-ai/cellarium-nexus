@@ -68,12 +68,13 @@ class CurriculumAPISchema(BaseModel):
     """
     API schema for Curriculum model.
     """
-
     id: int
     creator_id: int
-    cell_count: int
-    extract_bin_size: int
-    extract_files_dir: str
-    metadata_file_path: str
     created_at: datetime
+    cell_count: int | None = None
+    name: str | None = None
+    description: str | None = None
+    extract_files_dir: str | None = None
+    metadata_file_path: str | None = None
+    extract_bin_size: int | None = None
     filters_json: dict[str, Any] | None = None
