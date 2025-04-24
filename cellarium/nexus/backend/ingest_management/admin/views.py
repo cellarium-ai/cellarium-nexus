@@ -108,7 +108,9 @@ class IngestInfoAdmin(ModelAdmin):
                 df_ingest_file_info=df, column_mapping=column_mapping, bigquery_dataset=bigquery_dataset
             )
 
-            messages.success(request=request, message=mark_safe(constants.INGEST_PIPELINE_SUCCESS_MESSAGE.format(pipeline_url)))
+            messages.success(
+                request=request, message=mark_safe(constants.INGEST_PIPELINE_SUCCESS_MESSAGE.format(pipeline_url))
+            )
             return redirect("admin:ingest_management_ingestinfo_changelist")
 
         return render(

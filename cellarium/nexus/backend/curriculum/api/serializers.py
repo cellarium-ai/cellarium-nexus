@@ -13,14 +13,14 @@ class CurriculumSerializer(serializers.ModelSerializer):
     :raise ValidationError: If validation fails for any field
     """
 
-    creator = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    creator_id = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), source="creator")
 
     class Meta:
         model = Curriculum
         fields = [
             "id",
             "name",
-            "creator",
+            "creator_id",
             "cell_count",
             "extract_bin_size",
             "extract_files_dir",
