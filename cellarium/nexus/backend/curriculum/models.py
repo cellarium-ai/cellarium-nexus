@@ -22,21 +22,23 @@ class Curriculum(models.Model):
     ]
 
     name = models.CharField(max_length=512, verbose_name=_("name"))
+    cell_count = models.IntegerField(verbose_name=_("cell count"), null=True, blank=True)
     creator = models.ForeignKey(
         to=UserModel,
         on_delete=models.CASCADE,
         related_name="curriculums",
         verbose_name=_("creator"),
     )
-    cell_count = models.IntegerField(verbose_name=_("cell count"), null=True, blank=True)
     extract_bin_size = models.IntegerField(verbose_name=_("extract bin size"), null=True, blank=True)
     extract_bin_count = models.IntegerField(verbose_name=_("extract bin count"), null=True, blank=True)
-    extract_files_path = models.FilePathField(
+    extract_files_path = models.CharField(
+        max_length=1024,
         verbose_name=_("extract files directory"),
         null=True,
         blank=True,
     )
-    metadata_file_path = models.FileField(
+    metadata_file_path = models.CharField(
+        max_length=1024,
         verbose_name=_("metadata file path"),
         null=True,
         blank=True,

@@ -27,6 +27,6 @@ class CurriculumSerializer(serializers.ModelSerializer):
             "metadata_file_path",
             "created_at",
             "filters_json",
-            "status"
+            "status",
         ]
         read_only_fields = ["id", "created_at"]
