@@ -149,3 +149,25 @@ def transfer_directory_to_bucket(
     upload_many_blobs_with_transfer_manager(
         bucket_name=bucket_name, file_paths=file_paths, prefix=prefix, workers=max_workers
     )
+
+
+def get_blob_size(bucket_name: str, file_path: str) -> int:
+    """
+    Get the size of a blob in Google Cloud Storage in bytes.
+
+    :param bucket_name: Bucket name in Google Cloud Storage.
+    :param file_path: Path to the blob in the bucket.
+
+    :raise: google.cloud.exceptions.GoogleCloudError - If there's an error communicating with Google Cloud Storage.
+    :raise: google.cloud.exceptions.NotFound - If the specified blob doesn't exist.
+
+    :return: Size of the blob in bytes.
+    """
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(file_path)
+
+    # This will make an API call to get blob metadata including size
+    blob.reload()
+
+    return blob.size

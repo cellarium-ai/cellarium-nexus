@@ -16,4 +16,9 @@ urlpatterns = [
         views.ReserveIndexesFeatureInfoAPIView.as_view(),
         name="reserve-indexes-feature-info",
     ),
+    path(
+        "validation-report-item/create/",
+        views.ValidationReportItemCreateAPIView.as_view(),
+        name="validation-report-item-create",
+    ),
 ]

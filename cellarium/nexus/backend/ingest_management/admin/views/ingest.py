@@ -1,4 +1,5 @@
 import pandas as pd
+from django.conf import settings
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse
@@ -11,8 +12,6 @@ from unfold.decorators import action
 from cellarium.nexus.backend.ingest_management import models
 from cellarium.nexus.backend.ingest_management.admin import constants, forms
 from cellarium.nexus.backend.ingest_management.admin import utils as admin_utils
-
-# Constants at the top
 
 
 class ObsColumnMappingInline(TabularInline):
@@ -78,7 +77,7 @@ class IngestInfoAdmin(ModelAdmin):
             },
         ),
     )
-    actions_list = ["ingest_new_data"]
+    actions_list = ["ingest_new_data", "validate_new_data"]
 
     @action(description=_("Ingest New Data"), url_path="ingest-new-data")
     def ingest_new_data(self, request: HttpRequest) -> HttpResponse:
@@ -123,3 +122,14 @@ class IngestInfoAdmin(ModelAdmin):
                 **self.admin_site.each_context(request),
             },
         )
+
+    @action(description=_("Validate New Data"), url_path="validate-new-data")
+    def validate_new_data(self, request: HttpRequest) -> HttpResponse:
+        """
+        Redirect to the ValidationReportAdmin's validate_new_data action.
+
+        :param request: The HTTP request
+
+        :return: HTTP response with redirect to ValidationReportAdmin action
+        """
+        return redirect("admin:ingest_management_validationreport_validate_new_data")

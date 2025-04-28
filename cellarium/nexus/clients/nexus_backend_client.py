@@ -3,10 +3,9 @@ from enum import Enum
 from typing import Any, Literal
 
 from nexus.clients.api_schemas import (
-    CellInfoAPISchema,
     CurriculumAPISchema,
-    FeatureInfoAPISchema,
     IngestInfoAPISchema,
+    ValidationReportItemAPISchema,
 )
 from nexus.clients.base import BaseAPIHTTPClient
 
@@ -19,6 +18,7 @@ class ApiEndpoints:
     INGEST_FROM_AVRO: str = "api/ingest-management/ingest-from-avro/"
     REGISTER_CURRICULUM: str = "api/curriculum/curriculums/"
     UPDATE_CURRICULUM: str = "api/curriculum/curriculums/{name}/"
+    CREATE_VALIDATION_REPORT_ITEM: str = "api/ingest-management/validation-report-item/create/"
 
 
 class ReserveIndexesModelType(Enum):
@@ -228,3 +228,39 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
 
         api_out = self.patch_json(endpoint=ApiEndpoints.UPDATE_CURRICULUM.format(name=name), data=data)
         return CurriculumAPISchema(**api_out)
+
+    def create_validation_report_item(
+        self,
+        *,
+        report_id: int,
+        input_file_gcs_path: str,
+        validator_name: str,
+        is_valid: bool,
+        message: str | None = None,
+    ) -> ValidationReportItemAPISchema:
+        """
+        Create a validation report item for an existing validation report.
+
+        :param report_id: ID of the existing validation report
+        :param input_file_gcs_path: GCS path to the input file that was validated
+        :param validator_name: Name of the validator that performed the validation
+        :param is_valid: Whether the validation passed or failed
+        :param message: Optional message with validation details
+
+        :raise: HTTPError if the request fails
+        :raise: ValueError if the response is invalid
+
+        :return: Created validation report item
+        """
+        data = {
+            "report_id": report_id,
+            "input_file_gcs_path": input_file_gcs_path,
+            "validator_name": validator_name,
+            "is_valid": is_valid,
+        }
+
+        if message is not None:
+            data["message"] = message
+
+        api_out = self.post_json(endpoint=ApiEndpoints.CREATE_VALIDATION_REPORT_ITEM, data=data)
+        return ValidationReportItemAPISchema(**api_out)

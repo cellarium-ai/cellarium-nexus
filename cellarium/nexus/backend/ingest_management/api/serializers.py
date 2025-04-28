@@ -58,3 +58,31 @@ class ReserveIndexesSerializer(serializers.Serializer):
     batch_size = serializers.IntegerField(min_value=1, write_only=True)
     index_start = serializers.IntegerField(read_only=True)
     index_end = serializers.IntegerField(read_only=True)
+
+
+class ValidationReportItemSerializer(serializers.ModelSerializer):
+    """
+    Serializer for ValidationReportItem model.
+
+    Used for creating and retrieving validation report items.
+    """
+
+    report_id = serializers.PrimaryKeyRelatedField(
+        source="report",
+        queryset=models.ValidationReport.objects.all(),
+        required=True,
+        help_text="ID of the existing ValidationReport",
+    )
+
+    class Meta:
+        model = models.ValidationReportItem
+        fields = (
+            "id",
+            "report_id",
+            "input_file_gcs_path",
+            "validator_name",
+            "is_valid",
+            "message",
+            "created_at",
+        )
+        read_only_fields = ("id", "created_at")

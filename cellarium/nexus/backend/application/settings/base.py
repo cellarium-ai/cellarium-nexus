@@ -215,6 +215,11 @@ UNFOLD = {
                         "icon": "table_rows",
                         "link": reverse_lazy("admin:ingest_management_columnmapping_changelist"),
                     },
+                    {
+                        "title": _("Validation Reports"),
+                        "icon": "fact_check",
+                        "link": reverse_lazy("admin:ingest_management_validationreport_changelist"),
+                    },
                 ],
             },
             {

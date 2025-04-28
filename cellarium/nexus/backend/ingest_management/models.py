@@ -1,5 +1,6 @@
 import uuid
 
+from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.db import models
 from django.utils.translation import gettext_lazy as _
@@ -121,3 +122,78 @@ class IndexTracking(models.Model):
 
     def __str__(self):
         return f"{self.content_type.name} -- {self.largest_index}"
+
+
+class ValidationReport(models.Model):
+    """
+    Model for storing validation reports for data ingestion.
+    """
+
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("created at"))
+    creator = models.ForeignKey(
+        to=get_user_model(),
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="validation_reports",
+        verbose_name=_("creator"),
+    )
+
+    class Meta:
+        verbose_name = _("validation report")
+        verbose_name_plural = _("validation reports")
+        ordering = ["-created_at"]
+        app_label = "ingest_management"
+
+    def __str__(self):
+        return f"Validation Report {self.id} - {self.created_at}"
+
+
+class ValidationReportItem(models.Model):
+    """
+    Model for storing individual validation report items.
+    """
+
+    report = models.ForeignKey(
+        ValidationReport,
+        on_delete=models.CASCADE,
+        related_name="items",
+        verbose_name=_("report"),
+    )
+    input_file_gcs_path = models.CharField(max_length=1024, verbose_name=_("input file GCS path"))
+    validator_name = models.CharField(max_length=255, verbose_name=_("validator name"))
+    is_valid = models.BooleanField(verbose_name=_("is valid"))
+    message = models.TextField(verbose_name=_("message"), null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("created at"))
+
+    class Meta:
+        verbose_name = _("validation report item")
+        verbose_name_plural = _("validation report items")
+        ordering = ["-created_at"]
+        app_label = "ingest_management"
+
+    def __str__(self):
+        """
+        Return a string representation of the validation report item with truncated GCS path.
+
+        :return: String representation
+        """
+        status = "Valid" if self.is_valid else "Invalid"
+
+        # Truncate the GCS path if it's too long
+        max_length = 40
+        gcs_path = self.input_file_gcs_path
+        if gcs_path and len(gcs_path) > max_length:
+            # Extract the filename (last part of the path)
+            path_parts = gcs_path.split("/")
+            filename = path_parts[-1] if path_parts else ""
+
+            # Use the filename or a truncated version with ellipsis
+            if len(filename) <= max_length:
+                truncated_path = filename
+            else:
+                truncated_path = f"{gcs_path[:15]}...{gcs_path[-20:]}"
+        else:
+            truncated_path = gcs_path
+
+        return f"{status} - {self.validator_name} - {truncated_path}"

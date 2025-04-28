@@ -1,0 +1,9 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls %}
+
+{% block submit_buttons_bottom %}
+    {{ block.super }}
+    <div class="submit-row">
+        <a href="{% url 'admin:ingest_management_validationreport_export_items_as_csv' original.pk %}" class="button">{% translate "Export Items as CSV" %}</a>
+    </div>
+{% endblock %}

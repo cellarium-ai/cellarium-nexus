@@ -14,10 +14,10 @@ import fastavro
 import smart_open
 from google.cloud import bigquery
 from nexus.clients import NexusBackendAPIClient
-from nexus.omics_datastore.bq_ops.bq_datastore_controller import BQDatastoreController
+from nexus.omics_datastore.bq_ops import BigQueryDataOperator
 from nexus.omics_datastore.bq_ops.ingest.create_ingest_files import optimized_read_anndata
 
-from cellarium.nexus.nexus_data_controller import constants
+from cellarium.nexus.coordinator import constants
 from cellarium.nexus.shared import schemas, utils
 from cellarium.nexus.shared.schemas.omics_datastore import ExtractMetadata
 
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class NexusDataController:
+class NexusDataOpsCoordinator:
     """
     Control and manage Nexus data operations.
 
@@ -46,7 +46,7 @@ class NexusDataController:
         self.backend_client = NexusBackendAPIClient(api_url=nexus_backend_api_url)
         self.bq_client = bigquery.Client(project=project_id)
         self.project_id = project_id
-        self.bq_controller = BQDatastoreController(
+        self.bq_data_operator = BigQueryDataOperator(
             client=self.bq_client,
             project=self.project_id,
             dataset=bigquery_dataset,
@@ -132,8 +132,7 @@ class NexusDataController:
                     batch_size=total_features
                 )
 
-                # Use instance bq_controller
-                ingest_job_result = self.bq_controller.create_ingest_files(
+                ingest_job_result = self.bq_data_operator.create_ingest_files(
                     adata_file_path=local_input_data_path,
                     tag=tag,
                     cell_info_start_index=cell_info_start_index,
@@ -204,7 +203,7 @@ class NexusDataController:
             raise
 
         try:
-            self.bq_controller.ingest_data(
+            self.bq_data_operator.ingest_data(
                 gcs_bucket_name=bucket_name,
                 gcs_stage_dir=bucket_stage_dir,
             )
@@ -237,7 +236,7 @@ class NexusDataController:
 
         :raise google.api_core.exceptions.GoogleAPIError: If dataset creation fails
         """
-        return self.bq_controller.initialize_bigquery_resources(location=location)
+        return self.bq_data_operator.initialize_bigquery_resources(location=location)
 
     def prepare_extract_tables(
         self,
@@ -282,7 +281,7 @@ class NexusDataController:
             name=extract_name, creator_id=creator_id, extract_bin_size=extract_bin_size, filters_json=filters
         )
         try:
-            extract_metadata = self.bq_controller.prepare_extract_tables(
+            extract_metadata = self.bq_data_operator.prepare_extract_tables(
                 extract_table_prefix=extract_name,
                 features=features,
                 extract_bin_size=extract_bin_size,
@@ -351,7 +350,7 @@ class NexusDataController:
             logger.info(f"Created temporary directory `{temp_dir_path}`")
 
             # Extract data locally
-            self.bq_controller.extract_data(
+            self.bq_data_operator.extract_data(
                 extract_table_prefix=extract_name,
                 bins=bins,
                 output_dir=temp_dir_path,

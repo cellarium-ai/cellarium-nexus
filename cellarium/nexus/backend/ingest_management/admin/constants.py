@@ -5,7 +5,9 @@ BIGQUERY_SUCCESS_MESSAGE_LINK_FORMAT = (
 )
 BIGQUERY_SUCCESS_MESSAGE_TEXT = _("BigQuery dataset in GCP was created successfully.")
 CHANGELIST_ACTION_FORM = "admin/custom_templates/changelist_action_with_form.html"
-REQUIRED_CSV_FILE_COLUMNS = ["gcs_file_path"]
+GCS_PATH_COLUMN = "gcs_file_path"
+TAGS_COLUMN = "tag"
+REQUIRED_CSV_FILE_COLUMNS = [GCS_PATH_COLUMN, TAGS_COLUMN]
 
 # Form titles and messages
 PREPARE_EXTRACT_TABLES_TITLE = _("Prepare Extract Tables")

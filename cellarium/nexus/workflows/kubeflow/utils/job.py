@@ -91,5 +91,7 @@ def submit_pipeline(
     temp_file.close()
 
     # Generate the Vertex AI Pipeline dashboard URL
-    pipeline_url = f"https://console.cloud.google.com/vertex-ai/locations/{pipeline_location}/pipelines/runs/{job.name}?project={gcp_project}"
-    return pipeline_url
+    return (
+        f"https://console.cloud.google.com/vertex-ai/locations/{pipeline_location}/"
+        f"pipelines/runs/{job.name}?project={gcp_project}"
+    )

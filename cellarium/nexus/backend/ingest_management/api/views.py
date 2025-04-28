@@ -106,3 +106,13 @@ class ReserveIndexesFeatureInfoAPIView(ReserveIndexesAPIViewAbstract):
     """Reserves indexes for FeatureInfo model."""
 
     model_class = cell_models.CellFeatureInfo
+
+
+class ValidationReportItemCreateAPIView(CreateAPIView):
+    """
+    API view for creating ValidationReportItem entries.
+
+    Allows creating validation report items for existing validation reports.
+    """
+
+    serializer_class = serializers.ValidationReportItemSerializer

@@ -21,11 +21,11 @@ from cellarium.nexus.shared import schemas
 logger = logging.getLogger(__name__)
 
 
-class BQDatastoreController:
+class BigQueryDataOperator:
     """
     Control and manage BigQuery operations for the Nexus datastore.
 
-    This controller provides low-level operations for interacting with BigQuery:
+    This class provides low-level operations for interacting with BigQuery:
     - Dataset and table management
     - Data ingestion
     - Extract table preparation
@@ -41,7 +41,7 @@ class BQDatastoreController:
         dataset: str,
     ) -> None:
         """
-        Initialize the BigQuery datastore controller.
+        Initialize the BigQuery datastore operator.
 
         :param client: Initialized BigQuery client
         :param project: GCP project ID

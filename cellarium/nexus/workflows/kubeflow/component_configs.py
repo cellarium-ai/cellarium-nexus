@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -42,6 +42,24 @@ class BQOpsPrepareExtract(BaseModel):
     extract_bin_size: int
     bucket_name: str
     extract_bucket_path: str
+
+
+class ValidationConfig(BaseModel):
+    """
+    Configuration for validating AnnData files and reporting results.
+
+    :param nexus_backend_api_url: URL of the Nexus backend API
+    :param validation_report_id: ID of the validation report to update
+    :param adata_gcs_paths: List of GCS paths to AnnData files to validate
+    :param validation_methods: List of validation method names to apply to each file
+    :param max_bytes_valid_per_file: Maximum file size in bytes for validation
+    """
+
+    nexus_backend_api_url: str
+    validation_report_id: int
+    adata_gcs_paths: list[str]
+    validation_methods: list[str]
+    max_bytes_valid_per_file: int
 
 
 class BQOpsExtract(BaseModel):

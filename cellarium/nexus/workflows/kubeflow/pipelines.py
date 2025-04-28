@@ -74,3 +74,18 @@ def extract_data_pipeline(prepare_extract_config: str, extract_configs: t.List[s
     extract_op.after(prepare_op)
     mark_curriculum_as_finished_op = components.mark_curriculum_as_finished_job(gcs_config_path=prepare_extract_config)
     mark_curriculum_as_finished_op.after(extract_op)
+
+
+@dsl.pipeline(
+    name="nexus-pipelines-validate-ingest-files",
+    description="Validate ingest AnnData files and report results",
+)
+def validate_anndata_pipeline(validation_config: str) -> None:
+    """
+    Validate multiple AnnData files and report validation results.
+
+    :param validation_config: GCS path to configuration file for validate_anndata_files_job
+
+    :raise: RuntimeError if the validation component fails
+    """
+    components.validate_anndata_files_job(gcs_config_path=validation_config)

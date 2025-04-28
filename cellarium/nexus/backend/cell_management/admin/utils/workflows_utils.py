@@ -6,7 +6,7 @@ from google.cloud import bigquery
 from cellarium.nexus.backend.cell_management import models
 from cellarium.nexus.backend.cell_management.admin import constants
 from cellarium.nexus.backend.cell_management.admin.utils import exceptions
-from cellarium.nexus.omics_datastore.bq_ops import bq_datastore_controller
+from cellarium.nexus.omics_datastore.bq_ops import BigQueryDataOperator
 from cellarium.nexus.shared import schemas
 from cellarium.nexus.shared.utils import workflows_configs
 from cellarium.nexus.workflows.kubeflow import component_configs
@@ -27,10 +27,10 @@ def get_total_cell_in_bq_number(bigquery_dataset: models.BigQueryDataset, filter
     :return: Total number of cells matching the filters
     """
     bq_client = bigquery.Client(project=settings.GCP_PROJECT_ID)
-    controller = bq_datastore_controller.BQDatastoreController(
+    bq_data_operator = BigQueryDataOperator(
         client=bq_client, project=settings.GCP_PROJECT_ID, dataset=bigquery_dataset.name
     )
-    return controller.count_cells(filter_statements=filters)
+    return bq_data_operator.count_cells(filter_statements=filters)
 
 
 def compose_extract_curriculum_configs(

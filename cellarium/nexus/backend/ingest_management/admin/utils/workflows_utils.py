@@ -1,14 +1,15 @@
 import datetime
 import os
 import secrets
+from typing import List
 
 import pandas as pd
 from django.conf import settings
 
 from cellarium.nexus.backend.cell_management.models import BigQueryDataset
 from cellarium.nexus.shared import utils
-from cellarium.nexus.workflows.kubeflow.component_configs import IngestTaskConfig
-from cellarium.nexus.workflows.kubeflow.pipelines import ingest_data_pipeline
+from cellarium.nexus.workflows.kubeflow.component_configs import IngestTaskConfig, ValidationConfig
+from cellarium.nexus.workflows.kubeflow.pipelines import ingest_data_pipeline, validate_anndata_pipeline
 from cellarium.nexus.workflows.kubeflow.utils.job import submit_pipeline
 
 
@@ -70,8 +71,53 @@ def submit_ingest_pipeline(
         pipeline_component=ingest_data_pipeline,
         display_name=f"Nexus Ingest Data - {bigquery_dataset.name}",
         gcp_project=settings.GCP_PROJECT_ID,
+        pipeline_kwargs={"ingest_task_configs": task_config_paths},
+        service_account=settings.PIPELINE_SERVICE_ACCOUNT,
+        pipeline_root_path=settings.PIPELINE_ROOT_PATH,
+    )
+
+
+def submit_validation_pipeline(
+    adata_gcs_paths: List[str],
+    validation_report_id: int,
+    validation_methods: List[str],
+    max_bytes_valid_per_file: int = 5000000000,
+) -> str:
+    """
+    Submit a Kubeflow pipeline for validating AnnData files.
+
+    Create a validation config, save it to GCS, and submit the validation pipeline.
+
+    :param adata_gcs_paths: List of GCS paths to AnnData files to validate
+    :param validation_report_id: ID of the validation report to update with results
+    :param validation_methods: List of validation method names to apply to each file
+    :param max_bytes_valid_per_file: Maximum file size in bytes for validation
+
+    :raise IOError: If there's an error writing config to GCS
+    :raise google.api_core.exceptions.GoogleAPIError: If pipeline submission fails
+
+    :return: URL to the Vertex AI Pipeline dashboard for the submitted job
+    """
+    # Create validation config
+    validation_config = ValidationConfig(
+        nexus_backend_api_url=settings.SITE_URL,
+        validation_report_id=validation_report_id,
+        adata_gcs_paths=adata_gcs_paths,
+        validation_methods=validation_methods,
+        max_bytes_valid_per_file=max_bytes_valid_per_file,
+    )
+
+    # Save config to GCS
+    configs_stage_dir = f"gs://{settings.BUCKET_NAME_PRIVATE}/pipeline-configs"
+    config_paths = utils.workflows_configs.dump_configs_to_bucket([validation_config], configs_stage_dir)
+
+    # Submit pipeline and return the pipeline URL
+    return submit_pipeline(
+        pipeline_component=validate_anndata_pipeline,
+        display_name=f"Nexus Validate AnnData - Report {validation_report_id}",
+        gcp_project=settings.GCP_PROJECT_ID,
         pipeline_kwargs={
-            "ingest_task_configs": task_config_paths,
+            "validation_config": config_paths[0],
         },
         service_account=settings.PIPELINE_SERVICE_ACCOUNT,
         pipeline_root_path=settings.PIPELINE_ROOT_PATH,

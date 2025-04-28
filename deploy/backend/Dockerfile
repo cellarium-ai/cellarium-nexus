@@ -7,7 +7,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # system deps
-RUN apt-get update && apt-get install -y gcc python3-dev libpq-dev \
+RUN apt-get update && apt-get install -y gcc python3-dev libpq-dev git \
  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # copy code and install it

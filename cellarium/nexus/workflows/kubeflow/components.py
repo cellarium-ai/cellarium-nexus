@@ -11,18 +11,18 @@ SERVICE_ACCOUNT = "vertex-pipelines-sa@dsp-cellarium.iam.gserviceaccount.com"
     service_account=SERVICE_ACCOUNT,
 )
 def create_ingest_files_job(gcs_config_path: str):
-    from cellarium.nexus.nexus_data_controller import NexusDataController
+    from cellarium.nexus.coordinator import NexusDataOpsCoordinator
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import IngestTaskConfig
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=IngestTaskConfig)
 
-    controller = NexusDataController(
+    coordinator = NexusDataOpsCoordinator(
         project_id=params.project_id,
         nexus_backend_api_url=params.nexus_backend_api_url,
         bigquery_dataset=params.bigquery_dataset,
     )
-    controller.create_ingest_files(
+    coordinator.create_ingest_files(
         input_file_path=params.data_source_path,
         tag=params.tag,
         bigquery_dataset=params.bigquery_dataset,
@@ -39,18 +39,18 @@ def create_ingest_files_job(gcs_config_path: str):
     service_account=SERVICE_ACCOUNT,
 )
 def ingest_data_to_bigquery_job(gcs_config_path: str):
-    from cellarium.nexus.nexus_data_controller import NexusDataController
+    from cellarium.nexus.coordinator import NexusDataOpsCoordinator
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import IngestTaskConfig
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=IngestTaskConfig)
 
-    controller = NexusDataController(
+    coordinator = NexusDataOpsCoordinator(
         project_id=params.project_id,
         nexus_backend_api_url=params.nexus_backend_api_url,
         bigquery_dataset=params.bigquery_dataset,
     )
-    controller.ingest_data_to_bigquery(
+    coordinator.ingest_data_to_bigquery(
         bucket_name=params.bucket_name,
         bucket_stage_dir=params.ingest_bucket_path,
     )
@@ -60,18 +60,18 @@ def ingest_data_to_bigquery_job(gcs_config_path: str):
     base_image=BASE_IMAGE, machine_type="e2-standard-4", display_name="prepare_extract", service_account=SERVICE_ACCOUNT
 )
 def prepare_extract_job(gcs_config_path: str):
-    from cellarium.nexus.nexus_data_controller import NexusDataController
+    from cellarium.nexus.coordinator import NexusDataOpsCoordinator
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import BQOpsPrepareExtract
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=BQOpsPrepareExtract)
 
-    controller = NexusDataController(
+    coordinator = NexusDataOpsCoordinator(
         project_id=params.project_id,
         nexus_backend_api_url=params.nexus_backend_api_url,
         bigquery_dataset=params.bigquery_dataset,
     )
-    controller.prepare_extract_tables(
+    coordinator.prepare_extract_tables(
         extract_name=params.name,
         features=params.features,
         creator_id=params.creator_id,
@@ -87,18 +87,18 @@ def prepare_extract_job(gcs_config_path: str):
     base_image=BASE_IMAGE, machine_type="e2-standard-32", display_name="extract", service_account=SERVICE_ACCOUNT
 )
 def extract_job(gcs_config_path: str):
-    from cellarium.nexus.nexus_data_controller import NexusDataController
+    from cellarium.nexus.coordinator import NexusDataOpsCoordinator
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import BQOpsExtract
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=BQOpsExtract)
 
-    controller = NexusDataController(
+    coordinator = NexusDataOpsCoordinator(
         project_id=params.project_id,
         nexus_backend_api_url=params.nexus_backend_api_url,
         bigquery_dataset=params.bigquery_dataset,
     )
-    controller.extract_data(
+    coordinator.extract_data(
         extract_name=params.name,
         bins=params.bins,
         bucket_name=params.bucket_name,
@@ -126,19 +126,52 @@ def mark_curriculum_as_finished_job(gcs_config_path: str):
 
     :raise Exception: If any error occurs during the process
     """
-    from cellarium.nexus.nexus_data_controller import NexusDataController
+    from cellarium.nexus.coordinator import NexusDataOpsCoordinator
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import BQOpsPrepareExtract
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=BQOpsPrepareExtract)
 
-    controller = NexusDataController(
+    coordinator = NexusDataOpsCoordinator(
         project_id=params.project_id,
         nexus_backend_api_url=params.nexus_backend_api_url,
         bigquery_dataset=params.bigquery_dataset,
     )
-    controller.mark_curriculum_as_finished(
+    coordinator.mark_curriculum_as_finished(
         extract_name=params.name,
         bucket_name=params.bucket_name,
         extract_bucket_path=params.extract_bucket_path,
+    )
+
+
+@job.dsl_component_job(
+    base_image=BASE_IMAGE,
+    machine_type="e2-standard-4",
+    display_name="validate_anndata_files",
+    service_account=SERVICE_ACCOUNT,
+)
+def validate_anndata_files_job(gcs_config_path: str):
+    """
+    Validate multiple AnnData files and report validation results.
+
+    Downloads each AnnData file from GCS, applies validation methods, and reports results to the Nexus backend API.
+
+    :param gcs_config_path: Path to the configuration file in GCS
+
+    :raise: ValidationError if validation fails for any file
+    """
+    from cellarium.nexus.coordinator import NexusDataValidationCoordinator
+    from cellarium.nexus.shared import utils
+    from cellarium.nexus.workflows.kubeflow.component_configs import ValidationConfig
+
+    params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=ValidationConfig)
+
+    coordinator = NexusDataValidationCoordinator(
+        nexus_backend_api_url=params.nexus_backend_api_url,
+        validation_report_id=params.validation_report_id,
+        max_bytes_valid_per_file=params.max_bytes_valid_per_file,
+    )
+    coordinator.validate_and_report_multiple(
+        adata_gcs_paths=params.adata_gcs_paths,
+        validation_methods=params.validation_methods,
     )

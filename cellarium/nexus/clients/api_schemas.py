@@ -79,3 +79,17 @@ class CurriculumAPISchema(BaseModel):
     metadata_file_path: str | None = None
     extract_bin_size: int | None = None
     filters_json: dict[str, Any] | None = None
+
+
+class ValidationReportItemAPISchema(BaseModel):
+    """
+    API schema for ValidationReportItem model.
+    """
+
+    id: int
+    report_id: int
+    input_file_gcs_path: str
+    validator_name: str
+    is_valid: bool
+    message: str | None = None
+    created_at: datetime
