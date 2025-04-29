@@ -9,6 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import action
 
+from cellarium.nexus.backend.core.admin.helpers import CountRelatedObjectsDeleteMixin
 from cellarium.nexus.backend.ingest_management import models
 from cellarium.nexus.backend.ingest_management.admin import constants, forms
 from cellarium.nexus.backend.ingest_management.admin import utils as admin_utils
@@ -43,12 +44,15 @@ class ColumnMappingAdmin(ModelAdmin):
 
 
 @admin.register(models.IngestInfo)
-class IngestInfoAdmin(ModelAdmin):
+class IngestInfoAdmin(CountRelatedObjectsDeleteMixin, ModelAdmin):
     """
     Admin interface for managing ingest file information.
 
     Provides functionality to track and manage file ingestion metadata and data ingestion actions.
     """
+
+    # Override the actions to use our custom delete_selected action
+    actions = ["delete_selected"]
 
     list_display = (
         "id",

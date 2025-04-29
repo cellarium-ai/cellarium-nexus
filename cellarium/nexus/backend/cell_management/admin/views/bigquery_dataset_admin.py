@@ -14,18 +14,22 @@ from unfold.admin import ModelAdmin
 
 from cellarium.nexus.backend.cell_management.admin import constants
 from cellarium.nexus.backend.cell_management.models import BigQueryDataset
+from cellarium.nexus.backend.core.admin.helpers import CountRelatedObjectsDeleteMixin
 from cellarium.nexus.omics_datastore.bq_ops import create_bq_tables
 
 logger = logging.getLogger(__name__)
 
 
 @admin.register(BigQueryDataset)
-class BigQueryDatasetAdmin(ModelAdmin):
+class BigQueryDatasetAdmin(CountRelatedObjectsDeleteMixin, ModelAdmin):
     """
     Admin interface for managing BigQuery datasets.
 
     Provides functionality to create and manage BigQuery datasets in GCP.
     """
+
+    # Override the actions to use our custom delete_selected action
+    actions = ["delete_selected"]
 
     list_display = ("id", "name", "description", "link_display")
     search_fields = ("name",)
