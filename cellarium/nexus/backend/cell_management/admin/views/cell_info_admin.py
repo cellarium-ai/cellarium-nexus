@@ -86,30 +86,16 @@ class CellInfoAdmin(ModelAdmin):
 
         :return: HTTP response
         """
-        filters, bigquery_dataset = admin_utils.extract_filters_from_django_admin_request(request=request)
-
-        # If no dataset from filters, try to get the default one
-        if not bigquery_dataset:
-            bigquery_dataset = BigQueryDataset.objects.get_default_dataset()
-            if not bigquery_dataset:
-                dataset_count = BigQueryDataset.objects.count()
-                if dataset_count == 0:
-                    messages.error(request, constants.NO_DATASETS_ERROR)
-                    return redirect("admin:cell_management_cellinfo_changelist")
-                else:
-                    messages.error(request, _(constants.MULTIPLE_DATASETS_ERROR))
-                    return redirect("admin:cell_management_cellinfo_changelist")
-
         referer = request.META.get("HTTP_REFERER", "")
-        if referer and "?" in referer:
-            query_params = parse_qs(urlparse(referer).query)
-            original_filters = {k: v[0] for k, v in query_params.items()}
-            logger.info(f"Original filter parameters: {original_filters}")
+        # if referer and "?" in referer:
+        query_params = parse_qs(urlparse(referer).query)
+        original_filters = {k: v[0] for k, v in query_params.items()}
+        logger.info(f"Original filter parameters: {original_filters}")
 
-            request.GET = request.GET.copy()
-            request.GET.update(original_filters)
+        request.GET = request.GET.copy()
+        request.GET.update(original_filters)
 
-            filters, bq_dataset_unused = admin_utils.extract_filters_from_django_admin_request(request=request)
+        filters, bigquery_dataset = admin_utils.extract_filters_from_django_admin_request(request=request)
 
         # Create initial form data with extracted filters and dataset
         initial_data = {"filters": filters, "bigquery_dataset": bigquery_dataset}
@@ -122,6 +108,7 @@ class CellInfoAdmin(ModelAdmin):
             name = form.cleaned_data["name"]
             extract_bin_size = form.cleaned_data["extract_bin_size"]
             filters = form.cleaned_data["filters"] or {}
+            bigquery_dataset = form.cleaned_data["bigquery_dataset"]
 
             pipeline_url = admin_utils.submit_extract_pipeline(
                 feature_schema=feature_schema,

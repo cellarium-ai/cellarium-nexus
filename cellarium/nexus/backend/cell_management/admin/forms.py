@@ -110,9 +110,8 @@ class ExtractCurriculumForm(forms.Form):
     bigquery_dataset = forms.ModelChoiceField(
         label=_("BigQuery Dataset"),
         queryset=BigQueryDataset.objects.all(),
-        widget=UnfoldAdminSelectWidget(attrs={"disabled": "disabled"}),
+        widget=UnfoldAdminSelectWidget,
         help_text=_("BigQuery Dataset to extract data from"),
-        required=False,  # Not required since we handle it in the view
     )
 
     filters = forms.JSONField(
@@ -152,26 +151,6 @@ class ExtractCurriculumForm(forms.Form):
                     pass
 
         super().__init__(*args, **kwargs)
-
-        # If there's an initial dataset, make the field read-only
-        if "initial" in kwargs and kwargs["initial"].get("bigquery_dataset"):
-            self.fields["bigquery_dataset"].widget.attrs["disabled"] = "disabled"
-            # Store the initial value to use it in clean
-            self._initial_dataset = kwargs["initial"].get("bigquery_dataset")
-
-    def clean(self):
-        """
-        Clean the form data.
-
-        Ensure the BigQuery dataset is set, either from the form or from the initial value.
-        """
-        cleaned_data = super().clean()
-
-        # If the field is disabled, it won't be in cleaned_data, so use the initial value
-        if "bigquery_dataset" not in cleaned_data and hasattr(self, "_initial_dataset"):
-            cleaned_data["bigquery_dataset"] = self._initial_dataset
-
-        return cleaned_data
 
     def clean_name(self):
         """

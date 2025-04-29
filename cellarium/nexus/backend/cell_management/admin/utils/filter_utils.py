@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def extract_filters_from_django_admin_request(
-    request: HttpRequest, dataset_filter_key: str = "ingest__bigquery_dataset"
+    request: HttpRequest, dataset_filter_key: str = "ingest__bigquery_dataset__id__exact"
 ) -> tuple[dict[str, Any], BigQueryDataset | None]:
     """
     Extract filters from Django admin request parameters and determine the BigQuery dataset.
@@ -51,7 +51,7 @@ def extract_filters_from_django_admin_request(
         # Handle the BigQuery dataset filter separately
         if key == dataset_filter_key:
             try:
-                bigquery_dataset = BigQueryDataset.objects.get(id=value)
+                bigquery_dataset = BigQueryDataset.objects.get(id=int(value))
                 logger.info(f"Using dataset from filter: {bigquery_dataset.name}")
             except (BigQueryDataset.DoesNotExist, ValueError) as e:
                 logger.error(f"Error retrieving BigQuery dataset: {str(e)}")
@@ -78,19 +78,15 @@ def extract_filters_from_django_admin_request(
                 try:
                     numeric_value = float(from_value)
                     filters[f"c.{base_key}__gte"] = numeric_value
-                    logger.info(f"Added range filter (from) for {base_key}: gte={numeric_value}")
                 except ValueError:
                     filters[f"c.{base_key}__gte"] = from_value
-                    logger.info(f"Added string range filter (from) for {base_key}: gte={from_value}")
 
             if to_value:
                 try:
                     numeric_value = float(to_value)
                     filters[f"c.{base_key}__lte"] = numeric_value
-                    logger.info(f"Added range filter (to) for {base_key}: lte={numeric_value}")
                 except ValueError:
                     filters[f"c.{base_key}__lte"] = to_value
-                    logger.info(f"Added string range filter (to) for {base_key}: lte={to_value}")
             continue
 
         # Handle multiple values
@@ -99,15 +95,12 @@ def extract_filters_from_django_admin_request(
             if values:
                 filter_key = f"c.{key}__not_in" if is_exclude else f"c.{key}__in"
                 filters[filter_key] = values
-                logger.info(f"Added multiple {'exclude' if is_exclude else 'include'} filter for {key}: {values}")
         else:
             # Handle single value
             if is_exclude:
                 filters[f"c.{key}__not_eq"] = value
-                logger.info(f"Added single exclude filter for {key}: {value}")
             else:
                 filters[f"c.{key}__eq"] = value
-                logger.info(f"Added single filter for {key}: {value}")
 
     # Log the final filters
     logger.info(f"Extracted filters: {filters}")
