@@ -390,6 +390,7 @@ retry_operation "Creating Cloud SQL instance ${DB_INSTANCE_NAME}" \
     --cpu=\"${DB_CPU}\" \
     --memory=\"${DB_MEMORY}GB\" \
     --storage-size=\"${DB_STORAGE}\" \
+    --storage-auto-increase \
     --region=${DB_REGION} \
     --require-ssl \
     --root-password=\"${DB_PASSWORD}\" \
