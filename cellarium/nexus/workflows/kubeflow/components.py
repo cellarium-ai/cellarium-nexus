@@ -112,7 +112,7 @@ def extract_job(gcs_config_path: str):
 @job.dsl_component_job(
     base_image=BASE_IMAGE,
     machine_type="e2-standard-4",
-    display_name="mark_curriculum_as_finished",
+    display_name="nexus_mark_curriculum_as_finished",
     service_account=SERVICE_ACCOUNT,
 )
 def mark_curriculum_as_finished_job(gcs_config_path: str):

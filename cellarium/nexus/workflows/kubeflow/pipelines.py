@@ -49,7 +49,7 @@ def ingest_data_pipeline(ingest_task_configs: t.List[str]) -> None:
 
     :raise: RuntimeError if any component fails
     """
-    with dsl.ParallelFor(items=ingest_task_configs, name="create-and-ingest-workers", parallelism=64) as item:
+    with dsl.ParallelFor(items=ingest_task_configs, name="create-and-ingest-workers", parallelism=32) as item:
         create_op = components.create_ingest_files_job(gcs_config_path=item)
         ingest_op = components.ingest_data_to_bigquery_job(gcs_config_path=item)
         ingest_op.after(create_op)
