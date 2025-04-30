@@ -31,6 +31,23 @@ class IngestTaskConfig(BaseModel):
 
 
 class BQOpsPrepareExtract(BaseModel):
+    """
+    Configuration for the prepare extract job.
+
+    :param name: Prefix for extract table names
+    :param creator_id: ID of the user who initiated the extract
+    :param project_id: GCP project ID
+    :param nexus_backend_api_url: URL of the Nexus backend API
+    :param bigquery_dataset: BigQuery dataset name
+    :param features: List of feature schemas to extract
+    :param filters: Dictionary of filters to apply
+    :param obs_columns: List of observation columns to include
+    :param extract_bin_size: Number of cells per extract bin
+    :param bucket_name: GCS bucket name for output files
+    :param extract_bucket_path: Path within bucket for output files
+    :param metadata_extra_columns: Optional list of additional metadata columns to include
+    """
+
     name: str
     creator_id: int
     project_id: str
@@ -42,6 +59,7 @@ class BQOpsPrepareExtract(BaseModel):
     extract_bin_size: int
     bucket_name: str
     extract_bucket_path: str
+    metadata_extra_columns: list[str] | None = None
 
 
 class ValidationConfig(BaseModel):

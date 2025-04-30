@@ -76,10 +76,11 @@ def prepare_extract_job(gcs_config_path: str):
         features=params.features,
         creator_id=params.creator_id,
         filters=params.filters,
-        obs_columns=params.obs_columns,
         extract_bin_size=params.extract_bin_size,
         bucket_name=params.bucket_name,
         extract_bucket_path=params.extract_bucket_path,
+        obs_columns=params.obs_columns,
+        metadata_extra_columns=params.metadata_extra_columns,
     )
 
 

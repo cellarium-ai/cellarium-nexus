@@ -109,6 +109,7 @@ class CellInfoAdmin(ModelAdmin):
             extract_bin_size = form.cleaned_data["extract_bin_size"]
             filters = form.cleaned_data["filters"] or {}
             bigquery_dataset = form.cleaned_data["bigquery_dataset"]
+            metadata_extra_columns = form.cleaned_data["metadata_extra_columns"]
 
             pipeline_url = admin_utils.submit_extract_pipeline(
                 feature_schema=feature_schema,
@@ -117,6 +118,7 @@ class CellInfoAdmin(ModelAdmin):
                 filters=filters,
                 bigquery_dataset=bigquery_dataset,
                 creator_id=request.user.id,
+                metadata_extra_columns=metadata_extra_columns,
             )
 
             messages.success(

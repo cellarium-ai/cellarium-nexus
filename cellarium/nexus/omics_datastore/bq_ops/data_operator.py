@@ -186,6 +186,7 @@ class BigQueryDataOperator:
         partition_size: int = 10,
         filters: dict[str, Any] | None = None,
         obs_columns: list[str] | None = None,
+        metadata_extra_columns: list[str] | None = None,
     ) -> schemas.ExtractMetadata:
         """
         Prepare BigQuery tables for efficient data extraction.
@@ -200,6 +201,8 @@ class BigQueryDataOperator:
         :param partition_size: Size of each partition
         :param filters: Optional filters to apply during preparation
         :param obs_columns: Optional list of observation columns to include
+        :param metadata_extra_columns: Optional list of metadata extra columns to include to extract files from
+            JSON blob. If not provided, none will be included.
 
         :raise google.api_core.exceptions.GoogleAPIError: If table preparation fails
 
@@ -219,6 +222,7 @@ class BigQueryDataOperator:
             partition_size=partition_size,
             filters=filters,
             obs_columns=obs_columns,
+            metadata_extra_columns=metadata_extra_columns,
         )
 
     def extract_data(

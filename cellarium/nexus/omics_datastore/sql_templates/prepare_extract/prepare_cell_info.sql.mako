@@ -10,6 +10,10 @@
     select_column_names_processed = mh.remove_leading_alias(select_column_names_processed)
     # This is required for random ordering during extraction
     select_column_names_processed.append("farm_finger")
+
+    if metadata_columns:
+        for metadata_column in metadata_columns:
+            select_column_names_processed.append(metadata_column)
 %>
 create or replace table `${project}.${dataset}.${extract_table_prefix}${constants.BQ_EXTRACT_CELL_INFO_TABLE_NAME}`
 partition by range_bucket(extract_bin, generate_array(0, ${partition_bin_count}, ${partition_size}))

@@ -254,6 +254,7 @@ class NexusDataOpsCoordinator:
         partition_size: int = 10,
         filters: dict[str, Any] | None = None,
         obs_columns: list[str] | None = None,
+        metadata_extra_columns: list[str] | None = None,
     ) -> None:
         """
         Prepare extract tables for data extraction.
@@ -271,6 +272,8 @@ class NexusDataOpsCoordinator:
         :param partition_size: Size of each partition
         :param filters: Optional query filters to apply
         :param obs_columns: Optional list of observation columns to include
+        :param metadata_extra_columns: Optional list of metadata extra columns to include from `metadata_extra` JSON
+            blob. If not provided, none will be included.
 
         :raise ValueError: If binning parameters are invalid
         :raise google.api_core.exceptions.GoogleAPIError: If table creation fails
@@ -292,6 +295,7 @@ class NexusDataOpsCoordinator:
                 partition_size=partition_size,
                 filters=filters,
                 obs_columns=obs_columns,
+                metadata_extra_columns=metadata_extra_columns,
             )
 
             # Save metadata to GCS

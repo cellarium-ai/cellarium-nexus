@@ -1,6 +1,7 @@
 import json
 
 from django import forms
+from django.forms.widgets import TextInput
 from django.utils.translation import gettext_lazy as _
 from django_json_widget.widgets import JSONEditorWidget as BaseJSONEditorWidget
 from unfold.widgets import (
@@ -12,6 +13,73 @@ from unfold.widgets import (
 
 from cellarium.nexus.backend.cell_management.models import BigQueryDataset, FeatureSchema
 from cellarium.nexus.backend.curriculum.models import Curriculum
+
+
+class CommaSeparatedWidget(UnfoldAdminTextInputWidget):
+    """
+    Widget that displays a list of strings as comma-separated values.
+    """
+
+    def __init__(self, attrs=None):
+        """
+        Initialize the widget with placeholder text.
+
+        :param attrs: HTML attributes
+        """
+        default_attrs = {
+            "class": "vTextField",
+            "placeholder": "Enter column names separated by commas",
+            "style": "width: 100%;",
+        }
+        if attrs:
+            default_attrs.update(attrs)
+        super().__init__(attrs=default_attrs)
+
+    def format_value(self, value):
+        """
+        Format the value for display in the widget.
+
+        :param value: Value to format
+
+        :return: Formatted value
+        """
+        if value is None:
+            return ""
+        if isinstance(value, list):
+            return ", ".join(str(v) for v in value)
+        return value
+
+
+class CommaSeparatedField(forms.CharField):
+    """
+    Field that converts comma-separated input to a list of strings.
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Initialize the field with the CommaSeparatedWidget.
+
+        :param args: Positional arguments
+        :param kwargs: Keyword arguments
+        """
+        kwargs.setdefault("widget", CommaSeparatedWidget)
+        super().__init__(*args, **kwargs)
+
+    def to_python(self, value):
+        """
+        Convert the input value to a list of strings.
+
+        :param value: Input value
+
+        :raise: forms.ValidationError
+
+        :return: List of strings
+        """
+        if not value:
+            return []
+        if isinstance(value, list):
+            return value
+        return [item.strip() for item in value.split(",") if item.strip()]
 
 
 class CustomJSONEditorWidget(BaseJSONEditorWidget):
@@ -113,7 +181,11 @@ class ExtractCurriculumForm(forms.Form):
         widget=UnfoldAdminSelectWidget,
         help_text=_("BigQuery Dataset to extract data from"),
     )
-
+    metadata_extra_columns = CommaSeparatedField(
+        label=_("Extra Metadata Columns"),
+        required=False,
+        help_text=_("Enter column names separated by commas to include as additional metadata in the extract."),
+    )
     filters = forms.JSONField(
         label=_("Filters"),
         required=False,
@@ -187,3 +259,12 @@ class ExtractCurriculumForm(forms.Form):
             return filters
         except json.JSONDecodeError as e:
             raise forms.ValidationError(_("Invalid JSON format: %s") % str(e))
+
+    def clean_metadata_extra_columns(self):
+        """
+        Validate the metadata_extra_columns field.
+
+        :return: List of column name strings
+        """
+        columns = self.cleaned_data.get("metadata_extra_columns")
+        return columns if columns else []

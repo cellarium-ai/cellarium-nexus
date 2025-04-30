@@ -111,6 +111,7 @@ class ExtractTablePreparer:
         partition_size: int = 10,
         filters: dict[str, Any] | None = None,
         obs_columns: list[str] | None = None,
+        metadata_extra_columns: list[str] | None = None,
     ) -> None:
         """
         Create cell info table with binning and randomization.
@@ -123,6 +124,8 @@ class ExtractTablePreparer:
         :param partition_size: Size of each partition
         :param filters: Query filters to apply
         :param obs_columns: Observation columns to include
+        :param metadata_extra_columns: Additional metadata columns to include to extract files from `metadata_extra`
+            JSON blob. If not provided, none will be included.
 
         :raise ValueError: If binning parameters are invalid
         :raise google.api_core.exceptions.GoogleAPIError: If table creation fails
@@ -140,6 +143,7 @@ class ExtractTablePreparer:
             select=obs_columns,
             filters=filters,
             random_seed_offset=random_seed_offset,
+            metadata_columns=metadata_extra_columns,
         )
 
         # Create randomized table
@@ -161,6 +165,7 @@ class ExtractTablePreparer:
             extract_bin_size=extract_bin_size,
             assign_bin_by_category=assign_bin_by_category,
             extract_bin_category_column_name=extract_bin_category_column_name,
+            metadata_columns=metadata_extra_columns,
         )
         sql = bq_sql.render(str(CELL_INFO_TEMPLATE), template_data)
         self.execute_query(sql)
@@ -206,6 +211,7 @@ def prepare_extract_tables(
     partition_size: int = 10,
     filters: dict[str, Any] | None = None,
     obs_columns: list[str] | None = None,
+    metadata_extra_columns: list[str] | None = None,
 ) -> schemas.ExtractMetadata:
     """
     Prepare all necessary tables for data extraction.
@@ -223,6 +229,8 @@ def prepare_extract_tables(
     :param partition_size: Size of each partition
     :param filters: Query filters to apply
     :param obs_columns: Observation columns to include
+    :param metadata_extra_columns: Additional metadata columns to include to extract files from `metadata_extra`.
+        If not provided, none will be included.
 
     :raise ValueError: If binning parameters are invalid
     :raise google.api_core.exceptions.GoogleAPIError: If table creation fails
@@ -253,6 +261,7 @@ def prepare_extract_tables(
         partition_size=partition_size,
         filters=filters,
         obs_columns=obs_columns,
+        metadata_extra_columns=metadata_extra_columns,
     )
 
     # Step 3: Prepare count matrix

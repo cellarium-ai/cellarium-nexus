@@ -40,6 +40,7 @@ def compose_extract_curriculum_configs(
     bigquery_dataset: models.BigQueryDataset,
     extract_bin_size: int,
     filters: dict | None = None,
+    metadata_extra_columns: list[str] | None = None,
 ) -> tuple[component_configs.BQOpsPrepareExtract, list[component_configs.BQOpsExtract]]:
     """
     Compose extract curriculum configs for the Kubeflow pipeline.
@@ -50,6 +51,7 @@ def compose_extract_curriculum_configs(
     :param bigquery_dataset: BigQuery dataset to extract from
     :param extract_bin_size: Number of cells per extract bin
     :param filters: Optional dictionary of filter statements to apply
+    :param metadata_extra_columns: Optional list of additional metadata columns to include
 
     :raise: ValueError: If extract_bin_size <= 0
     :raise: google.api_core.exceptions.GoogleAPIError: If BigQuery API request fails
@@ -85,6 +87,7 @@ def compose_extract_curriculum_configs(
         bucket_name=settings.BUCKET_NAME_PRIVATE,
         extract_bucket_path=extract_bucket_path,
         creator_id=creator_id,
+        metadata_extra_columns=metadata_extra_columns,
     )
 
     extract_configs = []
@@ -95,6 +98,7 @@ def compose_extract_curriculum_configs(
         if not worker_bins:
             continue
 
+        extract_obs_columns = obs_columns + metadata_extra_columns if metadata_extra_columns else obs_columns
         extract_configs.append(
             component_configs.BQOpsExtract(
                 name=name,
@@ -104,7 +108,7 @@ def compose_extract_curriculum_configs(
                 bins=worker_bins,
                 bucket_name=settings.BUCKET_NAME_PRIVATE,
                 extract_bucket_path=extract_bucket_path,
-                obs_columns=obs_columns,
+                obs_columns=extract_obs_columns,
                 max_workers=len(worker_bins),
             )
         )
@@ -118,6 +122,7 @@ def compose_and_dump_configs(
     name: str,
     extract_bin_size: int,
     filters: dict | None = None,
+    metadata_extra_columns: list[str] | None = None,
 ) -> tuple[str, list[str]]:
     """
     Compose extract pipeline configs and dump them to GCS bucket.
@@ -131,6 +136,7 @@ def compose_and_dump_configs(
     :param name: Name for the extract
     :param extract_bin_size: Number of cells per extract bin
     :param filters: Optional dictionary of filter statements to apply
+    :param metadata_extra_columns: Optional list of additional metadata columns to include
 
     :raise ValueError: If extract_bin_size <= 0
     :raise exceptions.ZeroCellsReturnedError: If no cells match the filters
@@ -146,6 +152,7 @@ def compose_and_dump_configs(
         name=name,
         extract_bin_size=extract_bin_size,
         filters=filters,
+        metadata_extra_columns=metadata_extra_columns,
     )
     configs_stage_dir = f"gs://{settings.BUCKET_NAME_PRIVATE}/pipeline-configs"
 
@@ -166,6 +173,7 @@ def submit_extract_pipeline(
     name: str,
     extract_bin_size: int,
     filters: dict | None = None,
+    metadata_extra_columns: list[str] | None = None,
 ) -> str:
     """
     Submit a Kubeflow pipeline for data extraction with the provided configurations.
@@ -178,6 +186,7 @@ def submit_extract_pipeline(
     :param name: Name for the extract
     :param extract_bin_size: Number of cells per extract bin
     :param filters: Optional dictionary of filter statements to apply
+    :param metadata_extra_columns: Optional list of additional metadata columns to include
 
     :raise ValueError: If extract_bin_size <= 0
     :raise exceptions.ZeroCellsReturnedError: If no cells match the filters
@@ -193,6 +202,7 @@ def submit_extract_pipeline(
         name=name,
         extract_bin_size=extract_bin_size,
         filters=filters,
+        metadata_extra_columns=metadata_extra_columns,
     )
     return submit_pipeline(
         pipeline_component=extract_data_pipeline,
