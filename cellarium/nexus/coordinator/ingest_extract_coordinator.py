@@ -2,6 +2,7 @@
 Control and manage Nexus data operations.
 """
 
+import concurrent.futures
 import datetime
 import json
 import logging
@@ -164,15 +165,34 @@ class NexusDataOpsCoordinator:
 
     def _read_gcs_avro_file(self, gcs_uri: str) -> list[dict]:
         """
-        Read records from an Avro file in GCS.
+        Read an Avro file from GCS.
 
-        :param gcs_uri: Full GCS URI to the Avro file
-        :return: List of records as dictionaries
-        :raise IOError: If file cannot be read
+        :param gcs_uri: GCS URI of the Avro file to read
+
+        :raise: IOError: If the file cannot be read
+        :raise: ValueError: If the file is not a valid Avro file
+
+        :return: List of records from the Avro file
         """
         with smart_open.open(gcs_uri, "rb") as f:
             avro_reader = fastavro.reader(f)
             return [record for record in avro_reader]
+
+    def _cleanup_ingest_files(self, bucket_name: str, bucket_stage_dir: str) -> list[str]:
+        """
+        Clean up ingest files from a GCS bucket after successful ingestion.
+
+        :param bucket_name: GCS bucket name containing the data
+        :param bucket_stage_dir: Directory in the bucket containing staged files
+
+        :raise: google.cloud.exceptions.GoogleAPIError: If deletion fails
+
+        :return: List of deleted blob names
+        """
+        logger.info(f"Cleaning up ingest files from gs://{bucket_name}/{bucket_stage_dir}")
+        deleted_files = utils.gcp.delete_files_from_bucket(bucket_name=bucket_name, prefix=bucket_stage_dir)
+        logger.info(f"Deleted {len(deleted_files)} files from gs://{bucket_name}/{bucket_stage_dir}")
+        return deleted_files
 
     def ingest_data_to_bigquery(
         self,
@@ -211,6 +231,10 @@ class NexusDataOpsCoordinator:
                 stage_dir=bucket_stage_dir,
                 ingest_id=ingest_id,
             )
+            self._cleanup_ingest_files(
+                bucket_name=bucket_name,
+                bucket_stage_dir=bucket_stage_dir,
+            )
             self.backend_client.update_ingest_status(
                 ingest_id=ingest_id,
                 new_status="SUCCEEDED",
@@ -224,6 +248,46 @@ class NexusDataOpsCoordinator:
             )
             # Re-raise the exception to stop execution
             raise
+
+    def ingest_data_to_bigquery_parallel(
+        self,
+        *,
+        bucket_name: str,
+        bucket_stage_dirs: list[str],
+        num_workers: int = 4,
+    ) -> None:
+        """
+        Ingest data from multiple GCS stage directories into BigQuery tables asynchronously.
+
+        :param bucket_name: GCS bucket name containing the data
+        :param bucket_stage_dirs: List of directories in the bucket containing staged files
+        :param num_workers: Number of concurrent workers for processing
+
+        :raise: ValueError: If bucket_stage_dirs is empty
+        :raise: Exception: If any of the ingestion operations fail (logged but not propagated)
+        """
+        if not bucket_stage_dirs:
+            raise ValueError("bucket_stage_dirs cannot be empty")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=num_workers) as executor:
+            # Submit all tasks to the executor
+            future_to_dir = {}
+            for stage_dir in bucket_stage_dirs:
+                future = executor.submit(
+                    self.ingest_data_to_bigquery,
+                    bucket_name=bucket_name,
+                    bucket_stage_dir=stage_dir,
+                )
+                future_to_dir[future] = stage_dir
+
+            # Process results as they complete
+            for future in concurrent.futures.as_completed(future_to_dir):
+                stage_dir = future_to_dir[future]
+                try:
+                    future.result()
+                    logger.info(f"Successfully ingested data from {stage_dir}")
+                except Exception as exc:
+                    logger.error(f"Failed to ingest data from {stage_dir}: {exc}")
 
     def create_bigquery_dataset(self, *, bigquery_dataset: str, location: str = "US") -> str:
         """
@@ -435,10 +499,7 @@ class NexusDataOpsCoordinator:
 
             # Mark the curriculum as failed
             try:
-                self.backend_client.update_curriculum(
-                    name=extract_name,
-                    status="FAILED",
-                )
+                self.backend_client.update_curriculum(name=extract_name, status="FAILED")
                 logger.info(f"Marked curriculum {extract_name} as failed")
             except Exception as api_error:
                 logger.error(f"Failed to mark curriculum as failed: {api_error}")

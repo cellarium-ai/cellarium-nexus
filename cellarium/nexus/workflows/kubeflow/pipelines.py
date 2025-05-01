@@ -37,22 +37,32 @@ def run_extracts_pipeline(extract_configs: t.List[str]) -> None:
 
 
 @dsl.pipeline(
-    name="nexus-pipelines-ingest-data",
+    name="nexus-pipelines-create-ingest-data",
     description="For each input config, create ingest files and then ingest data to BigQuery, in parallel.",
 )
-def ingest_data_pipeline(ingest_task_configs: t.List[str]) -> None:
+def create_ingest_files_parallel_pipeline(create_ingest_files_configs: t.List[str]) -> None:
     """
     For each input task configuration, create ingest files and then ingest them to BigQuery.
     These create->ingest sequences run in parallel for all input configurations.
 
-    :param ingest_task_configs: List of GCS paths to the combined IngestTaskConfig files.
+    :param create_ingest_files_configs: List of GCS paths to the combined IngestTaskConfig files.
 
     :raise: RuntimeError if any component fails
     """
-    with dsl.ParallelFor(items=ingest_task_configs, name="create-and-ingest-workers", parallelism=32) as item:
-        create_op = components.create_ingest_files_job(gcs_config_path=item)
-        ingest_op = components.ingest_data_to_bigquery_job(gcs_config_path=item)
-        ingest_op.after(create_op)
+    with dsl.ParallelFor(items=create_ingest_files_configs, name="create-ingest-files-workers", parallelism=64) as item:
+        components.create_ingest_files_job(gcs_config_path=item)
+
+
+@dsl.pipeline(
+    name="nexus-pipelines-ingest-data-to-bigquery",
+    description="Ingest data to BigQuery",
+)
+def ingest_data_to_bigquery_pipeline(create_ingest_files_configs: t.List[str], ingest_task_config: str) -> None:
+    create_ingest_files_op = create_ingest_files_parallel_pipeline(
+        create_ingest_files_configs=create_ingest_files_configs
+    )
+    ingest_data_to_bigquery_op = components.ingest_data_to_bigquery_job(gcs_config_path=ingest_task_config)
+    ingest_data_to_bigquery_op.after(create_ingest_files_op)
 
 
 @dsl.pipeline(

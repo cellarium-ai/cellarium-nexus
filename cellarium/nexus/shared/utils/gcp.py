@@ -171,3 +171,27 @@ def get_blob_size(bucket_name: str, file_path: str) -> int:
     blob.reload()
 
     return blob.size
+
+
+def delete_files_from_bucket(bucket_name: str, prefix: str) -> list[str]:
+    """
+    Delete all files from a GCS bucket with the given prefix.
+
+    :param bucket_name: Bucket name in Google Cloud Storage
+    :param prefix: Prefix of files to delete (a.k.a. "directory")
+
+    :raise: google.cloud.exceptions.GoogleCloudError: If there's an error communicating with Google Cloud Storage
+
+    :return: List of deleted blob names
+    """
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blobs = list(bucket.list_blobs(prefix=prefix))
+
+    deleted_blobs = []
+    for blob in blobs:
+        blob.delete()
+        deleted_blobs.append(blob.name)
+        logger.info(f"Deleted blob: {blob.name}")
+
+    return deleted_blobs

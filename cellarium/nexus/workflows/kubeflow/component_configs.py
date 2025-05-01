@@ -1,11 +1,11 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
 
 from cellarium.nexus.shared import schemas
 
 
-class IngestTaskConfig(BaseModel):
+class CreateIngestFilesConfig(BaseModel):
     """
     Combined configuration for a single create_ingest_files and
     ingest_data_to_bigquery task pair.
@@ -28,6 +28,24 @@ class IngestTaskConfig(BaseModel):
     ingest_bucket_path: str
     tag: str
     metadata_columns: Optional[Dict[str, Any]] = None
+
+
+class IngestFilesConfig(BaseModel):
+    """
+    Configuration for ingesting data from multiple stage directories into BigQuery.
+
+    :param project_id: GCP project ID
+    :param nexus_backend_api_url: URL of the Nexus backend API
+    :param bigquery_dataset: BigQuery dataset name
+    :param bucket_name: GCS bucket name containing the staged files
+    :param ingest_bucket_paths: List of directories in the bucket containing staged files
+    """
+
+    project_id: str
+    nexus_backend_api_url: str
+    bigquery_dataset: str
+    bucket_name: str
+    ingest_bucket_paths: list[str]
 
 
 class BQOpsPrepareExtract(BaseModel):

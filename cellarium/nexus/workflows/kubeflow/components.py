@@ -11,11 +11,23 @@ SERVICE_ACCOUNT = "vertex-pipelines-sa@dsp-cellarium.iam.gserviceaccount.com"
     service_account=SERVICE_ACCOUNT,
 )
 def create_ingest_files_job(gcs_config_path: str):
+    """
+    Create ingest files from input data sources.
+
+    Reads a CreateIngestFilesConfig from GCS and uses NexusDataOpsCoordinator to create
+    ingest files for the specified data source.
+
+    :param gcs_config_path: GCS path to the configuration file
+
+    :raise: Exception: If file creation fails
+    """
     from cellarium.nexus.coordinator import NexusDataOpsCoordinator
     from cellarium.nexus.shared import utils
-    from cellarium.nexus.workflows.kubeflow.component_configs import IngestTaskConfig
+    from cellarium.nexus.workflows.kubeflow.component_configs import CreateIngestFilesConfig
 
-    params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=IngestTaskConfig)
+    params = utils.workflows_configs.read_component_config(
+        gcs_path=gcs_config_path, schema_class=CreateIngestFilesConfig
+    )
 
     coordinator = NexusDataOpsCoordinator(
         project_id=params.project_id,
@@ -39,20 +51,30 @@ def create_ingest_files_job(gcs_config_path: str):
     service_account=SERVICE_ACCOUNT,
 )
 def ingest_data_to_bigquery_job(gcs_config_path: str):
+    """
+    Ingest prepared data into BigQuery tables.
+
+    Reads an IngestFilesConfig from GCS and uses NexusDataOpsCoordinator to ingest
+    data from the specified bucket paths into BigQuery tables.
+
+    :param gcs_config_path: GCS path to the configuration file
+
+    :raise: Exception: If ingestion fails
+    """
     from cellarium.nexus.coordinator import NexusDataOpsCoordinator
     from cellarium.nexus.shared import utils
-    from cellarium.nexus.workflows.kubeflow.component_configs import IngestTaskConfig
+    from cellarium.nexus.workflows.kubeflow.component_configs import IngestFilesConfig
 
-    params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=IngestTaskConfig)
+    params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=IngestFilesConfig)
 
     coordinator = NexusDataOpsCoordinator(
         project_id=params.project_id,
         nexus_backend_api_url=params.nexus_backend_api_url,
         bigquery_dataset=params.bigquery_dataset,
     )
-    coordinator.ingest_data_to_bigquery(
+    coordinator.ingest_data_to_bigquery_parallel(
         bucket_name=params.bucket_name,
-        bucket_stage_dir=params.ingest_bucket_path,
+        bucket_stage_dirs=params.ingest_bucket_paths,
     )
 
 
@@ -60,6 +82,16 @@ def ingest_data_to_bigquery_job(gcs_config_path: str):
     base_image=BASE_IMAGE, machine_type="e2-standard-4", display_name="prepare_extract", service_account=SERVICE_ACCOUNT
 )
 def prepare_extract_job(gcs_config_path: str):
+    """
+    Prepare BigQuery tables for data extraction.
+
+    Reads a BQOpsPrepareExtract configuration from GCS and uses NexusDataOpsCoordinator
+    to prepare extract tables based on the specified features and filters.
+
+    :param gcs_config_path: GCS path to the configuration file
+
+    :raise: Exception: If preparation fails
+    """
     from cellarium.nexus.coordinator import NexusDataOpsCoordinator
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import BQOpsPrepareExtract
@@ -89,6 +121,16 @@ def prepare_extract_job(gcs_config_path: str):
     base_image=BASE_IMAGE, machine_type="e2-standard-32", display_name="extract", service_account=SERVICE_ACCOUNT
 )
 def extract_job(gcs_config_path: str):
+    """
+    Extract data from prepared tables into AnnData files.
+
+    Reads a BQOpsExtract configuration from GCS and uses NexusDataOpsCoordinator
+    to extract data from BigQuery tables into AnnData files for the specified bins.
+
+    :param gcs_config_path: GCS path to the configuration file
+
+    :raise: Exception: If extraction fails
+    """
     from cellarium.nexus.coordinator import NexusDataOpsCoordinator
     from cellarium.nexus.shared import utils
     from cellarium.nexus.workflows.kubeflow.component_configs import BQOpsExtract

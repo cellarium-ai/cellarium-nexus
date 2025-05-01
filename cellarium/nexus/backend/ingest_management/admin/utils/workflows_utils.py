@@ -8,8 +8,12 @@ from django.conf import settings
 
 from cellarium.nexus.backend.cell_management.models import BigQueryDataset
 from cellarium.nexus.shared import utils
-from cellarium.nexus.workflows.kubeflow.component_configs import IngestTaskConfig, ValidationConfig
-from cellarium.nexus.workflows.kubeflow.pipelines import ingest_data_pipeline, validate_anndata_pipeline
+from cellarium.nexus.workflows.kubeflow.component_configs import (
+    CreateIngestFilesConfig,
+    IngestFilesConfig,
+    ValidationConfig,
+)
+from cellarium.nexus.workflows.kubeflow.pipelines import ingest_data_to_bigquery_pipeline, validate_anndata_pipeline
 from cellarium.nexus.workflows.kubeflow.utils.job import submit_pipeline
 
 
@@ -49,7 +53,7 @@ def submit_ingest_pipeline(
 
         # Create combined config for this task
         task_configs.append(
-            IngestTaskConfig(
+            CreateIngestFilesConfig(
                 project_id=settings.GCP_PROJECT_ID,
                 nexus_backend_api_url=settings.SITE_URL,
                 bigquery_dataset=bigquery_dataset.name,
@@ -61,17 +65,35 @@ def submit_ingest_pipeline(
             )
         )
 
+    # Create ingest config for all stage directories
+    stage_dirs = [config.ingest_bucket_path for config in task_configs]
+
+    ingest_config = IngestFilesConfig(
+        project_id=settings.GCP_PROJECT_ID,
+        nexus_backend_api_url=settings.SITE_URL,
+        bigquery_dataset=bigquery_dataset.name,
+        bucket_name=settings.BUCKET_NAME_PRIVATE,
+        ingest_bucket_paths=stage_dirs,
+    )
+
     # Save configs to GCS
     configs_stage_dir = f"gs://{settings.BUCKET_NAME_PRIVATE}/pipeline-configs"
 
-    task_config_paths = utils.workflows_configs.dump_configs_to_bucket(task_configs, configs_stage_dir)
+    # Save create_ingest_files configs
+    create_ingest_configs_paths = utils.workflows_configs.dump_configs_to_bucket(task_configs, configs_stage_dir)
+
+    # Save ingest_data_to_bigquery config
+    ingest_config_paths = utils.workflows_configs.dump_configs_to_bucket([ingest_config], configs_stage_dir)
 
     # Submit pipeline and return the pipeline URL
     return submit_pipeline(
-        pipeline_component=ingest_data_pipeline,
+        pipeline_component=ingest_data_to_bigquery_pipeline,
         display_name=f"Nexus Ingest Data - {bigquery_dataset.name}",
         gcp_project=settings.GCP_PROJECT_ID,
-        pipeline_kwargs={"ingest_task_configs": task_config_paths},
+        pipeline_kwargs={
+            "create_ingest_files_configs": create_ingest_configs_paths,
+            "ingest_task_config": ingest_config_paths[0],
+        },
         service_account=settings.PIPELINE_SERVICE_ACCOUNT,
         pipeline_root_path=settings.PIPELINE_ROOT_PATH,
     )
