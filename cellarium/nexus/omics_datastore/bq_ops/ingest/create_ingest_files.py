@@ -24,6 +24,7 @@ import h5py
 import numpy as np
 import pandas as pd
 import pydantic
+import scipy.sparse
 from anndata._core.anndata import AnnData
 from anndata._io.h5ad import _clean_uns, _read_raw
 from anndata._io.specs import read_elem
@@ -245,6 +246,7 @@ def _process_cell_info_obs(
     ingest_id: int,
     start_index: int,
     end_index: int,
+    count_matrix: np.ndarray | scipy.sparse.spmatrix,
     column_mapping: dict[str, str] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
@@ -255,6 +257,7 @@ def _process_cell_info_obs(
     :param ingest_id: Ingest ID to apply
     :param start_index: Starting index for cell IDs
     :param end_index: Ending index for cell IDs
+    :param count_matrix: Matrix containing gene expression counts (X from AnnData)
     :param column_mapping: Optional mapping of input column names to schema names
 
     :return: Tuple of (schema_data_df, metadata_extra_df)
@@ -266,11 +269,22 @@ def _process_cell_info_obs(
     schema_field_names = [x for x in CellInfoBQAvroSchema.model_fields if x not in {constants.OBS_METADATA_EXTRA}]
     metadata_extra_columns = list(set(df.columns) - set(schema_field_names))
 
-    # Add Nexus ID, ingest ID, tag, and null values for total mRNA UMIs
+    # Add Nexus ID, ingest ID, and tag
     df[constants.OBS_NEXUS_ID] = range(start_index, end_index + 1)
     df[constants.OBS_INGEST_ID] = ingest_id
     df[constants.OBS_TAG] = tag
-    df[constants.OBS_TOTAL_MRNA_UMIS] = pd.Series([pd.NA] * len(df), dtype=pd.Int64Dtype())
+
+    # Calculate total_mrna_umis as the sum of all counts for each cell
+    # Handle different matrix formats (dense or sparse)
+    if scipy.sparse.issparse(count_matrix):
+        # For sparse matrix, use efficient methods to sum elements
+        total_mrna_umis = count_matrix.sum(axis=1).A1
+    else:
+        # For dense matrix (numpy array)
+        total_mrna_umis = np.sum(count_matrix, axis=1)
+
+    # Convert to pandas Series with Int64 dtype for consistent handling of NAs
+    df[constants.OBS_TOTAL_MRNA_UMIS] = pd.Series(total_mrna_umis, dtype=pd.Int64Dtype())
 
     df_for_schema = df[schema_field_names]
     df_metadata_extra = df[metadata_extra_columns]
@@ -351,6 +365,7 @@ def prepare_input_anndata(
         ingest_id=ingest_id,
         start_index=cell_index_start,
         end_index=cell_index_end,
+        count_matrix=adata.X,
         column_mapping=obs_mapping,
     )
 
