@@ -90,7 +90,6 @@ class MetadataExtractor:
         sql = bq_sql.render(str(EXTRACT_METADATA_TEMPLATE), template_data)
         result = list(self.execute_query(sql))[0]
 
-        # Create ExtractMetadata instance with the basic information
         return ExtractMetadata(
             total_bins=result.total_bins,
             last_bin_size=result.last_bin_size,
@@ -122,59 +121,6 @@ class MetadataExtractor:
 
         return categorical_columns
 
-    def get_measured_genes_info(self) -> pd.DataFrame:
-        """
-        Get information about measured genes grouped by tag.
-
-        Creates a matrix where rows are tags and columns are features, with values
-        indicating whether a feature is measured for that tag.
-
-        :raise google.api_core.exceptions.GoogleAPIError: If query fails
-
-        :return: DataFrame with gene measurement matrix (tags x features)
-        """
-        template_data = bq_sql.TemplateData(
-            project=self.project,
-            dataset=self.dataset,
-            extract_table_prefix=self.prefix,
-        )
-        sql = bq_sql.render(str(MEASURED_GENES_TEMPLATE), template_data)
-        query_result = self.client.query(sql).result()
-
-        # Convert query results to DataFrame
-        all_features = set()
-        gene_measurement_data = []
-        tags = []
-        feature_info = {}  # Store feature info for labels
-
-        for row in query_result:
-            tags.append(row.tag)
-            # Create a dictionary mapping feature IDs to True
-            measured_features = {}
-            for feature in row.features:
-                # Access dictionary fields using string keys
-                feature_id = feature["id"]
-                measured_features[feature_id] = True
-                # Store feature info for labels if we haven't seen it yet
-                if feature_id not in feature_info:
-                    feature_info[feature_id] = (feature["symbol"], feature["ensemble_id"])
-            # Keep track of all unique feature IDs
-            all_features.update(measured_features.keys())
-            gene_measurement_data.append(measured_features)
-
-        # Create measurement matrix
-        all_features = sorted(all_features)
-        gene_expression_mask = np.zeros((len(tags), len(all_features)))
-
-        for i, measured_features in enumerate(gene_measurement_data):
-            for j, feature_id in enumerate(all_features):
-                gene_expression_mask[i, j] = measured_features.get(feature_id, False)
-
-        # Create feature labels using symbol and ensemble_id
-        feature_labels = [f"{feature_info[feature_id][0]}_{feature_info[feature_id][1]}" for feature_id in all_features]
-
-        return pd.DataFrame(data=gene_expression_mask, index=pd.Index(tags, name="tag"), columns=feature_labels)
-
     def compose_extract_metadata(self) -> ExtractMetadata:
         """
         Create and return a complete ExtractMetadata object with all metadata.
@@ -189,11 +135,7 @@ class MetadataExtractor:
         logger.info("Extracting categorical columns metadata...")
         categorical_meta = self.get_categorical_columns()
 
-        logger.info("Extracting measured genes info...")
-        genes_info = self.get_measured_genes_info()
-
         # Update the extract_meta with additional attributes
         extract_meta.category_metadata = categorical_meta
-        extract_meta.measured_genes_mask = genes_info.to_dict(orient="records")
 
         return extract_meta
