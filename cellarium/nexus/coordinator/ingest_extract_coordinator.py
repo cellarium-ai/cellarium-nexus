@@ -18,7 +18,7 @@ from nexus.clients import NexusBackendAPIClient
 from nexus.omics_datastore.bq_ops import BigQueryDataOperator
 from nexus.omics_datastore.bq_ops.ingest.create_ingest_files import optimized_read_anndata
 
-from cellarium.nexus.coordinator import constants
+from cellarium.nexus.coordinator import constants, exceptions
 from cellarium.nexus.shared import schemas, utils
 from cellarium.nexus.shared.schemas.omics_datastore import ExtractMetadata
 
@@ -281,13 +281,18 @@ class NexusDataOpsCoordinator:
                 future_to_dir[future] = stage_dir
 
             # Process results as they complete
+            error_happened = False
             for future in concurrent.futures.as_completed(future_to_dir):
                 stage_dir = future_to_dir[future]
                 try:
                     future.result()
                     logger.info(f"Successfully ingested data from {stage_dir}")
                 except Exception as exc:
+                    error_happened = True
                     logger.error(f"Failed to ingest data from {stage_dir}: {exc}")
+
+            if error_happened:
+                raise exceptions.NexusDataOpsIngestError("Some ingest operations failed")
 
     def create_bigquery_dataset(self, *, bigquery_dataset: str, location: str = "US") -> str:
         """
