@@ -74,6 +74,7 @@ def prepare_extract_job(gcs_config_path: str):
     coordinator.prepare_extract_tables(
         extract_name=params.name,
         features=params.features,
+        categorical_column_count_limit=params.categorical_column_count_limit,
         creator_id=params.creator_id,
         filters=params.filters,
         extract_bin_size=params.extract_bin_size,

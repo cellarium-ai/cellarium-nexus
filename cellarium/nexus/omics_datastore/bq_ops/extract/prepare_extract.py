@@ -11,6 +11,7 @@ from typing import Any, Sequence
 from google.cloud import bigquery
 
 from cellarium.nexus.omics_datastore import bq_sql
+from cellarium.nexus.omics_datastore.bq_ops import constants
 from cellarium.nexus.omics_datastore.bq_ops.extract.metadata_extractor import MetadataExtractor
 from cellarium.nexus.shared import schemas
 
@@ -203,6 +204,7 @@ def prepare_extract_tables(
     dataset: str,
     extract_table_prefix: str,
     features: Sequence[schemas.FeatureSchema],
+    categorical_column_count_limit: int = constants.CATEGORICAL_COLUMN_COUNT_LIMIT_DEFAULT,
     extract_bin_size: int | None = None,
     assign_bin_by_category: bool = False,
     extract_bin_category_column_name: str | None = None,
@@ -221,6 +223,9 @@ def prepare_extract_tables(
     :param dataset: BigQuery dataset ID
     :param extract_table_prefix: Prefix for extract table names
     :param features: Sequence of feature schema objects
+    :param categorical_column_count_limit: Maximum number of categories per categorical column to be considered as
+        categorical. If the number of categories exceeds this limit, the column will not be unified across all extract
+        files.
     :param extract_bin_size: Size of cell bins
     :param assign_bin_by_category: Whether to bin by category
     :param extract_bin_category_column_name: Column name for category binning
@@ -281,6 +286,7 @@ def prepare_extract_tables(
         extract_table_prefix=extract_table_prefix,
         filters=filters,
         extract_bin_size=extract_bin_size,
+        categorical_column_count_limit=categorical_column_count_limit,
     )
 
     # Compose the extract metadata

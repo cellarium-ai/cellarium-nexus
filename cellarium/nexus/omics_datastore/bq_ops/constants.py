@@ -2,6 +2,7 @@ BQ_INGEST_TABLE_NAME = "ingest_info"
 BQ_FEATURE_INFO_TABLE_NAME = "feature_info"
 BQ_CELL_INFO_TABLE_NAME = "cell_info"
 BQ_RAW_COUNT_MATRIX_COO_TABLE_NAME = "raw_matrix_coo"
+CATEGORICAL_COLUMN_COUNT_LIMIT_DEFAULT = 5_000
 
 # Extract table names
 BQ_EXTRACT_FEATURE_INFO_TABLE_NAME = "__extract_feature_info"

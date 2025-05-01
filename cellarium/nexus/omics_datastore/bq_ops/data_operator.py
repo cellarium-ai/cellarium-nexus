@@ -178,6 +178,7 @@ class BigQueryDataOperator:
         *,
         extract_table_prefix: str,
         features: Sequence[schemas.FeatureSchema],
+        categorical_column_count_limit: int,
         extract_bin_size: int | None = None,
         assign_bin_by_category: bool = False,
         extract_bin_category_column_name: str | None = None,
@@ -193,6 +194,9 @@ class BigQueryDataOperator:
 
         :param extract_table_prefix: Prefix for extract table names
         :param features: List of feature schemas to prepare
+        :param categorical_column_count_limit: Maximum number of categories per categorical column to be considered as
+            categorical. If the number of categories exceeds this limit, the column will not be unified across all
+            extract files.
         :param extract_bin_size: Optional size for extract bins
         :param assign_bin_by_category: Whether to assign bins by category
         :param extract_bin_category_column_name: Column name for category-based binning
@@ -214,6 +218,7 @@ class BigQueryDataOperator:
             dataset=self.dataset,
             extract_table_prefix=extract_table_prefix,
             features=features,
+            categorical_column_count_limit=categorical_column_count_limit,
             extract_bin_size=extract_bin_size,
             assign_bin_by_category=assign_bin_by_category,
             extract_bin_category_column_name=extract_bin_category_column_name,

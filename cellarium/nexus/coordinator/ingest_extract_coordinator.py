@@ -243,6 +243,7 @@ class NexusDataOpsCoordinator:
         *,
         extract_name: str,
         features: Sequence[schemas.FeatureSchema],
+        categorical_column_count_limit: int,
         creator_id: int,
         bucket_name: str,
         extract_bucket_path: str,
@@ -261,6 +262,9 @@ class NexusDataOpsCoordinator:
 
         :param extract_name: Prefix for extract table names
         :param features: Sequence of feature schema objects
+        :param categorical_column_count_limit: Maximum number of categories per categorical column to be considered as
+            categorical. If the number of categories exceeds this limit, the column will not be unified across all
+            extract files.
         :param creator_id: ID of the curriculum creator
         :param bucket_name: GCS bucket name for metadata storage
         :param extract_bucket_path: Path within bucket for metadata storage
@@ -287,6 +291,7 @@ class NexusDataOpsCoordinator:
             extract_metadata = self.bq_data_operator.prepare_extract_tables(
                 extract_table_prefix=extract_name,
                 features=features,
+                categorical_column_count_limit=categorical_column_count_limit,
                 extract_bin_size=extract_bin_size,
                 assign_bin_by_category=assign_bin_by_category,
                 extract_bin_category_column_name=extract_bin_category_column_name,

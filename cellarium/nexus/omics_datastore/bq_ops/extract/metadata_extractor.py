@@ -51,6 +51,7 @@ class MetadataExtractor:
         project: str,
         dataset: str,
         extract_table_prefix: str,
+        categorical_column_count_limit: int = 5_000,
         filters: dict[str, Any] | None = None,
         extract_bin_size: int | None = None,
     ) -> None:
@@ -58,6 +59,7 @@ class MetadataExtractor:
         self.project = project
         self.dataset = dataset
         self.prefix = extract_table_prefix
+        self.categorical_column_count_limit = categorical_column_count_limit
         self.filters = filters
         self.extract_bin_size = extract_bin_size
 
@@ -112,12 +114,23 @@ class MetadataExtractor:
         categorical_columns = {}
         for field in table.schema:
             if field.field_type == "STRING" and field.name not in COLUMNS_TO_IGNORE:
-                template_data = bq_sql.TemplateData(
+                count_sql_template = bq_sql.TemplateData(
                     project=self.project, dataset=self.dataset, extract_table_prefix=self.prefix, column_name=field.name
                 )
-                sql = bq_sql.render(str(TEMPLATE_DIR / "categorical_values.sql.mako"), template_data)
-                results = self.execute_query(sql)
-                categorical_columns[field.name] = [row[0] for row in results]
+                count_sql = bq_sql.render(str(TEMPLATE_DIR / "categorical_values_counts.sql.mako"), count_sql_template)
+                count_result = self.execute_query(count_sql)
+                column_count = next(count_result)[0]
+
+                if column_count <= self.categorical_column_count_limit:
+                    template_data = bq_sql.TemplateData(
+                        project=self.project,
+                        dataset=self.dataset,
+                        extract_table_prefix=self.prefix,
+                        column_name=field.name,
+                    )
+                    sql = bq_sql.render(str(TEMPLATE_DIR / "categorical_values.sql.mako"), template_data)
+                    results = self.execute_query(sql)
+                    categorical_columns[field.name] = [row[0] for row in results]
 
         return categorical_columns
 

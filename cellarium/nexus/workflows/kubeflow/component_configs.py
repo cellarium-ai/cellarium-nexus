@@ -40,6 +40,9 @@ class BQOpsPrepareExtract(BaseModel):
     :param nexus_backend_api_url: URL of the Nexus backend API
     :param bigquery_dataset: BigQuery dataset name
     :param features: List of feature schemas to extract
+    :param categorical_column_count_limit: Maximum number of categories per categorical column to be considered as
+        categorical. If the number of categories exceeds this limit, the column will not be unified across all extract
+        files.
     :param filters: Dictionary of filters to apply
     :param obs_columns: List of observation columns to include
     :param extract_bin_size: Number of cells per extract bin
@@ -54,6 +57,7 @@ class BQOpsPrepareExtract(BaseModel):
     nexus_backend_api_url: str
     bigquery_dataset: str
     features: list[schemas.FeatureSchema]
+    categorical_column_count_limit: int
     filters: dict[str, Any]
     obs_columns: list[str]
     extract_bin_size: int

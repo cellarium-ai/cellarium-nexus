@@ -186,6 +186,17 @@ class ExtractCurriculumForm(forms.Form):
         required=False,
         help_text=_("Enter column names separated by commas to include as additional metadata in the extract."),
     )
+    categorical_column_count_limit = forms.IntegerField(
+        label=_("Categorical Column Count Limit"),
+        min_value=1,
+        max_value=25_000,
+        initial=5000,
+        widget=UnfoldAdminIntegerFieldWidget,
+        help_text=_(
+            "Maximum number of categories per categorical column to be considered as categorical. "
+            "If the number of categories exceeds this limit, the column will not be unified across all extract files."
+        ),
+    )
     filters = forms.JSONField(
         label=_("Filters"),
         required=False,
