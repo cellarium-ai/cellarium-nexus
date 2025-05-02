@@ -57,9 +57,9 @@ def submit_pipeline(
     :param pipeline_kwargs: Keyword arguments to pass to the pipeline function.
     :param pipeline_location: Datacenter location of Google Cloud Platform to run the pipeline job.
     :param service_account: Service account email to use for the pipeline execution. If None, the default compute
-                           service account will be used.
+        service account will be used.
     :param pipeline_root_path: GCS path to use as the pipeline root directory. If None, the default
-                             Vertex AI Pipelines location will be used.
+        Vertex AI Pipelines location will be used.
 
     :raise: google.api_core.exceptions.GoogleAPIError: If pipeline submission fails.
 

@@ -36,7 +36,7 @@ from cellarium.nexus.omics_datastore.bq_avro_schemas.cell_management import (
     FeatureInfoBQAvroSchema,
     IngestInfoBQAvroSchema,
 )
-from cellarium.nexus.omics_datastore.bq_ops import constants
+from cellarium.nexus.omics_datastore.bq_ops import constants, exceptions
 
 # Default value for maximum batch size of avro files when they are being created by avro writer
 FLUSH_BATCH_SIZE_DEFAULT = 10000
@@ -88,7 +88,7 @@ def get_adata_x_shape(file_path: str) -> tuple[int, int]:
     return shape
 
 
-def optimized_read_anndata(input_file_path: pathlib.Path) -> anndata.AnnData:
+def optimized_read_anndata(input_file_path: pathlib.Path) -> AnnData:
     """
     Read an AnnData object from an `h5ad` file while handling specific attributes.
 
@@ -241,27 +241,27 @@ def _apply_column_mapping(df: pd.DataFrame, mapping: dict[str, str]) -> pd.DataF
 
 
 def _process_cell_info_obs(
-    df: pd.DataFrame,
+    adata: AnnData,
     tag: str | None,
     ingest_id: int,
     start_index: int,
     end_index: int,
-    count_matrix: np.ndarray | scipy.sparse.spmatrix,
     column_mapping: dict[str, str] | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Process cell info observations and apply column mapping if provided.
 
-    :param df: Input DataFrame to process
+    :param adata: Input anndata object to process
     :param tag: Tag to apply
     :param ingest_id: Ingest ID to apply
     :param start_index: Starting index for cell IDs
     :param end_index: Ending index for cell IDs
-    :param count_matrix: Matrix containing gene expression counts (X from AnnData)
     :param column_mapping: Optional mapping of input column names to schema names
 
     :return: Tuple of (schema_data_df, metadata_extra_df)
     """
+    df = adata.obs
+
     if column_mapping:
         logger.info("Mapping obs columns: " + ", ".join(f"{k} -> {v}" for k, v in column_mapping.items()))
         df = _apply_column_mapping(df=df, mapping=column_mapping)
@@ -275,13 +275,9 @@ def _process_cell_info_obs(
     df[constants.OBS_TAG] = tag
 
     # Calculate total_mrna_umis as the sum of all counts for each cell
-    # Handle different matrix formats (dense or sparse)
-    if scipy.sparse.issparse(count_matrix):
-        # For sparse matrix, use efficient methods to sum elements
-        total_mrna_umis = count_matrix.sum(axis=1).A1
-    else:
-        # For dense matrix (numpy array)
-        total_mrna_umis = np.sum(count_matrix, axis=1)
+    count_matrix = adata.X
+    count_matrix = count_matrix[:]
+    total_mrna_umis = count_matrix.sum(axis=1).A1
 
     # Convert to pandas Series with Int64 dtype for consistent handling of NAs
     df[constants.OBS_TOTAL_MRNA_UMIS] = pd.Series(total_mrna_umis, dtype=pd.Int64Dtype())
@@ -360,12 +356,11 @@ def prepare_input_anndata(
     var_mapping = column_mapping.get("var_mapping") if column_mapping else None
 
     df_obs_schema_data, df_obs_metadata_extra = _process_cell_info_obs(
-        df=adata.obs,
+        adata=adata,
         tag=tag,
         ingest_id=ingest_id,
         start_index=cell_index_start,
         end_index=cell_index_end,
-        count_matrix=adata.X,
         column_mapping=obs_mapping,
     )
 
@@ -548,6 +543,7 @@ def dump_core_matrix_in_parallel(
 
         done, not_done = concurrency.wait(futures, return_when=concurrency.ALL_COMPLETED)
 
+        error_raised = False
         for future in done:
             try:
                 # Attempt to get the result of the future
@@ -559,6 +555,10 @@ def dump_core_matrix_in_parallel(
                 logger.info(f"Exception message: {e}")
                 # Format and print the full traceback
                 traceback.print_exception(type(e), e, e.__traceback__)
+                error_raised = True
+
+        if error_raised:
+            raise exceptions.DataIngestError("Error occurred during parallel processing of raw count matrix.")
 
     logger.info(f"    Processed {total_cells} cells... in {current_milli_time() - start} ms")
 
