@@ -66,7 +66,7 @@ class CellFeatureInfo(models.Model):
 
 class CellInfo(models.Model):
     id = models.BigAutoField(primary_key=True, verbose_name=_("ID"), editable=False)
-    original_id = models.CharField(max_length=256, verbose_name=_("original id"), unique=True)
+    original_id = models.CharField(max_length=256, verbose_name=_("original id"))
     ingest = models.ForeignKey(
         to="ingest_management.IngestInfo", on_delete=models.CASCADE, related_name="cells", verbose_name=_("ingest")
     )
@@ -76,7 +76,7 @@ class CellInfo(models.Model):
     )
     # Cell Features
     donor_id = models.CharField(max_length=256, null=True, blank=True, verbose_name=_("donor id"))
-    cell_type = models.CharField(max_length=256, null=False, db_index=True, verbose_name=_("cell type"))
+    cell_type = models.CharField(max_length=256, null=True, blank=True, db_index=True, verbose_name=_("cell type"))
     assay = models.CharField(max_length=256, null=True, blank=True, db_index=True, verbose_name=_("assay"))
     development_stage = models.CharField(
         max_length=256, null=True, blank=True, db_index=True, verbose_name=_("development stage")
@@ -98,25 +98,25 @@ class CellInfo(models.Model):
         max_length=256, null=True, blank=True, db_index=True, verbose_name=_("cell type ontology term id")
     )
     assay_ontology_term_id = models.CharField(
-        max_length=256, null=True, blank=True, verbose_name=_("assay ontology term id")
+        max_length=256, null=True, blank=True, db_index=True, verbose_name=_("assay ontology term id")
     )
     development_stage_ontology_term_id = models.CharField(
-        max_length=256, null=True, blank=True, verbose_name=_("development stage ontology term id")
+        max_length=256, null=True, blank=True, db_index=True, verbose_name=_("development stage ontology term id")
     )
     tissue_ontology_term_id = models.CharField(
-        max_length=256, null=True, blank=True, verbose_name=_("tissue ontology term id")
+        max_length=256, null=True, blank=True, db_index=True, verbose_name=_("tissue ontology term id")
     )
     disease_ontology_term_id = models.CharField(
-        max_length=256, null=True, blank=True, verbose_name=_("disease ontology term id")
+        max_length=256, null=True, blank=True, db_index=True, verbose_name=_("disease ontology term id")
     )
     organism_ontology_term_id = models.CharField(
-        max_length=256, null=True, blank=True, verbose_name=_("organism ontology term id")
+        max_length=256, null=True, blank=True, db_index=True, verbose_name=_("organism ontology term id")
     )
     self_reported_ethnicity_ontology_term_id = models.CharField(
-        max_length=256, null=True, blank=True, verbose_name=_("self-reported ethnicity ontology term id")
+        max_length=256, null=True, blank=True, db_index=True, verbose_name=_("self-reported ethnicity ontology term id")
     )
     sex_ontology_term_id = models.CharField(
-        max_length=256, null=True, blank=True, verbose_name=_("sex ontology term id")
+        max_length=256, null=True, blank=True, db_index=True, verbose_name=_("sex ontology term id")
     )
 
     class Meta:

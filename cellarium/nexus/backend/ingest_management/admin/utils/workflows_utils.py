@@ -80,7 +80,9 @@ def submit_ingest_pipeline(
     configs_stage_dir = f"gs://{settings.BUCKET_NAME_PRIVATE}/pipeline-configs"
 
     # Save create_ingest_files configs
-    create_ingest_configs_paths = utils.workflows_configs.dump_configs_to_bucket(create_ingest_files_configs, configs_stage_dir)
+    create_ingest_configs_paths = utils.workflows_configs.dump_configs_to_bucket(
+        create_ingest_files_configs, configs_stage_dir
+    )
 
     # Save ingest_data_to_bigquery config
     ingest_config_paths = utils.workflows_configs.dump_configs_to_bucket([ingest_config], configs_stage_dir)
