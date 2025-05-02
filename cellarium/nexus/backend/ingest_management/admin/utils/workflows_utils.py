@@ -38,7 +38,7 @@ def submit_ingest_pipeline(
     base_stage_dir = f"{settings.BACKEND_PIPELINE_DIR}/data-ingests/{timestamp}_{secrets.token_hex(12)}"
 
     # Create list for combined task configs
-    task_configs = []
+    create_ingest_files_configs = []
 
     for i, row in df_ingest_file_info.iterrows():
         # Extract file name without extension from gcs_file_path
@@ -52,7 +52,7 @@ def submit_ingest_pipeline(
         tag = row["tag"] if "tag" in df_ingest_file_info.columns else None
 
         # Create combined config for this task
-        task_configs.append(
+        create_ingest_files_configs.append(
             CreateIngestFilesConfig(
                 project_id=settings.GCP_PROJECT_ID,
                 nexus_backend_api_url=settings.SITE_URL,
@@ -66,7 +66,7 @@ def submit_ingest_pipeline(
         )
 
     # Create ingest config for all stage directories
-    stage_dirs = [config.ingest_bucket_path for config in task_configs]
+    stage_dirs = [config.ingest_bucket_path for config in create_ingest_files_configs]
 
     ingest_config = IngestFilesConfig(
         project_id=settings.GCP_PROJECT_ID,
@@ -80,7 +80,7 @@ def submit_ingest_pipeline(
     configs_stage_dir = f"gs://{settings.BUCKET_NAME_PRIVATE}/pipeline-configs"
 
     # Save create_ingest_files configs
-    create_ingest_configs_paths = utils.workflows_configs.dump_configs_to_bucket(task_configs, configs_stage_dir)
+    create_ingest_configs_paths = utils.workflows_configs.dump_configs_to_bucket(create_ingest_files_configs, configs_stage_dir)
 
     # Save ingest_data_to_bigquery config
     ingest_config_paths = utils.workflows_configs.dump_configs_to_bucket([ingest_config], configs_stage_dir)

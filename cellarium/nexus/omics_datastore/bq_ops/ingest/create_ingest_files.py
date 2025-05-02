@@ -279,8 +279,7 @@ def _process_cell_info_obs(
     count_matrix = count_matrix[:]
     total_mrna_umis = count_matrix.sum(axis=1).A1
 
-    # Convert to pandas Series with Int64 dtype for consistent handling of NAs
-    df[constants.OBS_TOTAL_MRNA_UMIS] = pd.Series(total_mrna_umis, dtype=pd.Int64Dtype())
+    df[constants.OBS_TOTAL_MRNA_UMIS] = total_mrna_umis.astype(int)
 
     df_for_schema = df[schema_field_names]
     df_metadata_extra = df[metadata_extra_columns]
