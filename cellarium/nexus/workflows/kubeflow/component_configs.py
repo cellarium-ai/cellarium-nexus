@@ -66,6 +66,7 @@ class BQOpsPrepareExtract(BaseModel):
     :param extract_bin_size: Number of cells per extract bin
     :param bucket_name: GCS bucket name for output files
     :param extract_bucket_path: Path within bucket for output files
+    :param extract_bin_keys: Optional list of keys to bin by. If not provided, bins will be assigned randomly.
     :param metadata_extra_columns: Optional list of additional metadata columns to include
     """
 
@@ -81,6 +82,7 @@ class BQOpsPrepareExtract(BaseModel):
     extract_bin_size: int
     bucket_name: str
     extract_bucket_path: str
+    extract_bin_keys: list[str] | None = None
     metadata_extra_columns: list[str] | None = None
 
 

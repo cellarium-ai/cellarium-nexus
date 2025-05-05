@@ -114,6 +114,7 @@ def prepare_extract_job(gcs_config_path: str):
         extract_bucket_path=params.extract_bucket_path,
         obs_columns=params.obs_columns,
         metadata_extra_columns=params.metadata_extra_columns,
+        extract_bin_keys=params.extract_bin_keys,
     )
 
 

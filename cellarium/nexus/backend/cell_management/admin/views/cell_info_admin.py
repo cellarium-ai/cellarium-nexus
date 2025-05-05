@@ -111,12 +111,14 @@ class CellInfoAdmin(ModelAdmin):
             filters = form.cleaned_data["filters"] or {}
             bigquery_dataset = form.cleaned_data["bigquery_dataset"]
             categorical_column_count_limit = form.cleaned_data["categorical_column_count_limit"]
+            extract_bin_keys = form.cleaned_data["extract_bin_keys"]
 
             pipeline_url = admin_utils.submit_extract_pipeline(
                 feature_schema=feature_schema,
                 name=name,
                 extract_bin_size=extract_bin_size,
                 categorical_column_count_limit=categorical_column_count_limit,
+                extract_bin_keys=extract_bin_keys,
                 filters=filters,
                 bigquery_dataset=bigquery_dataset,
                 creator_id=request.user.id,

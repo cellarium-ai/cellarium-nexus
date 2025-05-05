@@ -1,3 +1,5 @@
+from typing import Any
+
 from cellarium.nexus.omics_datastore.bq_sql.constants import TemplateDataDictNames
 from cellarium.nexus.omics_datastore.bq_sql.validation import template_data_validator
 
@@ -41,7 +43,7 @@ class TemplateData:
         dataset: str | None = None,
         select: list[str] | None = None,
         filters: dict[str, object] | None = None,
-        **other_kwargs: str | bool | int | float | None,
+        **other_kwargs: str | bool | int | float | list[Any] | None,
     ) -> None:
         template_data_validator.validate_not_empty(value=project)
 

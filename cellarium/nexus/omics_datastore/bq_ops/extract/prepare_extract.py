@@ -105,11 +105,10 @@ class ExtractTablePreparer:
     def prepare_cell_info(
         self,
         extract_bin_size: int | None = None,
-        assign_bin_by_category: bool = False,
-        extract_bin_category_column_name: str | None = None,
         random_seed_offset: int = 0,
         partition_bin_count: int = 40000,
         partition_size: int = 10,
+        extract_bin_keys: list[str] | None = None,
         filters: dict[str, Any] | None = None,
         obs_columns: list[str] | None = None,
         metadata_extra_columns: list[str] | None = None,
@@ -118,11 +117,10 @@ class ExtractTablePreparer:
         Create cell info table with binning and randomization.
 
         :param extract_bin_size: Size of cell bins
-        :param assign_bin_by_category: Whether to bin by category
-        :param extract_bin_category_column_name: Column name for category binning
         :param random_seed_offset: Offset for randomization
         :param partition_bin_count: Number of partitions
         :param partition_size: Size of each partition
+        :param extract_bin_keys: List of keys to bin by. If not provided, bins will be assigned randomly.
         :param filters: Query filters to apply
         :param obs_columns: Observation columns to include
         :param metadata_extra_columns: Additional metadata columns to include to extract files from `metadata_extra`
@@ -131,12 +129,6 @@ class ExtractTablePreparer:
         :raise ValueError: If binning parameters are invalid
         :raise google.api_core.exceptions.GoogleAPIError: If table creation fails
         """
-        if not assign_bin_by_category and extract_bin_size is None:
-            raise ValueError("extract_bin_size required when not binning by category")
-        if assign_bin_by_category and extract_bin_category_column_name is None:
-            raise ValueError("category column name required when binning by category")
-
-        # Create randomized intermediate table
         template_data = bq_sql.TemplateData(
             project=self.project,
             dataset=self.dataset,
@@ -145,6 +137,7 @@ class ExtractTablePreparer:
             filters=filters,
             random_seed_offset=random_seed_offset,
             metadata_columns=metadata_extra_columns,
+            extract_bin_keys=extract_bin_keys,
         )
 
         # Create randomized table
@@ -164,8 +157,7 @@ class ExtractTablePreparer:
             partition_bin_count=partition_bin_count,
             partition_size=partition_size,
             extract_bin_size=extract_bin_size,
-            assign_bin_by_category=assign_bin_by_category,
-            extract_bin_category_column_name=extract_bin_category_column_name,
+            extract_bin_keys=extract_bin_keys,
             metadata_columns=metadata_extra_columns,
         )
         sql = bq_sql.render(str(CELL_INFO_TEMPLATE), template_data)
@@ -206,11 +198,10 @@ def prepare_extract_tables(
     features: Sequence[schemas.FeatureSchema],
     categorical_column_count_limit: int = constants.CATEGORICAL_COLUMN_COUNT_LIMIT_DEFAULT,
     extract_bin_size: int | None = None,
-    assign_bin_by_category: bool = False,
-    extract_bin_category_column_name: str | None = None,
     random_seed_offset: int = 0,
     partition_bin_count: int = 40000,
     partition_size: int = 10,
+    extract_bin_keys: list[str] | None = None,
     filters: dict[str, Any] | None = None,
     obs_columns: list[str] | None = None,
     metadata_extra_columns: list[str] | None = None,
@@ -227,11 +218,10 @@ def prepare_extract_tables(
         categorical. If the number of categories exceeds this limit, the column will not be unified across all extract
         files.
     :param extract_bin_size: Size of cell bins
-    :param assign_bin_by_category: Whether to bin by category
-    :param extract_bin_category_column_name: Column name for category binning
     :param random_seed_offset: Offset for randomization
     :param partition_bin_count: Number of partitions
     :param partition_size: Size of each partition
+    :param extract_bin_keys: List of keys to bin by. If not provided, bins will be assigned randomly.
     :param filters: Query filters to apply
     :param obs_columns: Observation columns to include
     :param metadata_extra_columns: Additional metadata columns to include to extract files from `metadata_extra`.
@@ -259,11 +249,10 @@ def prepare_extract_tables(
     logger.info("Preparing cell info table with binning...")
     preparer.prepare_cell_info(
         extract_bin_size=extract_bin_size,
-        assign_bin_by_category=assign_bin_by_category,
-        extract_bin_category_column_name=extract_bin_category_column_name,
         random_seed_offset=random_seed_offset,
         partition_bin_count=partition_bin_count,
         partition_size=partition_size,
+        extract_bin_keys=extract_bin_keys,
         filters=filters,
         obs_columns=obs_columns,
         metadata_extra_columns=metadata_extra_columns,

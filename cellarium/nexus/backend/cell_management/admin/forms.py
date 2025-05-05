@@ -197,6 +197,13 @@ class ExtractCurriculumForm(forms.Form):
             "If the number of categories exceeds this limit, the column will not be unified across all extract files."
         ),
     )
+    extract_bin_keys = CommaSeparatedField(
+        label=_("Extract Bin Keys"),
+        required=False,
+        help_text=_(
+            "Optional list of comma-separated keys to bin by. If not provided, bins will be assigned randomly."
+        ),
+    )
     filters = forms.JSONField(
         label=_("Filters"),
         required=False,

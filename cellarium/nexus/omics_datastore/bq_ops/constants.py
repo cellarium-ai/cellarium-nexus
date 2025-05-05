@@ -3,6 +3,7 @@ BQ_FEATURE_INFO_TABLE_NAME = "feature_info"
 BQ_CELL_INFO_TABLE_NAME = "cell_info"
 BQ_RAW_COUNT_MATRIX_COO_TABLE_NAME = "raw_matrix_coo"
 CATEGORICAL_COLUMN_COUNT_LIMIT_DEFAULT = 5_000
+EXTRACT_BIN_KEY_NAME = "extract_bin_category_key"
 
 # Extract table names
 BQ_EXTRACT_FEATURE_INFO_TABLE_NAME = "__extract_feature_info"
@@ -10,6 +11,7 @@ BQ_EXTRACT_CELL_INFO_TABLE_NAME = "__extract_cell_info"
 BQ_EXTRACT_CELL_INFO_RANDOMIZED_TABLE_NAME = "__extract_cell_info_randomized"
 BQ_EXTRACT_MATRIX_COO_TABLE_NAME = "__extract_matrix_coo"
 
+# Ingest file names
 INGEST_INGEST_FILE_NAME = "ingest-info.avro"
 INGEST_CELL_INFO_FILE_NAME = "cell-info.avro"
 INGEST_FEATURE_INFO_FILE_NAME = "feature-info.avro"

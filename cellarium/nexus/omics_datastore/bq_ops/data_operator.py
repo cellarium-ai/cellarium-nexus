@@ -180,11 +180,10 @@ class BigQueryDataOperator:
         features: Sequence[schemas.FeatureSchema],
         categorical_column_count_limit: int,
         extract_bin_size: int | None = None,
-        assign_bin_by_category: bool = False,
-        extract_bin_category_column_name: str | None = None,
         random_seed_offset: int = 0,
         partition_bin_count: int = 40000,
         partition_size: int = 10,
+        extract_bin_keys: list[str] | None = None,
         filters: dict[str, Any] | None = None,
         obs_columns: list[str] | None = None,
         metadata_extra_columns: list[str] | None = None,
@@ -198,11 +197,10 @@ class BigQueryDataOperator:
             categorical. If the number of categories exceeds this limit, the column will not be unified across all
             extract files.
         :param extract_bin_size: Optional size for extract bins
-        :param assign_bin_by_category: Whether to assign bins by category
-        :param extract_bin_category_column_name: Column name for category-based binning
         :param random_seed_offset: Offset for random seed
         :param partition_bin_count: Number of bins per partition
         :param partition_size: Size of each partition
+        :param extract_bin_keys: Optional list of keys to bin by. If not provided, bins will be assigned randomly.
         :param filters: Optional filters to apply during preparation
         :param obs_columns: Optional list of observation columns to include
         :param metadata_extra_columns: Optional list of metadata extra columns to include to extract files from
@@ -212,6 +210,7 @@ class BigQueryDataOperator:
 
         :return: The complete ExtractMetadata object
         """
+
         return prepare_extract_tables(
             client=self.client,
             project=self.project,
@@ -220,11 +219,10 @@ class BigQueryDataOperator:
             features=features,
             categorical_column_count_limit=categorical_column_count_limit,
             extract_bin_size=extract_bin_size,
-            assign_bin_by_category=assign_bin_by_category,
-            extract_bin_category_column_name=extract_bin_category_column_name,
             random_seed_offset=random_seed_offset,
             partition_bin_count=partition_bin_count,
             partition_size=partition_size,
+            extract_bin_keys=extract_bin_keys,
             filters=filters,
             obs_columns=obs_columns,
             metadata_extra_columns=metadata_extra_columns,

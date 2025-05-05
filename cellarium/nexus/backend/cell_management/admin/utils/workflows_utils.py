@@ -40,6 +40,7 @@ def compose_extract_curriculum_configs(
     bigquery_dataset: models.BigQueryDataset,
     extract_bin_size: int,
     categorical_column_count_limit: int,
+    extract_bin_keys: list[str] | None = None,
     filters: dict | None = None,
     metadata_extra_columns: list[str] | None = None,
 ) -> tuple[component_configs.BQOpsPrepareExtract, list[component_configs.BQOpsExtract]]:
@@ -54,6 +55,8 @@ def compose_extract_curriculum_configs(
     :param categorical_column_count_limit: Maximum number of categories per categorical column to be considered as
             categorical. If the number of categories exceeds this limit, the column will not be unified across all
             extract files.
+    :param extract_bin_keys: Optional list of keys to use for binning the extract. If not provided, the keys will be
+        assigned randomly.
     :param filters: Optional dictionary of filter statements to apply
     :param metadata_extra_columns: Optional list of additional metadata columns to include
 
@@ -93,6 +96,7 @@ def compose_extract_curriculum_configs(
         extract_bucket_path=extract_bucket_path,
         creator_id=creator_id,
         metadata_extra_columns=metadata_extra_columns,
+        extract_bin_keys=extract_bin_keys,
     )
 
     extract_configs = []
@@ -127,6 +131,7 @@ def compose_and_dump_configs(
     name: str,
     extract_bin_size: int,
     categorical_column_count_limit: int,
+    extract_bin_keys: list[str] | None = None,
     filters: dict | None = None,
     metadata_extra_columns: list[str] | None = None,
 ) -> tuple[str, list[str]]:
@@ -141,6 +146,8 @@ def compose_and_dump_configs(
     :param bigquery_dataset: BigQuery dataset to extract data from
     :param name: Name for the extract
     :param extract_bin_size: Number of cells per extract bin
+    :param extract_bin_keys: Optional list of keys to use for binning the extract. If not provided, the keys will be
+        assigned randomly.
     :param filters: Optional dictionary of filter statements to apply
     :param categorical_column_count_limit: Maximum number of categories per categorical column to be considered as
             categorical. If the number of categories exceeds this limit, the column will not be unified across all
@@ -161,6 +168,7 @@ def compose_and_dump_configs(
         name=name,
         extract_bin_size=extract_bin_size,
         categorical_column_count_limit=categorical_column_count_limit,
+        extract_bin_keys=extract_bin_keys,
         filters=filters,
         metadata_extra_columns=metadata_extra_columns,
     )
@@ -183,6 +191,7 @@ def submit_extract_pipeline(
     name: str,
     extract_bin_size: int,
     categorical_column_count_limit: int,
+    extract_bin_keys: list[str] | None = None,
     filters: dict | None = None,
     metadata_extra_columns: list[str] | None = None,
 ) -> str:
@@ -199,6 +208,8 @@ def submit_extract_pipeline(
     :param categorical_column_count_limit: Maximum number of categories per categorical column to be considered as
             categorical. If the number of categories exceeds this limit, the column will not be unified across all
             extract files.
+    :param extract_bin_keys: Optional list of keys to use for binning the extract. If not provided, the keys will be
+        assigned randomly.
     :param filters: Optional dictionary of filter statements to apply
     :param metadata_extra_columns: Optional list of additional metadata columns to include
 
@@ -216,6 +227,7 @@ def submit_extract_pipeline(
         name=name,
         categorical_column_count_limit=categorical_column_count_limit,
         extract_bin_size=extract_bin_size,
+        extract_bin_keys=extract_bin_keys,
         filters=filters,
         metadata_extra_columns=metadata_extra_columns,
     )

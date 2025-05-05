@@ -206,6 +206,32 @@ def select(column_names: list[str]) -> str:
     return f"select {', '.join(processed_columns)}" if processed_columns else "*"
 
 
+def build_concat_expression(columns: list[str], alias: str, delim: str = "##") -> str:
+    """
+    Construct an SQL expression that concatenates a list of columns with a specified delimiter and assigns
+    the result to a given alias.
+
+    :param columns: List of column names to concatenate.
+    :param alias: Alias name for the resulting concatenated column.
+    :param delim: Delimiter used to separate columns in the concatenation.
+
+    :raises ValueError: If no columns are provided.
+
+    :return: A string representing the fully concatenated SQL expression.
+    """
+    if not columns:
+        raise ValueError("The list of columns must not be empty.")
+
+    interleaved_parts = []
+    for i, col in enumerate(columns):
+        if i > 0:
+            interleaved_parts.append(f"'{delim}'")
+        interleaved_parts.append(col)
+
+    concat_expression_inner = ", ".join(interleaved_parts)
+    return f"concat({concat_expression_inner}) as {alias}"
+
+
 def where(filters: dict[str, Any] | None) -> str:
     """
     Construct a SQL where clause from the provided filters.
