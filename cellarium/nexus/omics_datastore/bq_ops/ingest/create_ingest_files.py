@@ -24,7 +24,6 @@ import h5py
 import numpy as np
 import pandas as pd
 import pydantic
-import scipy.sparse
 from anndata._core.anndata import AnnData
 from anndata._io.h5ad import _clean_uns, _read_raw
 from anndata._io.specs import read_elem

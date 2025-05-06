@@ -5,6 +5,8 @@ Prepare BigQuery tables for efficient data extraction by preprocessing and stagi
 import csv
 import logging
 import tempfile
+from datetime import datetime, timedelta, timezone
+
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -62,6 +64,25 @@ class ExtractTablePreparer:
         query = self.client.query(sql)
         return query.result()
 
+    def set_table_expiration(
+        self,
+        table_id: str,
+        expiration_delta: timedelta,
+    ) -> None:
+        """
+        Set expiration time for a BigQuery table.
+
+        :param table_id: Fully qualified table ID (project.dataset.table)
+        :param expiration_delta: Time delta after which the table will expire
+
+        :raise google.api_core.exceptions.GoogleAPIError: If table update fails
+        """
+        expiration = datetime.now(timezone.utc) + expiration_delta
+        table = self.client.get_table(table_id)
+        table.expires = expiration
+        self.client.update_table(table=table, fields=["expires"])
+        logger.info(f"Set expiration for {table_id} to {expiration.isoformat()} UTC")
+
     def prepare_feature_table(self, features: Sequence[schemas.FeatureSchema]) -> None:
         """
         Create feature mapping table from provided schema using CSV load job.
@@ -92,7 +113,7 @@ class ExtractTablePreparer:
                 write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
             )
 
-            table_id = f"{self.project}.{self.dataset}.{self.prefix}__extract_feature_info"
+            table_id = f"{self.project}.{self.dataset}.{self.prefix}{constants.BQ_EXTRACT_FEATURE_INFO_TABLE_NAME}"
 
             # Load data from CSV
             logger.info("Creating feature info table...")
@@ -101,6 +122,9 @@ class ExtractTablePreparer:
                 load_job.result()  # Wait for job to complete
 
             logger.info(f"Loaded {load_job.output_rows} rows into {table_id}")
+
+            # Set the expiration time
+            self.set_table_expiration(table_id=table_id, expiration_delta=timedelta(hours=3))
 
     def prepare_cell_info(
         self,
@@ -163,6 +187,10 @@ class ExtractTablePreparer:
         sql = bq_sql.render(str(CELL_INFO_TEMPLATE), template_data)
         self.execute_query(sql)
 
+        # Set expiration time for the cell info table (14 days)
+        cell_info_table_id = f"{self.project}.{self.dataset}.{self.prefix}{constants.BQ_EXTRACT_CELL_INFO_TABLE_NAME}"
+        self.set_table_expiration(table_id=cell_info_table_id, expiration_delta=timedelta(days=14))
+
         # Drop intermediate table
         logger.info("Dropping intermediate randomized table...")
         sql = bq_sql.render(str(DROP_CELL_INFO_RAND_TEMPLATE), template_data)
@@ -188,6 +216,12 @@ class ExtractTablePreparer:
         logger.info("Creating count matrix table...")
         sql = bq_sql.render(str(TEMPLATE_DIR / "prepare_count_matrix.sql.mako"), template_data)
         self.execute_query(sql)
+
+        # Set expiration time for the count matrix table (4 hours)
+        count_matrix_table_id = (
+            f"{self.project}.{self.dataset}.{self.prefix}{constants.BQ_EXTRACT_MATRIX_COO_TABLE_NAME}"
+        )
+        self.set_table_expiration(table_id=count_matrix_table_id, expiration_delta=timedelta(hours=4))
 
 
 def prepare_extract_tables(
