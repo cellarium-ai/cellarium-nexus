@@ -99,12 +99,12 @@ class CountRelatedObjectsDeleteMixin:
             if n:
                 for obj in queryset:
                     obj_display = str(obj)
-                    self.log_deletion(request=request, obj=obj, obj_display=obj_display)
+                    self.log_deletion(request=request, obj=obj, object_repr=obj_display)
                 queryset.delete()
                 self.message_user(
                     request=request,
                     message=gettext("Successfully deleted %(count)d %(items)s.")
-                    % {"count": n, "items": model_ngettext(opts=self.opts, n=n)},
+                    % {"count": n, "items": model_ngettext(self.opts, n)},
                 )
             return None
 
