@@ -9,9 +9,6 @@ from cellarium.nexus.backend.cell_management.admin.utils import exceptions
 from cellarium.nexus.omics_datastore.bq_ops import BigQueryDataOperator
 from cellarium.nexus.shared import schemas
 from cellarium.nexus.shared.utils import workflows_configs
-from cellarium.nexus.workflows.kubeflow import component_configs
-from cellarium.nexus.workflows.kubeflow.pipelines import extract_data_pipeline
-from cellarium.nexus.workflows.kubeflow.utils.job import submit_pipeline
 
 
 def get_total_cell_in_bq_number(bigquery_dataset: models.BigQueryDataset, filters: dict | None = None) -> int:
@@ -43,7 +40,7 @@ def compose_extract_curriculum_configs(
     extract_bin_keys: list[str] | None = None,
     filters: dict | None = None,
     metadata_extra_columns: list[str] | None = None,
-) -> tuple[component_configs.BQOpsPrepareExtract, list[component_configs.BQOpsExtract]]:
+) -> tuple[schemas.component_configs.BQOpsPrepareExtract, list[schemas.component_configs.BQOpsExtract]]:
     """
     Compose extract curriculum configs for the Kubeflow pipeline.
 
@@ -82,7 +79,7 @@ def compose_extract_curriculum_configs(
 
     extract_bucket_path = f"{settings.BACKEND_PIPELINE_DIR}/data-extracts/{name}"
 
-    prepare_extract_config = component_configs.BQOpsPrepareExtract(
+    prepare_extract_config = schemas.component_configs.BQOpsPrepareExtract(
         name=name,
         project_id=settings.GCP_PROJECT_ID,
         nexus_backend_api_url=settings.SITE_URL,
@@ -109,7 +106,7 @@ def compose_extract_curriculum_configs(
 
         extract_obs_columns = obs_columns + metadata_extra_columns if metadata_extra_columns else obs_columns
         extract_configs.append(
-            component_configs.BQOpsExtract(
+            schemas.component_configs.BQOpsExtract(
                 name=name,
                 project_id=settings.GCP_PROJECT_ID,
                 nexus_backend_api_url=settings.SITE_URL,
@@ -220,6 +217,9 @@ def submit_extract_pipeline(
 
     :return: URL to the Vertex AI Pipeline dashboard for the submitted job
     """
+    from cellarium.nexus.workflows.kubeflow.pipelines import extract_data_pipeline  # noqa
+    from cellarium.nexus.workflows.kubeflow.utils.job import submit_pipeline  # noqa
+
     prepare_extract_config_path, extract_config_paths = compose_and_dump_configs(
         feature_schema=feature_schema,
         creator_id=creator_id,

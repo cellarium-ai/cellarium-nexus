@@ -2,7 +2,7 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel
 
-from cellarium.nexus.shared import schemas
+from cellarium.nexus.shared.schemas.omics_datastore import FeatureSchema
 
 
 class CreateIngestFilesConfig(BaseModel):
@@ -75,7 +75,7 @@ class BQOpsPrepareExtract(BaseModel):
     project_id: str
     nexus_backend_api_url: str
     bigquery_dataset: str
-    features: list[schemas.FeatureSchema]
+    features: list[FeatureSchema]
     categorical_column_count_limit: int
     filters: dict[str, Any]
     obs_columns: list[str]

@@ -56,6 +56,9 @@ prompt_value() {
 # Docker image
 prompt_value "Enter the Docker image URL for Cellarium Nexus" "IMAGE_PATH"
 
+# Nexus pipeline base Docker image URL
+prompt_value "Enter the Nexus pipeline base Docker image URL" "PIPELINE_BASE_IMAGE"
+
 # Project settings
 prompt_value "Enter your Google Cloud Project ID" "GCP_PROJECT_ID"
 
@@ -175,6 +178,7 @@ declare -a vars=(
     "DB_PASSWORD"
     "PIPELINE_SERVICE_ACCOUNT"
     "PIPELINE_ROOT_PATH"
+    "PIPELINE_BASE_IMAGE"
     "BUCKET_NAME_PRIVATE"
     "BUCKET_NAME_PUBLIC"
     "SECRET_KEY"

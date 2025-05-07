@@ -1,14 +1,12 @@
+from cellarium.nexus.workflows.kubeflow import conf
 from cellarium.nexus.workflows.kubeflow.utils import job
-
-BASE_IMAGE = "us-central1-docker.pkg.dev/dsp-cellarium/nexus/nexus-workflows:latest"
-SERVICE_ACCOUNT = "vertex-pipelines-sa@dsp-cellarium.iam.gserviceaccount.com"
 
 
 @job.dsl_component_job(
-    base_image=BASE_IMAGE,
     machine_type="e2-standard-8",
     display_name="create_ingest_files",
-    service_account=SERVICE_ACCOUNT,
+    base_image=conf.BASE_IMAGE,
+    service_account=conf.SERVICE_ACCOUNT,
 )
 def create_ingest_files_job(gcs_config_path: str):
     """
@@ -23,7 +21,7 @@ def create_ingest_files_job(gcs_config_path: str):
     """
     from cellarium.nexus.coordinator import NexusDataOpsCoordinator
     from cellarium.nexus.shared import utils
-    from cellarium.nexus.workflows.kubeflow.component_configs import CreateIngestFilesConfig
+    from cellarium.nexus.shared.schemas.component_configs import CreateIngestFilesConfig
 
     params = utils.workflows_configs.read_component_config(
         gcs_path=gcs_config_path, schema_class=CreateIngestFilesConfig
@@ -45,10 +43,10 @@ def create_ingest_files_job(gcs_config_path: str):
 
 
 @job.dsl_component_job(
-    base_image=BASE_IMAGE,
     machine_type="e2-standard-4",
     display_name="ingest_data_to_bigquery",
-    service_account=SERVICE_ACCOUNT,
+    base_image=conf.BASE_IMAGE,
+    service_account=conf.SERVICE_ACCOUNT,
 )
 def ingest_data_to_bigquery_job(gcs_config_path: str):
     """
@@ -63,7 +61,7 @@ def ingest_data_to_bigquery_job(gcs_config_path: str):
     """
     from cellarium.nexus.coordinator import NexusDataOpsCoordinator
     from cellarium.nexus.shared import utils
-    from cellarium.nexus.workflows.kubeflow.component_configs import IngestFilesConfig
+    from cellarium.nexus.shared.schemas.component_configs import IngestFilesConfig
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=IngestFilesConfig)
 
@@ -79,7 +77,10 @@ def ingest_data_to_bigquery_job(gcs_config_path: str):
 
 
 @job.dsl_component_job(
-    base_image=BASE_IMAGE, machine_type="e2-standard-4", display_name="prepare_extract", service_account=SERVICE_ACCOUNT
+    machine_type="e2-standard-4",
+    display_name="prepare_extract",
+    base_image=conf.BASE_IMAGE,
+    service_account=conf.SERVICE_ACCOUNT,
 )
 def prepare_extract_job(gcs_config_path: str):
     """
@@ -94,7 +95,7 @@ def prepare_extract_job(gcs_config_path: str):
     """
     from cellarium.nexus.coordinator import NexusDataOpsCoordinator
     from cellarium.nexus.shared import utils
-    from cellarium.nexus.workflows.kubeflow.component_configs import BQOpsPrepareExtract
+    from cellarium.nexus.shared.schemas.component_configs import BQOpsPrepareExtract
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=BQOpsPrepareExtract)
 
@@ -119,7 +120,10 @@ def prepare_extract_job(gcs_config_path: str):
 
 
 @job.dsl_component_job(
-    base_image=BASE_IMAGE, machine_type="e2-standard-32", display_name="extract", service_account=SERVICE_ACCOUNT
+    machine_type="e2-standard-32",
+    display_name="extract",
+    base_image=conf.BASE_IMAGE,
+    service_account=conf.SERVICE_ACCOUNT,
 )
 def extract_job(gcs_config_path: str):
     """
@@ -134,7 +138,7 @@ def extract_job(gcs_config_path: str):
     """
     from cellarium.nexus.coordinator import NexusDataOpsCoordinator
     from cellarium.nexus.shared import utils
-    from cellarium.nexus.workflows.kubeflow.component_configs import BQOpsExtract
+    from cellarium.nexus.shared.schemas.component_configs import BQOpsExtract
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=BQOpsExtract)
 
@@ -154,10 +158,10 @@ def extract_job(gcs_config_path: str):
 
 
 @job.dsl_component_job(
-    base_image=BASE_IMAGE,
     machine_type="e2-standard-4",
     display_name="nexus_mark_curriculum_as_finished",
-    service_account=SERVICE_ACCOUNT,
+    base_image=conf.BASE_IMAGE,
+    service_account=conf.SERVICE_ACCOUNT,
 )
 def mark_curriculum_as_finished_job(gcs_config_path: str):
     """
@@ -173,7 +177,7 @@ def mark_curriculum_as_finished_job(gcs_config_path: str):
     """
     from cellarium.nexus.coordinator import NexusDataOpsCoordinator
     from cellarium.nexus.shared import utils
-    from cellarium.nexus.workflows.kubeflow.component_configs import BQOpsPrepareExtract
+    from cellarium.nexus.shared.schemas.component_configs import BQOpsPrepareExtract
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=BQOpsPrepareExtract)
 
@@ -190,10 +194,10 @@ def mark_curriculum_as_finished_job(gcs_config_path: str):
 
 
 @job.dsl_component_job(
-    base_image=BASE_IMAGE,
     machine_type="e2-standard-4",
     display_name="validate_anndata_files",
-    service_account=SERVICE_ACCOUNT,
+    base_image=conf.BASE_IMAGE,
+    service_account=conf.SERVICE_ACCOUNT,
 )
 def validate_anndata_files_job(gcs_config_path: str):
     """
@@ -207,7 +211,7 @@ def validate_anndata_files_job(gcs_config_path: str):
     """
     from cellarium.nexus.coordinator import NexusDataValidationCoordinator
     from cellarium.nexus.shared import utils
-    from cellarium.nexus.workflows.kubeflow.component_configs import ValidationConfig
+    from cellarium.nexus.shared.schemas.component_configs import ValidationConfig
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=ValidationConfig)
 

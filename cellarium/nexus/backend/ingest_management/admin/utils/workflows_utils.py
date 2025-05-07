@@ -7,14 +7,7 @@ import pandas as pd
 from django.conf import settings
 
 from cellarium.nexus.backend.cell_management.models import BigQueryDataset
-from cellarium.nexus.shared import utils
-from cellarium.nexus.workflows.kubeflow.component_configs import (
-    CreateIngestFilesConfig,
-    IngestFilesConfig,
-    ValidationConfig,
-)
-from cellarium.nexus.workflows.kubeflow.pipelines import ingest_data_to_bigquery_pipeline, validate_anndata_pipeline
-from cellarium.nexus.workflows.kubeflow.utils.job import submit_pipeline
+from cellarium.nexus.shared import schemas, utils
 
 
 def submit_ingest_pipeline(
@@ -34,6 +27,9 @@ def submit_ingest_pipeline(
 
     :return: URL to the Vertex AI Pipeline dashboard for the submitted job
     """
+    from cellarium.nexus.workflows.kubeflow.pipelines import ingest_data_to_bigquery_pipeline  # noqa
+    from cellarium.nexus.workflows.kubeflow.utils.job import submit_pipeline  # noqa
+
     timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
     base_stage_dir = f"{settings.BACKEND_PIPELINE_DIR}/data-ingests/{timestamp}_{secrets.token_hex(12)}"
 
@@ -53,7 +49,7 @@ def submit_ingest_pipeline(
 
         # Create combined config for this task
         create_ingest_files_configs.append(
-            CreateIngestFilesConfig(
+            schemas.component_configs.CreateIngestFilesConfig(
                 project_id=settings.GCP_PROJECT_ID,
                 nexus_backend_api_url=settings.SITE_URL,
                 bigquery_dataset=bigquery_dataset.name,
@@ -68,7 +64,7 @@ def submit_ingest_pipeline(
     # Create ingest config for all stage directories
     stage_dirs = [config.ingest_bucket_path for config in create_ingest_files_configs]
 
-    ingest_config = IngestFilesConfig(
+    ingest_config = schemas.component_configs.IngestFilesConfig(
         project_id=settings.GCP_PROJECT_ID,
         nexus_backend_api_url=settings.SITE_URL,
         bigquery_dataset=bigquery_dataset.name,
@@ -122,8 +118,10 @@ def submit_validation_pipeline(
 
     :return: URL to the Vertex AI Pipeline dashboard for the submitted job
     """
-    # Create validation config
-    validation_config = ValidationConfig(
+    from cellarium.nexus.workflows.kubeflow.pipelines import validate_anndata_pipeline  # noqa
+    from cellarium.nexus.workflows.kubeflow.utils.job import submit_pipeline  # noqa
+
+    validation_config = schemas.component_configs.ValidationConfig(
         nexus_backend_api_url=settings.SITE_URL,
         validation_report_id=validation_report_id,
         adata_gcs_paths=adata_gcs_paths,
