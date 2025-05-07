@@ -6,20 +6,6 @@ from cellarium.nexus.shared.schemas.omics_datastore import FeatureSchema
 
 
 class CreateIngestFilesConfig(BaseModel):
-    """
-    Combined configuration for a single create_ingest_files and
-    ingest_data_to_bigquery task pair.
-
-    :param project_id: GCP project ID
-    :param nexus_backend_api_url: URL of the Nexus backend API
-    :param bigquery_dataset: BigQuery dataset name
-    :param data_source_path: Path to the input file for creation
-    :param bucket_name: GCS bucket name for staging files
-    :param ingest_bucket_path: Specific path within bucket for staging files for this task
-    :param tag: Tag associated with the data source
-    :param metadata_columns: Optional dictionary containing obs and var column mappings
-    """
-
     project_id: str
     nexus_backend_api_url: str
     bigquery_dataset: str
@@ -31,16 +17,6 @@ class CreateIngestFilesConfig(BaseModel):
 
 
 class IngestFilesConfig(BaseModel):
-    """
-    Configuration for ingesting data from multiple stage directories into BigQuery.
-
-    :param project_id: GCP project ID
-    :param nexus_backend_api_url: URL of the Nexus backend API
-    :param bigquery_dataset: BigQuery dataset name
-    :param bucket_name: GCS bucket name containing the staged files
-    :param ingest_bucket_paths: List of directories in the bucket containing staged files
-    """
-
     project_id: str
     nexus_backend_api_url: str
     bigquery_dataset: str
@@ -49,27 +25,6 @@ class IngestFilesConfig(BaseModel):
 
 
 class BQOpsPrepareExtract(BaseModel):
-    """
-    Configuration for the prepare extract job.
-
-    :param name: Prefix for extract table names
-    :param creator_id: ID of the user who initiated the extract
-    :param project_id: GCP project ID
-    :param nexus_backend_api_url: URL of the Nexus backend API
-    :param bigquery_dataset: BigQuery dataset name
-    :param features: List of feature schemas to extract
-    :param categorical_column_count_limit: Maximum number of categories per categorical column to be considered as
-        categorical. If the number of categories exceeds this limit, the column will not be unified across all extract
-        files.
-    :param filters: Dictionary of filters to apply
-    :param obs_columns: List of observation columns to include
-    :param extract_bin_size: Number of cells per extract bin
-    :param bucket_name: GCS bucket name for output files
-    :param extract_bucket_path: Path within bucket for output files
-    :param extract_bin_keys: Optional list of keys to bin by. If not provided, bins will be assigned randomly.
-    :param metadata_extra_columns: Optional list of additional metadata columns to include
-    """
-
     name: str
     creator_id: int
     project_id: str
@@ -87,16 +42,6 @@ class BQOpsPrepareExtract(BaseModel):
 
 
 class ValidationConfig(BaseModel):
-    """
-    Configuration for validating AnnData files and reporting results.
-
-    :param nexus_backend_api_url: URL of the Nexus backend API
-    :param validation_report_id: ID of the validation report to update
-    :param adata_gcs_paths: List of GCS paths to AnnData files to validate
-    :param validation_methods: List of validation method names to apply to each file
-    :param max_bytes_valid_per_file: Maximum file size in bytes for validation
-    """
-
     nexus_backend_api_url: str
     validation_report_id: int
     adata_gcs_paths: list[str]
@@ -105,20 +50,6 @@ class ValidationConfig(BaseModel):
 
 
 class BQOpsExtract(BaseModel):
-    """
-    Configuration for the extract job.
-
-    :param project_id: GCP project ID
-    :param nexus_backend_api_url: URL of the Nexus backend API
-    :param bigquery_dataset: BigQuery dataset name
-    :param name: Prefix for extract table names
-    :param bins: List of bin numbers to extract
-    :param bucket_name: GCS bucket name for output files
-    :param extract_bucket_path: Path within bucket for output files
-    :param obs_columns: Optional list of observation columns to include
-    :param max_workers: Optional maximum number of parallel workers
-    """
-
     name: str
     project_id: str
     nexus_backend_api_url: str
