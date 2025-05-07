@@ -7,8 +7,8 @@ from unfold.admin import ModelAdmin
 from unfold.contrib.filters.admin import RangeNumericFilter, RelatedDropdownFilter
 
 from cellarium.nexus.backend.cell_management.admin.forms import CustomJSONEditorWidget
+from cellarium.nexus.backend.core.admin.helpers import GCSDisplayMixin
 from cellarium.nexus.backend.curriculum.models import Curriculum
-from cellarium.nexus.backend.shared.admin import GCSDisplayMixin
 
 
 @admin.register(Curriculum)
