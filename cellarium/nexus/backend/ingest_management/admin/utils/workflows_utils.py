@@ -53,23 +53,23 @@ def submit_ingest_pipeline(
                 project_id=settings.GCP_PROJECT_ID,
                 nexus_backend_api_url=settings.SITE_URL,
                 bigquery_dataset=bigquery_dataset.name,
-                data_source_path=file_path,
+                input_file_path=file_path,
                 bucket_name=settings.BUCKET_NAME_PRIVATE,
-                ingest_bucket_path=stage_dir,
+                bucket_stage_dir=stage_dir,
                 tag=tag,
-                metadata_columns=column_mapping,
+                column_mapping=column_mapping,
             )
         )
 
     # Create ingest config for all stage directories
-    stage_dirs = [config.ingest_bucket_path for config in create_ingest_files_configs]
+    stage_dirs = [config.bucket_stage_dir for config in create_ingest_files_configs]
 
     ingest_config = schemas.component_configs.IngestFilesConfig(
         project_id=settings.GCP_PROJECT_ID,
         nexus_backend_api_url=settings.SITE_URL,
         bigquery_dataset=bigquery_dataset.name,
         bucket_name=settings.BUCKET_NAME_PRIVATE,
-        ingest_bucket_paths=stage_dirs,
+        bucket_stage_dirs=stage_dirs,
     )
 
     # Save configs to GCS

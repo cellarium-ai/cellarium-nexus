@@ -80,7 +80,7 @@ def compose_extract_curriculum_configs(
     extract_bucket_path = f"{settings.BACKEND_PIPELINE_DIR}/data-extracts/{name}"
 
     prepare_extract_config = schemas.component_configs.BQOpsPrepareExtract(
-        name=name,
+        extract_name=name,
         project_id=settings.GCP_PROJECT_ID,
         nexus_backend_api_url=settings.SITE_URL,
         bigquery_dataset=bigquery_dataset.name,
@@ -107,7 +107,7 @@ def compose_extract_curriculum_configs(
         extract_obs_columns = obs_columns + metadata_extra_columns if metadata_extra_columns else obs_columns
         extract_configs.append(
             schemas.component_configs.BQOpsExtract(
-                name=name,
+                extract_name=name,
                 project_id=settings.GCP_PROJECT_ID,
                 nexus_backend_api_url=settings.SITE_URL,
                 bigquery_dataset=bigquery_dataset.name,

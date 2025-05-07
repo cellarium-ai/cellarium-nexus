@@ -9,11 +9,11 @@ class CreateIngestFilesConfig(BaseModel):
     project_id: str
     nexus_backend_api_url: str
     bigquery_dataset: str
-    data_source_path: str
+    input_file_path: str
     bucket_name: str
-    ingest_bucket_path: str
+    bucket_stage_dir: str
     tag: str
-    metadata_columns: Optional[Dict[str, Any]] = None
+    column_mapping: Optional[Dict[str, Any]] = None
 
 
 class IngestFilesConfig(BaseModel):
@@ -21,11 +21,11 @@ class IngestFilesConfig(BaseModel):
     nexus_backend_api_url: str
     bigquery_dataset: str
     bucket_name: str
-    ingest_bucket_paths: list[str]
+    bucket_stage_dirs: list[str]
 
 
 class BQOpsPrepareExtract(BaseModel):
-    name: str
+    extract_name: str
     creator_id: int
     project_id: str
     nexus_backend_api_url: str
@@ -50,7 +50,7 @@ class ValidationConfig(BaseModel):
 
 
 class BQOpsExtract(BaseModel):
-    name: str
+    extract_name: str
     project_id: str
     nexus_backend_api_url: str
     bigquery_dataset: str

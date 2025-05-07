@@ -34,12 +34,12 @@ def create_ingest_files_job(gcs_config_path: str):
         bigquery_dataset=params.bigquery_dataset,
     )
     coordinator.create_ingest_files(
-        input_file_path=params.data_source_path,
+        input_file_path=params.input_file_path,
         tag=params.tag,
         bigquery_dataset=params.bigquery_dataset,
         bucket_name=params.bucket_name,
-        bucket_stage_dir=params.ingest_bucket_path,
-        column_mapping=params.metadata_columns,
+        bucket_stage_dir=params.bucket_stage_dir,
+        column_mapping=params.column_mapping,
     )
 
 
@@ -74,7 +74,7 @@ def ingest_data_to_bigquery_job(gcs_config_path: str):
     )
     coordinator.ingest_data_to_bigquery_parallel(
         bucket_name=params.bucket_name,
-        bucket_stage_dirs=params.ingest_bucket_paths,
+        bucket_stage_dirs=params.bucket_stage_dirs,
     )
 
 
@@ -108,7 +108,7 @@ def prepare_extract_job(gcs_config_path: str):
         bigquery_dataset=params.bigquery_dataset,
     )
     coordinator.prepare_extract_tables(
-        extract_name=params.name,
+        extract_name=params.extract_name,
         features=params.features,
         categorical_column_count_limit=params.categorical_column_count_limit,
         creator_id=params.creator_id,
@@ -152,7 +152,7 @@ def extract_job(gcs_config_path: str):
         bigquery_dataset=params.bigquery_dataset,
     )
     coordinator.extract_data(
-        extract_name=params.name,
+        extract_name=params.extract_name,
         bins=params.bins,
         bucket_name=params.bucket_name,
         extract_bucket_path=params.extract_bucket_path,
@@ -192,7 +192,7 @@ def mark_curriculum_as_finished_job(gcs_config_path: str):
         bigquery_dataset=params.bigquery_dataset,
     )
     coordinator.mark_curriculum_as_finished(
-        extract_name=params.name,
+        extract_name=params.extract_name,
         bucket_name=params.bucket_name,
         extract_bucket_path=params.extract_bucket_path,
     )

@@ -16,8 +16,10 @@ def pydantic_to_avro(pydantic_model: Type[BaseModel]) -> dict[str, Any]:
     3. Adding the `JSON` fields to the Avro schema with custom attributes.
 
     :param pydantic_model: A class that inherits from `pydantic.BaseModel`.
-    :return: Avro schema as a dictionary.
+
     :raises ValueError: If the generated schema is invalid or unsupported.
+
+    :return: Avro schema as a dictionary.
     """
     # Separate JSON fields and others
     json_fields: dict[str, Any] = {}
@@ -73,6 +75,7 @@ def pydantic_to_bigquery(pydantic_model: Type[BaseModel]) -> list[bigquery.Schem
     "STRING" as the default type.
 
     :param pydantic_model: A class that inherits from :class:`pydantic.BaseModel`
+
     :return: A list of object :class:`bigquery.SchemaField` which describes a BigQuery table schema
     """
     schema_fields = []
