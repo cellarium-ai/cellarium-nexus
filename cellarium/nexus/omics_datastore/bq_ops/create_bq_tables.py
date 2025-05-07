@@ -47,7 +47,9 @@ def create_table(
         logger.info(f"Table '{table_id}' exists, continuing.")
 
 
-def create_dataset(client: bigquery.Client, project: str, dataset: str, location: str) -> None:
+def create_dataset(
+    client: bigquery.Client, project: str, dataset: str, location: str, labels: dict[str, str] | None = None
+) -> None:
     """
     Create the specified dataset in the specified project and location.
 
@@ -55,6 +57,7 @@ def create_dataset(client: bigquery.Client, project: str, dataset: str, location
     :param project: GCP project ID
     :param dataset: Name of the dataset to create
     :param location: Geographic location for the dataset (e.g., "US")
+    :param labels: Optional dictionary of labels to associate with the dataset, if any.
 
     :raise Conflict: if dataset already exists
     :raise Exception: for other BigQuery errors
@@ -65,6 +68,9 @@ def create_dataset(client: bigquery.Client, project: str, dataset: str, location
     dataset = bigquery.Dataset(dataset_ref=dataset_id)
     dataset.location = location
 
+    if labels:
+        dataset.labels = labels
+
     try:
         # Make an API request with an explicit timeout
         _ = client.create_dataset(dataset, timeout=30)
@@ -73,7 +79,9 @@ def create_dataset(client: bigquery.Client, project: str, dataset: str, location
         logger.info(f"Dataset {dataset_id} exists, continuing.")
 
 
-def create_bigquery_objects(client: bigquery.Client, project: str, dataset: str, location: str) -> str:
+def create_bigquery_objects(
+    client: bigquery.Client, project: str, dataset: str, location: str, labels: dict[str, str] | None = None
+) -> str:
     """
     Create the core BigQuery dataset and tables for cell management.
 
@@ -81,13 +89,14 @@ def create_bigquery_objects(client: bigquery.Client, project: str, dataset: str,
     :param project: GCP project ID
     :param dataset: Name of the dataset to create
     :param location: Geographic location for the dataset (e.g., "US")
+    :param labels: Optional dictionary of labels to associate with the dataset, if any.
 
     :raise Exception: if any BigQuery operation fails
 
     :return: URL to the created dataset in BigQuery console
     """
     # Create the dataset first
-    create_dataset(client=client, project=project, dataset=dataset, location=location)
+    create_dataset(client=client, project=project, dataset=dataset, location=location, labels=labels)
 
     # Convert Pydantic models to BigQuery schemas
     bq_ingest_info_table_schema = converter.pydantic_to_bigquery(pydantic_model=cell_management.IngestInfoBQAvroSchema)

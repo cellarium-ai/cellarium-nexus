@@ -20,7 +20,7 @@ check_command() {
 
 # Function to print script usage
 print_usage() {
-    echo "Usage: $0 --image-path IMAGE_PATH --project-id PROJECT_ID --sql-connection-name SQL_CONNECTION_NAME [--repo-location REPO_LOCATION] [--backend-sa-name BACKEND_SA_NAME] [--env-secret-name ENV_SECRET_NAME] [--service-name SERVICE_NAME] [--min-instances MIN_INSTANCES] [--max-instances MAX_INSTANCES] [--cpu CPU] [--memory MEMORY] [--timeout TIMEOUT]"
+    echo "Usage: $0 --image-path IMAGE_PATH --project-id PROJECT_ID --sql-connection-name SQL_CONNECTION_NAME [--repo-location REPO_LOCATION] [--backend-sa-name BACKEND_SA_NAME] [--env-secret-name ENV_SECRET_NAME] [--service-name SERVICE_NAME] [--min-instances MIN_INSTANCES] [--max-instances MAX_INSTANCES] [--cpu CPU] [--memory MEMORY] [--timeout TIMEOUT] [--application-label APPLICATION_LABEL]"
 }
 
 # Default values
@@ -34,6 +34,7 @@ MAX_INSTANCES=10
 CPU=2
 MEMORY=4
 TIMEOUT=3600
+APPLICATION_LABEL="cellarium-nexus"
 
 # Parse input parameters
 while [[ "$#" -gt 0 ]]; do
@@ -62,6 +63,8 @@ while [[ "$#" -gt 0 ]]; do
         --memory) MEMORY="$2"; shift ;;
         --timeout=*) TIMEOUT="${1#*=}" ;;
         --timeout) TIMEOUT="$2"; shift ;;
+        --application-label=*) APPLICATION_LABEL="${1#*=}" ;;
+        --application-label) APPLICATION_LABEL="$2"; shift ;;
         -h|--help) print_usage; exit 0 ;;
         *) echo -e "${RED}Unknown parameter: $1${NC}"; print_usage; exit 1 ;;
     esac
@@ -94,7 +97,8 @@ if gcloud run jobs describe "${JOB_NAME}" --region="${REPO_LOCATION}" --project=
         --set-cloudsql-instances="${SQL_CONNECTION_NAME}" \
         --set-secrets="${REMOTE_ENV_FILE}=${ENV_SECRET_NAME}:latest" \
         --command="/bin/bash" \
-        --args="-c,/app/deploy/backend/django_prepare_deploy.sh --env-file ${REMOTE_ENV_FILE}"
+        --args="-c,/app/deploy/backend/django_prepare_deploy.sh --env-file ${REMOTE_ENV_FILE}" \
+        --labels="application=${APPLICATION_LABEL}"
     check_command
 else
     echo -e "${YELLOW}Creating new Cloud Run job...${NC}"
@@ -107,7 +111,8 @@ else
         --set-cloudsql-instances="${SQL_CONNECTION_NAME}" \
         --set-secrets="${REMOTE_ENV_FILE}=${ENV_SECRET_NAME}:latest" \
         --command="/bin/bash" \
-        --args="-c,/app/deploy/backend/django_prepare_deploy.sh --env-file ${REMOTE_ENV_FILE}"
+        --args="-c,/app/deploy/backend/django_prepare_deploy.sh --env-file ${REMOTE_ENV_FILE}" \
+        --labels="application=${APPLICATION_LABEL}"
     check_command
 fi
 
@@ -137,6 +142,7 @@ gcloud run deploy "${SERVICE_NAME}" \
     --service-account="${BACKEND_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
     --add-cloudsql-instances="${SQL_CONNECTION_NAME}" \
     --set-secrets="${REMOTE_ENV_FILE}=${ENV_SECRET_NAME}:latest" \
+    --labels="application=${APPLICATION_LABEL}" \
     --allow-unauthenticated
 check_command
 

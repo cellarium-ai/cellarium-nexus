@@ -62,6 +62,9 @@ prompt_value "Enter the Nexus pipeline base Docker image URL" "PIPELINE_BASE_IMA
 # Project settings
 prompt_value "Enter your Google Cloud Project ID" "GCP_PROJECT_ID"
 
+# Application billing label
+prompt_value "Enter application billing label" "GCP_APPLICATION_BILLING_LABEL" "cellarium-nexus"
+
 # Database instance settings
 prompt_value "Enter database instance name" "DB_INSTANCE_NAME" "cellarium-nexus-instance"
 prompt_value "Enter number of CPUs" "DB_CPU" "2"
@@ -172,6 +175,7 @@ PIPELINE_ROOT_PATH="gs://${PIPELINE_BUCKET}/pipeline-root"
 # Write all variables to file
 declare -a vars=(
     "GCP_PROJECT_ID"
+    "GCP_APPLICATION_BILLING_LABEL"
     "DB_INSTANCE_CONNECTION_NAME"
     "DB_NAME"
     "DB_USER"
@@ -291,7 +295,8 @@ retry_operation "Creating private bucket ${BUCKET_NAME_PRIVATE}" \
     "gcloud storage buckets create \"gs://${BUCKET_NAME_PRIVATE}\" \
     --project=\"${GCP_PROJECT_ID}\" \
     --location=us-central1 \
-    --uniform-bucket-level-access"
+    --uniform-bucket-level-access \
+    --labels=application=${GCP_APPLICATION_BILLING_LABEL}"
 
 # Create public bucket
 echo "Creating public bucket: ${BUCKET_NAME_PUBLIC}"
@@ -299,7 +304,8 @@ retry_operation "Creating public bucket ${BUCKET_NAME_PUBLIC}" \
     "gcloud storage buckets create \"gs://${BUCKET_NAME_PUBLIC}\" \
     --project=\"${GCP_PROJECT_ID}\" \
     --location=us-central1 \
-    --uniform-bucket-level-access"
+    --uniform-bucket-level-access \
+    --labels=application=${GCP_APPLICATION_BILLING_LABEL}"
 
 echo -e "\n${YELLOW}Configuring CORS for public bucket...${NC}"
 gcloud storage buckets update "gs://${BUCKET_NAME_PUBLIC}" \
@@ -398,6 +404,7 @@ retry_operation "Creating Cloud SQL instance ${DB_INSTANCE_NAME}" \
     --region=${DB_REGION} \
     --require-ssl \
     --root-password=\"${DB_PASSWORD}\" \
+    --labels=application=${GCP_APPLICATION_BILLING_LABEL} \
     --project=\"${GCP_PROJECT_ID}\""
 
 echo -e "\n${YELLOW}Creating database and user...${NC}"
@@ -419,24 +426,25 @@ echo -e "\n${YELLOW}Creating Secret Manager secrets...${NC}"
 retry_operation "Creating secret ${ENV_SECRET_NAME}" \
     "gcloud secrets create \"${ENV_SECRET_NAME}\" \
     --replication-policy=\"automatic\" \
+    --labels=application=${GCP_APPLICATION_BILLING_LABEL} \
     --project=\"${GCP_PROJECT_ID}\""
 
 # Update secret with environment variables
 gcloud secrets versions add "${ENV_SECRET_NAME}" \
     --data-file="${secret_file}" \
     --project="${GCP_PROJECT_ID}"
+check_command
 
 # Clean up temporary file
 rm "${secret_file}"
-check_command
-
 
 echo -e "\n${YELLOW}Creating Vertex AI Pipeline bucket...${NC}"
 retry_operation "Creating bucket ${PIPELINE_BUCKET}" \
     "gcloud storage buckets create \"gs://${PIPELINE_BUCKET}\" \
     --project=\"${GCP_PROJECT_ID}\" \
     --location=us-central1 \
-    --uniform-bucket-level-access"
+    --uniform-bucket-level-access \
+    --labels=application=${GCP_APPLICATION_BILLING_LABEL}"
 
 echo -e "\n${YELLOW}Deploying to Cloud Run...${NC}"
 
@@ -463,7 +471,8 @@ bash "$(dirname "$0")/deploy-cloudrun.sh" \
     --max-instances "${MAX_INSTANCES}" \
     --cpu "${CPU}" \
     --memory "${MEMORY}" \
-    --timeout "${TIMEOUT}"
+    --timeout "${TIMEOUT}" \
+    --application-label "${GCP_APPLICATION_BILLING_LABEL}"
 check_command
 
 # Get the service URL

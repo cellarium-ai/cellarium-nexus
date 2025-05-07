@@ -294,19 +294,6 @@ class NexusDataOpsCoordinator:
             if error_happened:
                 raise exceptions.NexusDataOpsIngestError("Some ingest operations failed")
 
-    def create_bigquery_dataset(self, *, bigquery_dataset: str, location: str = "US") -> str:
-        """
-        Create a new BigQuery dataset and initialize required tables.
-
-        :param bigquery_dataset: Name of the dataset to create
-        :param location: Geographic location for the dataset
-
-        :return: Name of the created dataset
-
-        :raise google.api_core.exceptions.GoogleAPIError: If dataset creation fails
-        """
-        return self.bq_data_operator.initialize_bigquery_resources(location=location)
-
     def prepare_extract_tables(
         self,
         *,

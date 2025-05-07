@@ -53,36 +53,17 @@ class BigQueryDataOperator:
         self.project = project
         self.dataset = dataset
 
-    def create_dataset(self, *, location: str = "US") -> str:
-        """
-        Create a new BigQuery dataset.
-
-        :param location: GCP region where to create the dataset
-
-        :raise google.api_core.exceptions.GoogleAPIError: If dataset creation fails
-
-        :return: Full path to the created dataset
-        """
-        dataset_ref = f"{self.project}.{self.dataset}"
-        dataset = bigquery.Dataset(dataset_ref)
-        dataset.location = location
-
-        self.client.create_dataset(dataset, exists_ok=True)
-        return dataset_ref
-
-    def initialize_bigquery_resources(self, *, location: str = "US") -> str:
+    def initialize_bigquery_resources(self, *, location: str = "US", labels: dict[str, str] | None = None) -> str:
         """
         Create BigQuery dataset and all required tables.
 
         :param location: GCP region where to create the resources
+        :param labels: Optional dictionary of labels to apply to the dataset and tables
 
         :raise google.api_core.exceptions.GoogleAPIError: If resource creation fails
         """
         return create_bigquery_objects(
-            client=self.client,
-            project=self.project,
-            dataset=self.dataset,
-            location=location,
+            client=self.client, project=self.project, dataset=self.dataset, location=location, labels=labels
         )
 
     def create_ingest_files(

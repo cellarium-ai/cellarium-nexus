@@ -13,4 +13,8 @@ class CoreConfig(AppConfig):
 
         from cellarium.nexus.workflows import kubeflow  # noqa
 
-        kubeflow.set_configs(base_image=settings.PIPELINE_BASE_IMAGE, service_account=settings.PIPELINE_SERVICE_ACCOUNT)
+        kubeflow.set_configs(
+            base_image=settings.PIPELINE_BASE_IMAGE,
+            service_account=settings.PIPELINE_SERVICE_ACCOUNT,
+            labels={"application": settings.GCP_APPLICATION_BILLING_LABEL},
+        )

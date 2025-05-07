@@ -94,6 +94,7 @@ def submit_ingest_pipeline(
         },
         service_account=settings.PIPELINE_SERVICE_ACCOUNT,
         pipeline_root_path=settings.PIPELINE_ROOT_PATH,
+        labels={"application": settings.GCP_APPLICATION_BILLING_LABEL},
     )
 
 
@@ -138,9 +139,8 @@ def submit_validation_pipeline(
         pipeline_component=validate_anndata_pipeline,
         display_name=f"Nexus Validate AnnData - Report {validation_report_id}",
         gcp_project=settings.GCP_PROJECT_ID,
-        pipeline_kwargs={
-            "validation_config": config_paths[0],
-        },
+        pipeline_kwargs={"validation_config": config_paths[0]},
         service_account=settings.PIPELINE_SERVICE_ACCOUNT,
         pipeline_root_path=settings.PIPELINE_ROOT_PATH,
+        labels={"application": settings.GCP_APPLICATION_BILLING_LABEL},
     )

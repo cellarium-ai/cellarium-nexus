@@ -55,7 +55,11 @@ class BigQueryDatasetAdmin(CountRelatedObjectsDeleteMixin, ModelAdmin):
             try:
                 bq_client = bigquery.Client()
                 link_to_dataset = create_bq_tables.create_bigquery_objects(
-                    client=bq_client, project=settings.GCP_PROJECT_ID, dataset=obj.name, location="US"
+                    client=bq_client,
+                    project=settings.GCP_PROJECT_ID,
+                    dataset=obj.name,
+                    location="US",
+                    labels={"application": settings.GCP_APPLICATION_BILLING_LABEL},
                 )
                 obj.link = link_to_dataset
             except Exception as e:

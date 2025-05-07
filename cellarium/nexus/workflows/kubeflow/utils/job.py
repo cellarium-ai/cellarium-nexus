@@ -46,6 +46,7 @@ def submit_pipeline(
     pipeline_location: str = constants.DEFAULT_PIPELINE_LOCATION,
     service_account: str | None = None,
     pipeline_root_path: str | None = None,
+    labels: dict[str, str] | None = None,
 ) -> str:
     """
     Create and run a pipeline on Vertex AI Pipelines. Use a temporary file to compile the pipeline config,
@@ -60,6 +61,7 @@ def submit_pipeline(
         service account will be used.
     :param pipeline_root_path: GCS path to use as the pipeline root directory. If None, the default
         Vertex AI Pipelines location will be used.
+    :param labels: Labels to apply to the pipeline job.
 
     :raise: google.api_core.exceptions.GoogleAPIError: If pipeline submission fails.
 
@@ -72,22 +74,15 @@ def submit_pipeline(
 
     compiler.Compiler().compile(pipeline_func=pipeline_component, package_path=temp_file.name)
 
-    job_args = {
-        "display_name": display_name,
-        "template_path": temp_file.name,
-        "parameter_values": pipeline_kwargs,
-    }
+    job = aiplatform.PipelineJob(
+        display_name=display_name,
+        template_path=temp_file.name,
+        parameter_values=pipeline_kwargs,
+        pipeline_root=pipeline_root_path,
+        labels=labels,
+    )
 
-    if pipeline_root_path:
-        job_args["pipeline_root"] = pipeline_root_path
-
-    job = aiplatform.PipelineJob(**job_args)
-
-    submit_kwargs = {}
-    if service_account:
-        submit_kwargs["service_account"] = service_account
-
-    job.submit(**submit_kwargs)
+    job.submit(service_account=service_account)
     temp_file.close()
 
     # Generate the Vertex AI Pipeline dashboard URL
