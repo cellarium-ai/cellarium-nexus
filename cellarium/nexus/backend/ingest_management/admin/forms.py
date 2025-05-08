@@ -5,17 +5,10 @@ from unfold.widgets import UnfoldAdminFileFieldWidget, UnfoldAdminSelectWidget
 from cellarium.nexus.backend.cell_management.models import BigQueryDataset
 from cellarium.nexus.backend.ingest_management.models import ColumnMapping
 
-
-class ValidateNewDataChangeListActionForm(forms.Form):
-    """
-    Form for validating new data uploads.
-    """
-
-    ingest_csv_file = forms.FileField(
-        label=_("Input datasets"),
-        widget=UnfoldAdminFileFieldWidget,
-        help_text=_("CSV file with GCS Bucket paths of files to ingest"),
-    )
+GENCODE_CHOICES = [
+    (43, _("Gencode 43")),
+    (44, _("Gencode 44")),
+]
 
 
 class IngestNewDataChangeListActionForm(forms.Form):
@@ -41,6 +34,13 @@ class IngestNewDataChangeListActionForm(forms.Form):
         widget=UnfoldAdminSelectWidget,
         help_text=_("Select an existing column mapping configuration"),
     )
+    gencode_version = forms.ChoiceField(
+        label=_("Gencode Version"),
+        choices=GENCODE_CHOICES,
+        widget=UnfoldAdminSelectWidget,
+        help_text=_("Select the Gencode version for validation"),
+        initial=44,
+    )
 
     def clean_column_mapping(self):
         """
@@ -65,12 +65,6 @@ class ValidateNewDataChangeListActionForm(forms.Form):
         widget=UnfoldAdminFileFieldWidget,
         help_text=_("CSV file with GCS Bucket paths of files to validate"),
     )
-
-    GENCODE_CHOICES = [
-        (43, _("Gencode 43")),
-        (44, _("Gencode 44")),
-    ]
-
     gencode_version = forms.ChoiceField(
         label=_("Gencode Version"),
         choices=GENCODE_CHOICES,

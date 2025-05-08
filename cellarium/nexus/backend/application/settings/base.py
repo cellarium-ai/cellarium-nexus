@@ -319,6 +319,7 @@ STORAGES = {
 }
 
 BACKEND_PIPELINE_DIR = "pipeline"
+INGEST_INPUT_FILE_MAX_SIZE = 3e9  # 3 Gb
 
 # Vertex AI Pipeline settings
 PIPELINE_SERVICE_ACCOUNT = env("PIPELINE_SERVICE_ACCOUNT", default=None)

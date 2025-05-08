@@ -1,7 +1,7 @@
 import datetime
 import os
 import secrets
-from typing import List
+from typing import Any
 
 import pandas as pd
 from django.conf import settings
@@ -11,7 +11,10 @@ from cellarium.nexus.shared import schemas, utils
 
 
 def submit_ingest_pipeline(
-    df_ingest_file_info: pd.DataFrame, bigquery_dataset: BigQueryDataset, column_mapping: dict
+    df_ingest_file_info: pd.DataFrame,
+    bigquery_dataset: BigQueryDataset,
+    column_mapping: dict[str, Any],
+    validation_methods: list[str] | None = None,
 ) -> str:
     """
     Submit a Kubeflow pipeline for data ingestion with the provided configurations.
@@ -21,6 +24,7 @@ def submit_ingest_pipeline(
     :param df_ingest_file_info: DataFrame containing information about files to ingest, must include gcs_file_path column
     :param bigquery_dataset: BigQuery dataset where data will be ingested
     :param column_mapping: Dictionary mapping input columns to schema columns
+    :param validation_methods: List of validation method names to apply to each file, if provided.
 
     :raise IOError: If there's an error writing configs to GCS
     :raise google.api_core.exceptions.GoogleAPIError: If pipeline submission fails
@@ -58,6 +62,8 @@ def submit_ingest_pipeline(
                 bucket_stage_dir=stage_dir,
                 tag=tag,
                 column_mapping=column_mapping,
+                max_input_data_size=settings.INGEST_INPUT_FILE_MAX_SIZE,
+                validation_methods=validation_methods,
             )
         )
 
@@ -99,10 +105,9 @@ def submit_ingest_pipeline(
 
 
 def submit_validation_pipeline(
-    adata_gcs_paths: List[str],
+    adata_gcs_paths: list[str],
     validation_report_id: int,
-    validation_methods: List[str],
-    max_bytes_valid_per_file: int = 5000000000,
+    validation_methods: list[str],
 ) -> str:
     """
     Submit a Kubeflow pipeline for validating AnnData files.
@@ -112,7 +117,6 @@ def submit_validation_pipeline(
     :param adata_gcs_paths: List of GCS paths to AnnData files to validate
     :param validation_report_id: ID of the validation report to update with results
     :param validation_methods: List of validation method names to apply to each file
-    :param max_bytes_valid_per_file: Maximum file size in bytes for validation
 
     :raise IOError: If there's an error writing config to GCS
     :raise google.api_core.exceptions.GoogleAPIError: If pipeline submission fails
@@ -127,7 +131,7 @@ def submit_validation_pipeline(
         validation_report_id=validation_report_id,
         adata_gcs_paths=adata_gcs_paths,
         validation_methods=validation_methods,
-        max_bytes_valid_per_file=max_bytes_valid_per_file,
+        max_bytes_valid_per_file=settings.INGEST_INPUT_FILE_MAX_SIZE,
     )
 
     # Save config to GCS

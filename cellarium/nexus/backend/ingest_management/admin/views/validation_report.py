@@ -188,7 +188,6 @@ class ValidationReportAdmin(ModelAdmin):
                 adata_gcs_paths=adata_gcs_paths,
                 validation_report_id=validation_report_id,
                 validation_methods=validation_methods,
-                max_bytes_valid_per_file=5000000000,
             )
 
             # Use mark_safe to prevent HTML escaping in the message

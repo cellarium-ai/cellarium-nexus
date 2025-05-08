@@ -40,6 +40,8 @@ def create_ingest_files_job(gcs_config_path: str):
         bucket_name=params.bucket_name,
         bucket_stage_dir=params.bucket_stage_dir,
         column_mapping=params.column_mapping,
+        max_input_data_size=params.max_input_data_size,
+        validation_methods=params.validation_methods,
     )
 
 

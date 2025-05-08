@@ -15,7 +15,7 @@ import fastavro
 import smart_open
 from google.cloud import bigquery
 from nexus.clients import NexusBackendAPIClient
-from nexus.omics_datastore.bq_ops import BigQueryDataOperator
+from nexus.omics_datastore.bq_ops import BigQueryDataOperator, BigQueryDataValidator
 from nexus.omics_datastore.bq_ops.ingest.create_ingest_files import optimized_read_anndata
 
 from cellarium.nexus.coordinator import constants, exceptions
@@ -53,7 +53,7 @@ class NexusDataOpsCoordinator:
             dataset=bigquery_dataset,
         )
 
-    def __update_ingest_info_with_error(self, *, ingest_id: int, error_message: str) -> None:
+    def __update_ingest_info_with_error(self, *, ingest_id: int, error_message: str | dict[str, str]) -> None:
         """
         Update ingest info with error message.
 
@@ -67,6 +67,27 @@ class NexusDataOpsCoordinator:
         )
         self.backend_client.update_ingest_status(ingest_id=ingest_id, new_status="FAILED")
 
+    def __run_validation_methods(
+        self, *, local_input_data_path: pathlib.Path, validation_methods: list[str] | None, ingest_id: int
+    ) -> None:
+        if validation_methods:
+            logger.info("Validating the file...")
+            validation_results = BigQueryDataValidator.call_validation_methods(
+                validation_methods=validation_methods, anndata_file_local_path=local_input_data_path
+            )
+            validation_messages = {}
+            error_occurred = False
+
+            for validation_method, (is_valid, messages, has_warning) in zip(validation_methods, validation_results):
+                if not is_valid:
+                    error_occurred = True
+                    validation_messages[validation_method] = messages
+
+            if error_occurred:
+                logger.error(f"Validation messages: {validation_messages}")
+                self.__update_ingest_info_with_error(ingest_id=ingest_id, error_message=validation_messages)
+                raise exceptions.NexusDataOpsValidationError("Validation failed for file")
+
     def create_ingest_files(
         self,
         *,
@@ -75,7 +96,9 @@ class NexusDataOpsCoordinator:
         bigquery_dataset: str,
         bucket_name: str,
         bucket_stage_dir: str,
+        max_input_data_size: int = constants.MAX_INPUT_INGEST_FILE_SIZE_BYTES,
         column_mapping: dict[str, Any] | None = None,
+        validation_methods: list[str] | None = None,
     ) -> tuple[int, str]:
         """
         Create ingest files and prepare them for ingestion.
@@ -85,7 +108,10 @@ class NexusDataOpsCoordinator:
         :param bigquery_dataset: Name of BigQuery dataset
         :param bucket_name: Name of GCS bucket
         :param bucket_stage_dir: Staging directory in bucket
+        :param max_input_data_size: Maximum size of input file in bytes. If the file is larger than this, an exception
+            will be raised.
         :param column_mapping: Optional dictionary containing obs and var column mappings
+        :param validation_methods: Optional list of validation methods to run on the data. If not provided, none applied
 
         :raise Exception: If file creation or upload fails
 
@@ -108,13 +134,23 @@ class NexusDataOpsCoordinator:
             # Create ingest info on backend
             ingest_info_api_struct = self.backend_client.create_ingest_file_info(bigquery_dataset=bigquery_dataset)
 
-            # Download file from bucket
+            logger.info("Validating the file size...")
+            BigQueryDataValidator.validate_remote_file_size(
+                adata_gcs_path=input_file_path, max_size_bytes=max_input_data_size
+            )
+
             logger.info("Downloading file from Bucket...")
             local_input_data_path = pathlib.Path(local_input_data_dir) / "adata.h5ad"
             utils.gcp.download_file_from_bucket(
                 bucket_name=input_file_bucket_name,
                 source_blob_name=input_file_bucket_path,
                 destination_file_name=local_input_data_path,
+            )
+
+            self.__run_validation_methods(
+                local_input_data_path=local_input_data_path,
+                validation_methods=validation_methods,
+                ingest_id=ingest_info_api_struct.id,
             )
 
             logger.info("Reading the file...")
@@ -241,11 +277,7 @@ class NexusDataOpsCoordinator:
                 ingest_finish_timestamp=datetime.datetime.now(),
             )
         except Exception as e:
-            self.backend_client.update_ingest_status(
-                ingest_id=ingest_id,
-                new_status="FAILED",
-                ingest_finish_timestamp=datetime.datetime.now(),
-            )
+            self.__update_ingest_info_with_error(ingest_id=ingest_id, error_message=str(e))
             # Re-raise the exception to stop execution
             raise
 

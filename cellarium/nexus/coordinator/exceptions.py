@@ -4,3 +4,7 @@ class NexusDataOpsError(Exception):
 
 class NexusDataOpsIngestError(NexusDataOpsError):
     pass
+
+
+class NexusDataOpsValidationError(NexusDataOpsError):
+    pass

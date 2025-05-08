@@ -83,6 +83,14 @@ class IngestInfoAdmin(CountRelatedObjectsDeleteMixin, ModelAdmin):
     )
     actions_list = ["ingest_new_data", "validate_new_data"]
 
+    def __get_validation_methods(self, gencode_version: str) -> list[str]:
+        gencode_validator = f"nexus.omics_datastore.bq_ops.validate.cellarium_validate_gencode_{gencode_version}"
+
+        return [
+            "nexus.omics_datastore.bq_ops.validate.validate_raw_counts",
+            gencode_validator,
+        ]
+
     @action(description=_("Ingest New Data"), url_path="ingest-new-data")
     def ingest_new_data(self, request: HttpRequest) -> HttpResponse:
         """
@@ -101,14 +109,20 @@ class IngestInfoAdmin(CountRelatedObjectsDeleteMixin, ModelAdmin):
             csv_file = form.cleaned_data["ingest_csv_file"]
             bigquery_dataset = form.cleaned_data["bigquery_dataset"]
             column_mapping_obj = form.cleaned_data.get("column_mapping")
+            # Get the selected genecode version
+            gencode_version = form.cleaned_data["gencode_version"]
 
+            validation_methods = self.__get_validation_methods(gencode_version=gencode_version)
             df = pd.read_csv(csv_file)
             if not all(col in df.columns for col in constants.REQUIRED_CSV_FILE_COLUMNS):
                 raise ValidationError(f"CSV must contain columns: {', '.join(constants.REQUIRED_CSV_FILE_COLUMNS)}")
 
             column_mapping = admin_utils.create_column_mapping(column_mapping_obj=column_mapping_obj)
             pipeline_url = admin_utils.submit_ingest_pipeline(
-                df_ingest_file_info=df, column_mapping=column_mapping, bigquery_dataset=bigquery_dataset
+                df_ingest_file_info=df,
+                column_mapping=column_mapping,
+                bigquery_dataset=bigquery_dataset,
+                validation_methods=validation_methods,
             )
 
             messages.success(

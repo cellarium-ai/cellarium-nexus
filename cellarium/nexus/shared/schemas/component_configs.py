@@ -13,7 +13,9 @@ class CreateIngestFilesConfig(BaseModel):
     bucket_name: str
     bucket_stage_dir: str
     tag: str
-    column_mapping: Optional[Dict[str, Any]] = None
+    max_input_data_size: int
+    column_mapping: dict[str, Any] | None = None
+    validation_methods: list[str] | None = None
 
 
 class IngestFilesConfig(BaseModel):
