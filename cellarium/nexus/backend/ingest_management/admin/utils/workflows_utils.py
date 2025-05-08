@@ -112,7 +112,8 @@ def submit_validation_pipeline(
     """
     Submit a Kubeflow pipeline for validating AnnData files.
 
-    Create a validation config, save it to GCS, and submit the validation pipeline.
+    Create validation configs in batches (each with max 100 files), save them to GCS,
+    and submit the validation pipeline to process them in parallel.
 
     :param adata_gcs_paths: List of GCS paths to AnnData files to validate
     :param validation_report_id: ID of the validation report to update with results
@@ -126,24 +127,36 @@ def submit_validation_pipeline(
     from cellarium.nexus.workflows.kubeflow.pipelines import validate_anndata_pipeline  # noqa
     from cellarium.nexus.workflows.kubeflow.utils.job import submit_pipeline  # noqa
 
-    validation_config = schemas.component_configs.ValidationConfig(
-        nexus_backend_api_url=settings.SITE_URL,
-        validation_report_id=validation_report_id,
-        adata_gcs_paths=adata_gcs_paths,
-        validation_methods=validation_methods,
-        max_bytes_valid_per_file=settings.INGEST_INPUT_FILE_MAX_SIZE,
-    )
+    # Create validation configs in batches
+    validation_configs = []
+    max_files_per_batch = settings.MAX_ADATA_FILES_PER_VALIDATION_BATCH
 
-    # Save config to GCS
+    # Split the adata_gcs_paths into batches of max_files_per_batch
+    for i in range(0, len(adata_gcs_paths), max_files_per_batch):
+        batch_paths = adata_gcs_paths[i : i + max_files_per_batch]
+
+        validation_configs.append(
+            schemas.component_configs.ValidationConfig(
+                nexus_backend_api_url=settings.SITE_URL,
+                validation_report_id=validation_report_id,
+                adata_gcs_paths=batch_paths,
+                validation_methods=validation_methods,
+                max_bytes_valid_per_file=settings.INGEST_INPUT_FILE_MAX_SIZE,
+            )
+        )
+
+    # Save configs to GCS
     configs_stage_dir = f"gs://{settings.BUCKET_NAME_PRIVATE}/pipeline-configs"
-    config_paths = utils.workflows_configs.dump_configs_to_bucket([validation_config], configs_stage_dir)
+    config_paths = utils.workflows_configs.dump_configs_to_bucket(
+        configs=validation_configs, bucket_path=configs_stage_dir
+    )
 
     # Submit pipeline and return the pipeline URL
     return submit_pipeline(
         pipeline_component=validate_anndata_pipeline,
         display_name=f"Nexus Validate AnnData - Report {validation_report_id}",
         gcp_project=settings.GCP_PROJECT_ID,
-        pipeline_kwargs={"validation_config": config_paths[0]},
+        pipeline_kwargs={"validation_configs": config_paths},
         service_account=settings.PIPELINE_SERVICE_ACCOUNT,
         pipeline_root_path=settings.PIPELINE_ROOT_PATH,
         labels={"application": settings.GCP_APPLICATION_BILLING_LABEL},
