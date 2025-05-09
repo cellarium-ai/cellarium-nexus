@@ -3,7 +3,7 @@ from cellarium.nexus.workflows.kubeflow.utils import job
 
 
 @job.dsl_component_job(
-    machine_type="e2-standard-8",
+    machine_type="e2-highmem-8",
     display_name="create_ingest_files",
     base_image=conf.BASE_IMAGE,
     service_account=conf.SERVICE_ACCOUNT,

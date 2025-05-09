@@ -42,10 +42,9 @@ class IngestFromAvroView(APIView):
         serializer.is_valid(raise_exception=True)
 
         stage_dir = serializer.validated_data["stage_dir"]
-        ingest = serializer.validated_data["ingest"]
 
         try:
-            cell_info_count, feature_info_count = import_from_avro.ingest_files(stage_dir=stage_dir, ingest=ingest)
+            cell_info_count, feature_info_count = import_from_avro.ingest_files(stage_dir=stage_dir)
 
             return Response(
                 {

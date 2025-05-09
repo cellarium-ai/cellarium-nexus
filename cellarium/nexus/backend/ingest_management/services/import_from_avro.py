@@ -171,12 +171,11 @@ def fetch_feature_info(stage_dir: str, file_name: str) -> Sequence[cell_models.C
         raise
 
 
-def ingest_files(stage_dir: str, ingest: ingest_models.IngestInfo) -> tuple[int, int]:
+def ingest_files(stage_dir: str) -> tuple[int, int]:
     """
     Ingest CellInfo and FeatureInfo from Avro files in a single transaction.
 
     :param stage_dir: Base staging directory path
-    :param ingest: IngestFileInfo instance
 
     :raise storage.exceptions.NotFound: if files don't exist in bucket
     :raise Exception: for other errors
@@ -195,8 +194,8 @@ def ingest_files(stage_dir: str, ingest: ingest_models.IngestInfo) -> tuple[int,
         )
 
         # Bulk insert into database
-        cell_models.CellInfo.objects.bulk_create(cell_infos)
-        cell_models.CellFeatureInfo.objects.bulk_create(feature_infos)
+        cell_models.CellInfo.objects.bulk_create(objs=cell_infos, batch_size=settings.INGEST_BATCH_SIZE)
+        cell_models.CellFeatureInfo.objects.bulk_create(objs=feature_infos, batch_size=settings.INGEST_BATCH_SIZE)
 
         cell_info_count = len(cell_infos)
         feature_info_count = len(feature_infos)

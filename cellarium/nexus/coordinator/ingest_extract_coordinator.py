@@ -286,7 +286,7 @@ class NexusDataOpsCoordinator:
         *,
         bucket_name: str,
         bucket_stage_dirs: list[str],
-        num_workers: int = 4,
+        num_workers: int = 2,
     ) -> None:
         """
         Ingest data from multiple GCS stage directories into BigQuery tables asynchronously.
