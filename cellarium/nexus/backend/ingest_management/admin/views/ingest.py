@@ -83,13 +83,17 @@ class IngestInfoAdmin(CountRelatedObjectsDeleteMixin, ModelAdmin):
     )
     actions_list = ["ingest_new_data", "validate_new_data"]
 
-    def __get_validation_methods(self, gencode_version: str) -> list[str]:
-        gencode_validator = f"nexus.omics_datastore.bq_ops.validate.cellarium_validate_gencode_{gencode_version}"
+    @staticmethod
+    def __get_validation_methods(gencode_version: str | None) -> list[str]:
+        validation_methods = ["nexus.omics_datastore.bq_ops.validate.validate_raw_counts"]
 
-        return [
-            "nexus.omics_datastore.bq_ops.validate.validate_raw_counts",
-            gencode_validator,
-        ]
+        if gencode_version is not None:
+            gencode_validation_method = (
+                f"nexus.omics_datastore.bq_ops.validate.cellarium_validate_gencode_{gencode_version}"
+            )
+            validation_methods.append(gencode_validation_method)
+
+        return validation_methods
 
     @action(description=_("Ingest New Data"), url_path="ingest-new-data")
     def ingest_new_data(self, request: HttpRequest) -> HttpResponse:

@@ -320,7 +320,7 @@ STORAGES = {
 
 BACKEND_PIPELINE_DIR = "pipeline"
 INGEST_INPUT_FILE_MAX_SIZE = 3e9  # 3 Gb
-MAX_ADATA_FILES_PER_VALIDATION_BATCH = 100  # Maximum number of AnnData files per validation batch
+MAX_ADATA_FILES_PER_VALIDATION_BATCH = 50  # Maximum number of AnnData files per validation batch
 
 # Vertex AI Pipeline settings
 PIPELINE_SERVICE_ACCOUNT = env("PIPELINE_SERVICE_ACCOUNT", default=None)

@@ -1,6 +1,6 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
-from unfold.widgets import UnfoldAdminFileFieldWidget, UnfoldAdminSelectWidget
+from unfold.widgets import UnfoldAdminFileFieldWidget, UnfoldAdminNullBooleanSelectWidget, UnfoldAdminSelectWidget
 
 from cellarium.nexus.backend.cell_management.models import BigQueryDataset
 from cellarium.nexus.backend.ingest_management.models import ColumnMapping
@@ -9,6 +9,8 @@ GENCODE_CHOICES = [
     (43, _("Gencode 43")),
     (44, _("Gencode 44")),
 ]
+
+GENCODE_CHOICES_WITH_NONE = [(None, _("---------"))] + GENCODE_CHOICES
 
 
 class IngestNewDataChangeListActionForm(forms.Form):
@@ -35,14 +37,18 @@ class IngestNewDataChangeListActionForm(forms.Form):
         help_text=_("Select an existing column mapping configuration"),
     )
     gencode_version = forms.ChoiceField(
+        required=False,
+        initial=None,
         label=_("Gencode Version"),
-        choices=GENCODE_CHOICES,
+        choices=GENCODE_CHOICES_WITH_NONE,
         widget=UnfoldAdminSelectWidget,
-        help_text=_("Select the Gencode version for validation"),
-        initial=44,
+        help_text=_(
+            "Select the Gencode version for validation. Will be ignored for non Homo Sapiens data. If not provided, "
+            "will not be used for validation."
+        ),
     )
 
-    def clean_column_mapping(self):
+    def clean_column_mapping(self) -> ColumnMapping | None:
         """
         Validate the column mapping model instance if provided.
 
@@ -53,6 +59,13 @@ class IngestNewDataChangeListActionForm(forms.Form):
             return None
 
         return mapping
+
+    def clean_gencode_version(self) -> int | None:
+        gencode_version = self.cleaned_data.get("gencode_version")
+        if gencode_version == "":
+            return None
+
+        return gencode_version
 
 
 class ValidateNewDataChangeListActionForm(forms.Form):
@@ -69,6 +82,6 @@ class ValidateNewDataChangeListActionForm(forms.Form):
         label=_("Gencode Version"),
         choices=GENCODE_CHOICES,
         widget=UnfoldAdminSelectWidget,
-        help_text=_("Select the Gencode version for validation"),
+        help_text=_("Select the Gencode version for validation. Will be ignored for non Homo Sapiens data."),
         initial=44,
     )
