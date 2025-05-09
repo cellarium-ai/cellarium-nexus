@@ -239,6 +239,23 @@ def _apply_column_mapping(df: pd.DataFrame, mapping: dict[str, str]) -> pd.DataF
     return df
 
 
+def _ensure_schema_fields(df: pd.DataFrame, schema_field_names: list[str]) -> pd.DataFrame:
+    """
+    Ensure all schema fields exist in the dataframe, filling missing columns with None values.
+
+    :param df: Input DataFrame to check and update
+    :param schema_field_names: List of required field names from schema
+
+    :return: DataFrame with all required schema fields
+    """
+    missing_fields = set(schema_field_names) - set(df.columns)
+    if missing_fields:
+        logger.info(f"Adding missing schema fields with None values: {', '.join(missing_fields)}")
+        for field in missing_fields:
+            df[field] = pd.Series([pd.NA] * len(df), dtype=pd.Int8Dtype())
+    return df
+
+
 def _process_cell_info_obs(
     adata: AnnData,
     tag: str | None,
@@ -280,6 +297,9 @@ def _process_cell_info_obs(
 
     df[constants.OBS_TOTAL_MRNA_UMIS] = total_mrna_umis.astype(int)
 
+    logger.info("Ensuring schema fields in obs DataFrame")
+    _ensure_schema_fields(df=df, schema_field_names=schema_field_names)
+
     df_for_schema = df[schema_field_names]
     df_metadata_extra = df[metadata_extra_columns]
 
@@ -317,6 +337,9 @@ def _process_feature_info_var(
     df[constants.VAR_NEXUS_ID] = range(start_index, end_index + 1)
     df[constants.VAR_INGEST_ID] = ingest_id
     df[constants.VAR_TAG] = tag
+
+    logger.info("Ensuring schema fields in var DataFrame")
+    _ensure_schema_fields(df=df, schema_field_names=schema_field_names)
 
     df_metadata_extra = df[metadata_extra_columns]
     df_for_schema = df[schema_field_names]
@@ -376,7 +399,8 @@ def prepare_input_anndata(
     adata.var = df_var_schema_data
 
     # Save the updated AnnData
-    adata.write_h5ad(filename=save_path, compression="gzip")
+    logger.info(f"Saving updated AnnData to {save_path}...")
+    adata.write_h5ad(filename=save_path)
 
     return df_obs_schema_data, df_obs_metadata_extra, df_var_schema_data, df_var_metadata_extra
 
