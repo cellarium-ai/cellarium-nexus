@@ -96,6 +96,8 @@ if gcloud run jobs describe "${JOB_NAME}" --region="${REPO_LOCATION}" --project=
         --service-account="${BACKEND_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
         --set-cloudsql-instances="${SQL_CONNECTION_NAME}" \
         --set-secrets="${REMOTE_ENV_FILE}=${ENV_SECRET_NAME}:latest" \
+        --cpu="4" \
+        --memory="16Gi" \
         --command="/bin/bash" \
         --args="-c,/app/deploy/backend/django_prepare_deploy.sh --env-file ${REMOTE_ENV_FILE}" \
         --labels="application=${APPLICATION_LABEL}"
@@ -110,6 +112,8 @@ else
         --service-account="${BACKEND_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
         --set-cloudsql-instances="${SQL_CONNECTION_NAME}" \
         --set-secrets="${REMOTE_ENV_FILE}=${ENV_SECRET_NAME}:latest" \
+        --cpu="4" \
+        --memory="16Gi" \
         --command="/bin/bash" \
         --args="-c,/app/deploy/backend/django_prepare_deploy.sh --env-file ${REMOTE_ENV_FILE}" \
         --labels="application=${APPLICATION_LABEL}"

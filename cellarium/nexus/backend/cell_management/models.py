@@ -70,6 +70,13 @@ class CellInfo(models.Model):
     ingest = models.ForeignKey(
         to="ingest_management.IngestInfo", on_delete=models.CASCADE, related_name="cells", verbose_name=_("ingest")
     )
+    bigquery_dataset = models.ForeignKey(
+        to="cell_management.BigQueryDataset",
+        on_delete=models.CASCADE,
+        related_name="cells",
+        verbose_name=_("BigQuery dataset"),
+        db_index=True,
+    )
     tag = models.CharField(max_length=64, verbose_name=_("tag"), null=True, db_index=True)
     metadata_extra = models.JSONField(
         verbose_name=_("metadata extra"), default=default_empty_dict, null=True, blank=True

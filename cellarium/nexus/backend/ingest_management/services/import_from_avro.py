@@ -73,11 +73,9 @@ def fetch_cell_info(stage_dir: str, file_name: str) -> Sequence[cell_models.Cell
     :return: A list of populated CellInfo models
     """
     try:
-        # Create a temporary directory that will be automatically cleaned up
         with tempfile.TemporaryDirectory() as temp_dir:
             local_path = Path(temp_dir) / file_name
 
-            # Download file from GCS using our utility
             source_blob_name = f"{stage_dir}/{file_name}"
             utils.gcp.download_file_from_bucket(
                 bucket_name=settings.BUCKET_NAME_PRIVATE,
@@ -86,11 +84,24 @@ def fetch_cell_info(stage_dir: str, file_name: str) -> Sequence[cell_models.Cell
             )
 
             cell_info_list = []
+            ingest_cache = {}
+
             for record in read_avro_records(local_path):
+                ingest_id = record["ingest_id"]
+
+                # Cache IngestInfo lookups to avoid repeated DB hits
+                if ingest_id not in ingest_cache:
+                    ingest_cache[ingest_id] = ingest_models.IngestInfo.objects.only("id", "bigquery_dataset_id").get(
+                        id=ingest_id
+                    )
+
+                ingest = ingest_cache[ingest_id]
+
                 cell_info = cell_models.CellInfo(
                     id=record["id"],
                     original_id=record["original_id"],
-                    ingest_id=record["ingest_id"],
+                    ingest_id=ingest.id,
+                    bigquery_dataset_id=ingest.bigquery_dataset_id,
                     metadata_extra=parse_metadata_extra(record["metadata_extra"]),
                     donor_id=record.get("donor_id"),
                     cell_type=record["cell_type"],
