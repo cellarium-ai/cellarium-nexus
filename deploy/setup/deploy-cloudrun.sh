@@ -20,7 +20,7 @@ check_command() {
 
 # Function to print script usage
 print_usage() {
-    echo "Usage: $0 --image-path IMAGE_PATH --project-id PROJECT_ID --sql-connection-name SQL_CONNECTION_NAME [--repo-location REPO_LOCATION] [--backend-sa-name BACKEND_SA_NAME] [--env-secret-name ENV_SECRET_NAME] [--service-name SERVICE_NAME] [--min-instances MIN_INSTANCES] [--max-instances MAX_INSTANCES] [--cpu CPU] [--memory MEMORY] [--timeout TIMEOUT] [--application-label APPLICATION_LABEL]"
+    echo "Usage: $0 --image-path IMAGE_PATH --project-id PROJECT_ID --sql-connection-name SQL_CONNECTION_NAME [--repo-location REPO_LOCATION] [--backend-sa-name BACKEND_SA_NAME] [--env-secret-name ENV_SECRET_NAME] [--service-name SERVICE_NAME] [--min-instances MIN_INSTANCES] [--max-instances MAX_INSTANCES] [--cpu CPU] [--memory MEMORY] [--timeout TIMEOUT] [--concurrency CONCURRENCY] [--application-label APPLICATION_LABEL]"
 }
 
 # Default values
@@ -31,8 +31,9 @@ REMOTE_ENV_FILE="/app/conf/.env"
 SERVICE_NAME="nexus"
 MIN_INSTANCES=0
 MAX_INSTANCES=10
-CPU=2
-MEMORY=4
+CPU=4
+MEMORY=16
+CONCURRENCY=20
 TIMEOUT=3600
 APPLICATION_LABEL="cellarium-nexus"
 
@@ -63,6 +64,8 @@ while [[ "$#" -gt 0 ]]; do
         --memory) MEMORY="$2"; shift ;;
         --timeout=*) TIMEOUT="${1#*=}" ;;
         --timeout) TIMEOUT="$2"; shift ;;
+        --concurrency=*) CONCURRENCY="${1#*=}" ;;
+        --concurrency) CONCURRENCY="$2"; shift ;;
         --application-label=*) APPLICATION_LABEL="${1#*=}" ;;
         --application-label) APPLICATION_LABEL="$2"; shift ;;
         -h|--help) print_usage; exit 0 ;;
@@ -142,6 +145,7 @@ gcloud run deploy "${SERVICE_NAME}" \
     --cpu="${CPU}" \
     --memory="${MEMORY}Gi" \
     --timeout="${TIMEOUT}s" \
+    --concurrency="${CONCURRENCY}" \
     --port=8080 \
     --service-account="${BACKEND_SA_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
     --add-cloudsql-instances="${SQL_CONNECTION_NAME}" \
