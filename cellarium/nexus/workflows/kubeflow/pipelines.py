@@ -49,7 +49,9 @@ def create_ingest_files_parallel_pipeline(create_ingest_files_configs: t.List[st
 
     :raise: RuntimeError if any component fails
     """
-    with dsl.ParallelFor(items=create_ingest_files_configs, name="create-ingest-files-workers", parallelism=64) as item:
+    with dsl.ParallelFor(
+        items=create_ingest_files_configs, name="create-ingest-files-workers", parallelism=200
+    ) as item:
         components.create_ingest_files_job(gcs_config_path=item)
 
 

@@ -201,7 +201,7 @@ def mark_curriculum_as_finished_job(gcs_config_path: str):
 
 
 @job.dsl_component_job(
-    machine_type="e2-standard-4",
+    machine_type="e2-highmem-4",
     display_name="validate_anndata_files",
     base_image=conf.BASE_IMAGE,
     service_account=conf.SERVICE_ACCOUNT,

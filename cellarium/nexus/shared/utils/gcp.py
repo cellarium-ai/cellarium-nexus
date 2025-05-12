@@ -192,6 +192,5 @@ def delete_files_from_bucket(bucket_name: str, prefix: str) -> list[str]:
     for blob in blobs:
         blob.delete()
         deleted_blobs.append(blob.name)
-        logger.info(f"Deleted blob: {blob.name}")
 
     return deleted_blobs

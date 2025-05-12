@@ -53,7 +53,7 @@ class NexusDataOpsCoordinator:
             dataset=bigquery_dataset,
         )
 
-    def __update_ingest_info_with_error(self, *, ingest_id: int, error_message: str | dict[str, str]) -> None:
+    def _update_ingest_info_with_error(self, *, ingest_id: int, error_message: str | dict[str, str]) -> None:
         """
         Update ingest info with error message.
 
@@ -67,7 +67,12 @@ class NexusDataOpsCoordinator:
         )
         self.backend_client.update_ingest_status(ingest_id=ingest_id, new_status="FAILED")
 
-    def __run_validation_methods(
+    def _update_ingest_info_with_success(self, *, ingest_id: int) -> None:
+        self.backend_client.update_ingest_status(
+            ingest_id=ingest_id, new_status="SUCCEEDED", ingest_finish_timestamp=datetime.datetime.now()
+        )
+
+    def _run_validation_methods(
         self, *, local_input_data_path: pathlib.Path, validation_methods: list[str] | None, ingest_id: int
     ) -> None:
         if validation_methods:
@@ -85,7 +90,7 @@ class NexusDataOpsCoordinator:
 
             if error_occurred:
                 logger.error(f"Validation messages: {validation_messages}")
-                self.__update_ingest_info_with_error(ingest_id=ingest_id, error_message=validation_messages)
+                self._update_ingest_info_with_error(ingest_id=ingest_id, error_message=validation_messages)
                 raise exceptions.NexusDataOpsValidationError("Validation failed for file")
 
     def create_ingest_files(
@@ -147,7 +152,7 @@ class NexusDataOpsCoordinator:
                 destination_file_name=local_input_data_path,
             )
 
-            self.__run_validation_methods(
+            self._run_validation_methods(
                 local_input_data_path=local_input_data_path,
                 validation_methods=validation_methods,
                 ingest_id=ingest_info_api_struct.id,
@@ -196,7 +201,7 @@ class NexusDataOpsCoordinator:
                 return ingest_info_api_struct.id, ingest_info_api_struct.nexus_uuid
 
             except Exception as e:
-                self.__update_ingest_info_with_error(ingest_id=ingest_info_api_struct.id, error_message=str(e))
+                self._update_ingest_info_with_error(ingest_id=ingest_info_api_struct.id, error_message=str(e))
                 raise
 
     def _read_gcs_avro_file(self, gcs_uri: str) -> list[dict]:
@@ -214,7 +219,22 @@ class NexusDataOpsCoordinator:
             avro_reader = fastavro.reader(f)
             return [record for record in avro_reader]
 
-    def _cleanup_ingest_files(self, bucket_name: str, bucket_stage_dir: str) -> list[str]:
+    def _ingest_data_to_bigquery(self, bucket_name: str, bucket_stage_dir: str) -> None:
+        logger.info(f"Ingesting data to Bigquery...")
+        self.bq_data_operator.ingest_data(
+            gcs_bucket_name=bucket_name,
+            gcs_stage_dir=bucket_stage_dir,
+        )
+
+    def _ingest_data_in_nexus_backend(self, bucket_stage_dir: str, ingest_id: int) -> None:
+        logging.info(f"Ingesting data to Nexus backend...")
+        self.backend_client.ingest_from_avro(
+            stage_dir=bucket_stage_dir,
+            ingest_id=ingest_id,
+        )
+
+    @staticmethod
+    def _cleanup_ingest_files(bucket_name: str, bucket_stage_dir: str) -> list[str]:
         """
         Clean up ingest files from a GCS bucket after successful ingestion.
 
@@ -259,27 +279,15 @@ class NexusDataOpsCoordinator:
             raise
 
         try:
-            self.bq_data_operator.ingest_data(
-                gcs_bucket_name=bucket_name,
-                gcs_stage_dir=bucket_stage_dir,
-            )
-            self.backend_client.ingest_from_avro(
-                stage_dir=bucket_stage_dir,
-                ingest_id=ingest_id,
-            )
-            self._cleanup_ingest_files(
-                bucket_name=bucket_name,
-                bucket_stage_dir=bucket_stage_dir,
-            )
-            self.backend_client.update_ingest_status(
-                ingest_id=ingest_id,
-                new_status="SUCCEEDED",
-                ingest_finish_timestamp=datetime.datetime.now(),
-            )
+            self._ingest_data_to_bigquery(bucket_name=bucket_name, bucket_stage_dir=bucket_stage_dir)
+            self._ingest_data_in_nexus_backend(bucket_stage_dir=bucket_stage_dir, ingest_id=ingest_id)
+            self._cleanup_ingest_files(bucket_name=bucket_name, bucket_stage_dir=bucket_stage_dir)
         except Exception as e:
-            self.__update_ingest_info_with_error(ingest_id=ingest_id, error_message=str(e))
+            self._update_ingest_info_with_error(ingest_id=ingest_id, error_message=str(e))
             # Re-raise the exception to stop execution
             raise
+        else:
+            self._update_ingest_info_with_success(ingest_id=ingest_id)
 
     def ingest_data_to_bigquery_parallel(
         self,
