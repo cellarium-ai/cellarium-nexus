@@ -165,11 +165,12 @@ def _process_column_names(column_names: list[str]) -> list[str]:
     Normalize column names, get rid of duplicates and validate the output list
 
     :param column_names: List of columns to process
-    :return: Normalized and validated list of columns
+
     :raises ValueError: If any column does not pass the validation rule
+
+    :return: Validated list of unique column names
     """
-    column_names_normalized = _normalize_column_names(column_names=column_names)
-    column_names_normalized_unique = _remove_duplicates(column_names_normalized)
+    column_names_normalized_unique = _remove_duplicates(column_names=column_names)
 
     for column_name in column_names_normalized_unique:
         validate_column_name(column_name=column_name)
