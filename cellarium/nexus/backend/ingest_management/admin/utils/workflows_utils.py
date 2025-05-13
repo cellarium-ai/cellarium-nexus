@@ -76,6 +76,7 @@ def submit_ingest_pipeline(
         bigquery_dataset=bigquery_dataset.name,
         bucket_name=settings.BUCKET_NAME_PRIVATE,
         bucket_stage_dirs=stage_dirs,
+        num_workers=settings.INGEST_NUM_WORKERS,
     )
 
     # Save configs to GCS

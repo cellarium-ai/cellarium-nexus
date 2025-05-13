@@ -77,6 +77,7 @@ def ingest_data_to_bigquery_job(gcs_config_path: str):
     coordinator.ingest_data_to_bigquery_parallel(
         bucket_name=params.bucket_name,
         bucket_stage_dirs=params.bucket_stage_dirs,
+        num_workers=params.num_workers,
     )
 
 

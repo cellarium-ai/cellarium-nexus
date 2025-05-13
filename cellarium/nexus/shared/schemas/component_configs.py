@@ -24,6 +24,7 @@ class IngestFilesConfig(BaseModel):
     bigquery_dataset: str
     bucket_name: str
     bucket_stage_dirs: list[str]
+    num_workers: int = 4
 
 
 class BQOpsPrepareExtract(BaseModel):
