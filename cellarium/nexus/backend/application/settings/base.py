@@ -326,7 +326,7 @@ PIPELINE_CONFIGS_DIR = "pipeline-configs"
 INGEST_INPUT_FILE_MAX_SIZE = 3e9  # 3 Gb
 MAX_ADATA_FILES_PER_VALIDATION_BATCH = 50  # Maximum number of AnnData files per validation batch
 INGEST_BATCH_SIZE = 2_500  # Used by Django's api that inserts Cell Info and Cell Feature Info into the database
-INGEST_NUM_WORKERS = 6
+INGEST_NUM_WORKERS = 4
 
 # Vertex AI Pipeline settings
 PIPELINE_SERVICE_ACCOUNT = env("PIPELINE_SERVICE_ACCOUNT", default=None)
