@@ -49,10 +49,34 @@ class IngestInfoAdmin(CountRelatedObjectsDeleteMixin, ModelAdmin):
     Admin interface for managing ingest file information.
 
     Provides functionality to track and manage file ingestion metadata and data ingestion actions.
+    Prevents direct creation and editing of ingests - they can only be created through the
+    'Ingest New Data' action.
     """
 
     # Override the actions to use our custom delete_selected action
     actions = ["delete_selected"]
+
+    # Prevent adding new instances through the admin interface
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """
+        Disable the ability to create new ingest instances directly.
+
+        :param request: The HTTP request
+
+        :return: False to prevent direct creation
+        """
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj=None) -> bool:
+        """
+        Disable the ability to edit ingest instances.
+
+        :param request: The HTTP request
+        :param obj: The object being changed
+
+        :return: False to prevent editing
+        """
+        return False
 
     list_display = (
         "id",

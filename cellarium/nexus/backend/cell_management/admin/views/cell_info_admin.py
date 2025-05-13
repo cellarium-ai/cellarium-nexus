@@ -27,7 +27,8 @@ class CellInfoAdmin(ModelAdmin):
     Admin interface for managing cell information.
 
     Provides functionality to filter and search cell data, including numeric range filters
-    for fields like id and total_mrna_umis.
+    for fields like id and total_mrna_umis. Prevents direct creation and editing of cell info
+    instances.
     """
 
     list_display = (
@@ -75,6 +76,27 @@ class CellInfoAdmin(ModelAdmin):
     ordering = ("-id",)
     readonly_fields = ("id",)
     actions_list = ["extract_curriculum_action"]
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """
+        Disable the ability to create new cell info instances directly.
+
+        :param request: The HTTP request
+
+        :return: False to prevent direct creation
+        """
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj=None) -> bool:
+        """
+        Disable the ability to edit cell info instances.
+
+        :param request: The HTTP request
+        :param obj: The object being changed
+
+        :return: False to prevent editing
+        """
+        return False
 
     @action(description=_("Extract Curriculum"), url_path="extract-curriculum")
     def extract_curriculum_action(self, request: HttpRequest) -> HttpResponse:
