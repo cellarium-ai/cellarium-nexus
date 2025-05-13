@@ -4,9 +4,9 @@ Admin module for cell feature information management.
 
 from django.contrib import admin
 from unfold.admin import ModelAdmin
-from unfold.contrib.filters.admin import ChoicesDropdownFilter, RangeNumericFilter, RelatedDropdownFilter
+from unfold.contrib.filters.admin import RangeNumericFilter, RelatedDropdownFilter
 
-from cellarium.nexus.backend.cell_management.admin.filters import MultiValueTextFilter
+from cellarium.nexus.backend.cell_management.admin.filters import TagDropdownFilter
 from cellarium.nexus.backend.cell_management.models import CellFeatureInfo
 
 
@@ -39,11 +39,8 @@ class CellFeatureInfoAdmin(ModelAdmin):
     )
     list_filter = (
         ("id", RangeNumericFilter),
-        ("biotype", MultiValueTextFilter),
-        ("is_filtered", ChoicesDropdownFilter),
-        ("tag", MultiValueTextFilter),
-        ("ensemble_id", MultiValueTextFilter),
-        ("symbol", MultiValueTextFilter),
+        "is_filtered",
+        TagDropdownFilter,
         ("ingest", RelatedDropdownFilter),
     )
     ordering = ("-id",)

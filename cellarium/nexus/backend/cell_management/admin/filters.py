@@ -6,7 +6,7 @@ specifically designed to work with Django Unfold.
 """
 
 import logging
-from typing import Any, List
+from typing import Any
 
 from django import forms
 from django.contrib import admin
@@ -15,7 +15,7 @@ from django.http import HttpRequest
 from django.http.request import HttpRequest as WSGIRequest
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from unfold.contrib.filters.admin import FieldTextFilter
+from unfold.contrib.filters.admin import DropdownFilter, MultipleDropdownFilter
 from unfold.widgets import UnfoldAdminTextInputWidget
 
 logger = logging.getLogger(__name__)
@@ -59,70 +59,6 @@ class SearchWithExcludeForm(forms.Form):
             ),
             help_text=_("Exclude these values instead of including them"),
         )
-
-
-class MultiValueTextFilter(FieldTextFilter):
-    """
-    A custom filter that supports comma-separated values for __in lookups.
-
-    This filter extends Django Unfold's FieldTextFilter to support filtering
-    by multiple values using comma-separated input. It automatically converts
-    the input to an __in lookup when commas are detected.
-    """
-
-    def queryset(self, request: HttpRequest, queryset: QuerySet) -> QuerySet:
-        """
-        Filter the queryset based on the filter value.
-
-        If the value contains commas, it will be split and used for an __in lookup.
-        Otherwise, it will use the standard exact lookup.
-
-        :param request: The HTTP request
-        :param queryset: The queryset to filter
-
-        :return: The filtered queryset
-        """
-        value = self.value()
-        if not value:
-            return queryset
-
-        # Check if the value contains commas (indicating multiple values)
-        if "," in value:
-            # Split by comma and clean each value
-            values = [v.strip() for v in value.split(",") if v.strip()]
-            if values:
-                # Use __in lookup for multiple values
-                filter_kwargs = {f"{self.field_path}__in": values}
-
-                # Debug logging to print the filter parameters and SQL query
-                logger.info(f"MultiValueTextFilter: field_path={self.field_path}, values={values}")
-
-                filtered_qs = queryset.filter(**filter_kwargs)
-
-                # Log the SQL query (this will only work if DEBUG=True in settings)
-                # Add a note about proper quoting in the actual query
-                logger.info(f"Generated SQL: {filtered_qs.query}")
-                logger.info(
-                    "Note: The actual SQL will have proper quoting for string values, even if not shown in the log"
-                )
-
-                return filtered_qs
-            return queryset
-
-        # For single values, use __exact lookup explicitly
-        # This ensures we match exactly what the user entered and handles quoting properly
-        filter_kwargs = {f"{self.field_path}__exact": value}
-
-        # Apply the filter
-        filtered_qs = queryset.filter(**filter_kwargs)
-
-        # Debug logging for single value filter
-        logger.info(f"Exact filter: field_path={self.field_path}, value={value}")
-        logger.info(f"Generated SQL: {filtered_qs.query}")
-        logger.info("Note: The actual SQL will have proper quoting for string values, even if not shown in the log")
-
-        # Ensure we never return None
-        return filtered_qs
 
 
 class OntologyTermFilter(admin.FieldListFilter):
@@ -175,7 +111,8 @@ class OntologyTermFilter(admin.FieldListFilter):
 
         # Log the lookup values for debugging
         logger.info(
-            f"OntologyTermFilter lookup values from request: lookup_kwarg={self.lookup_kwarg}, lookup_val={self.lookup_val}"
+            f"OntologyTermFilter lookup values from request: lookup_kwarg={self.lookup_kwarg}, "
+            f"lookup_val={self.lookup_val}"
         )
 
         # Call parent init
@@ -196,7 +133,7 @@ class OntologyTermFilter(admin.FieldListFilter):
         """
         return True
 
-    def expected_parameters(self) -> List[str]:
+    def expected_parameters(self) -> list[str]:
         """
         Return the list of expected parameters for this filter.
 
@@ -215,7 +152,8 @@ class OntologyTermFilter(admin.FieldListFilter):
 
         # Log the form data for debugging
         logger.info(
-            f"OntologyTermFilter choices: lookup_kwarg={self.lookup_kwarg}, value={self.value()}, exclude={exclude_active}"
+            f"OntologyTermFilter choices: lookup_kwarg={self.lookup_kwarg}, value={self.value()}, "
+            f"exclude={exclude_active}"
         )
 
         return (
@@ -301,3 +239,78 @@ class OntologyTermFilter(admin.FieldListFilter):
             logger.info(f"Filtering with: {filter_kwargs}")
 
         return filtered_qs
+
+
+class GenericDropdownFilter(DropdownFilter):
+    title = None
+    parameter_name = None
+    field_name = None
+
+    def lookups(self, request, model_admin):
+        assert self.field_name, "field_name must be set"
+        values = model_admin.model.objects.values_list(self.field_name, flat=True).distinct()
+        return [(x, x) for x in values if x not in ["", None]]
+
+    def queryset(self, request, queryset):
+        if self.value() not in ["", None]:
+            return queryset.filter(**{self.field_name: self.value()})
+        return queryset
+
+
+class GenericMultiDropdownFilter(MultipleDropdownFilter):
+    title = None
+    parameter_name = None
+    field_name = None
+
+    def lookups(self, request, model_admin):
+        assert self.field_name, "You must set 'field_name'"
+        values = model_admin.model.objects.values_list(self.field_name, flat=True).distinct()
+        return [(v, v) for v in values if v not in ["", None]]
+
+    def queryset(self, request, queryset):
+        values = self.value()
+        if values:
+            return queryset.filter(**{f"{self.field_name}__in": values})
+        return queryset
+
+
+class SexDropdownFilter(GenericDropdownFilter):
+    title = _("sex")
+    parameter_name = "sex"
+    field_name = "sex"
+
+
+class DonorDropdownFilter(GenericMultiDropdownFilter):
+    title = _("donor id")
+    parameter_name = "donor_id"
+    field_name = "donor_id"
+
+
+class SuspensionTypeDropdownFilter(GenericMultiDropdownFilter):
+    title = _("suspension type")
+    parameter_name = "suspension_type"
+    field_name = "suspension_type"
+
+
+class OrganismDropdownFilter(GenericMultiDropdownFilter):
+    title = _("organism")
+    parameter_name = "organism"
+    field_name = "organism"
+
+
+class TagDropdownFilter(GenericMultiDropdownFilter):
+    title = _("tag")
+    parameter_name = "tag"
+    field_name = "tag"
+
+
+class CellTypeDropdownFilter(GenericMultiDropdownFilter):
+    title = _("cell type")
+    parameter_name = "cell_type"
+    field_name = "cell_type"
+
+
+class DiseaseDropdownFilter(GenericMultiDropdownFilter):
+    title = _("disease")
+    parameter_name = "disease"
+    field_name = "disease"

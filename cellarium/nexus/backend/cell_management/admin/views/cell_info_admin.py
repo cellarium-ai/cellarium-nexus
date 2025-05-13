@@ -14,10 +14,9 @@ from unfold.admin import ModelAdmin
 from unfold.contrib.filters.admin import RangeNumericFilter, RelatedDropdownFilter
 from unfold.decorators import action
 
-from cellarium.nexus.backend.cell_management.admin import constants, forms
+from cellarium.nexus.backend.cell_management.admin import constants, filters, forms
 from cellarium.nexus.backend.cell_management.admin import utils as admin_utils
-from cellarium.nexus.backend.cell_management.admin.filters import MultiValueTextFilter, OntologyTermFilter
-from cellarium.nexus.backend.cell_management.models import BigQueryDataset, CellInfo
+from cellarium.nexus.backend.cell_management.models import CellInfo
 
 logger = logging.getLogger(__name__)
 
@@ -47,28 +46,31 @@ class CellInfoAdmin(ModelAdmin):
         "suspension_type",
         "total_mrna_umis",
         "tag",
-        "ingest__bigquery_dataset",
+        "bigquery_dataset",
     )
     list_filter_submit = True
     search_fields = ("id", "original_id", "cell_type", "assay", "organism", "tissue", "disease", "tag")
     list_filter = (
         # Text filters for fields without ontology term IDs
-        ("total_mrna_umis", RangeNumericFilter),
         ("id", RangeNumericFilter),
-        "sex",
-        ("donor_id", MultiValueTextFilter),
-        ("tag", MultiValueTextFilter),
-        ("suspension_type", MultiValueTextFilter),
+        ("total_mrna_umis", RangeNumericFilter),
+        filters.SexDropdownFilter,
+        filters.DonorDropdownFilter,
+        filters.TagDropdownFilter,
+        filters.SuspensionTypeDropdownFilter,
+        filters.OrganismDropdownFilter,
+        filters.CellTypeDropdownFilter,
+        filters.DiseaseDropdownFilter,
         # Ontology term ID filters with specialized filter
-        ("cell_type_ontology_term_id", OntologyTermFilter),
-        ("assay_ontology_term_id", OntologyTermFilter),
-        ("development_stage_ontology_term_id", OntologyTermFilter),
-        ("tissue_ontology_term_id", OntologyTermFilter),
-        ("disease_ontology_term_id", OntologyTermFilter),
-        ("organism_ontology_term_id", OntologyTermFilter),
-        ("self_reported_ethnicity_ontology_term_id", OntologyTermFilter),
+        ("cell_type_ontology_term_id", filters.OntologyTermFilter),
+        ("assay_ontology_term_id", filters.OntologyTermFilter),
+        ("development_stage_ontology_term_id", filters.OntologyTermFilter),
+        ("tissue_ontology_term_id", filters.OntologyTermFilter),
+        ("disease_ontology_term_id", filters.OntologyTermFilter),
+        ("organism_ontology_term_id", filters.OntologyTermFilter),
+        ("self_reported_ethnicity_ontology_term_id", filters.OntologyTermFilter),
         # Related filters
-        ("ingest__bigquery_dataset", RelatedDropdownFilter),
+        ("bigquery_dataset", RelatedDropdownFilter),
     )
     ordering = ("-id",)
     readonly_fields = ("id",)
@@ -89,8 +91,8 @@ class CellInfoAdmin(ModelAdmin):
         referer = request.META.get("HTTP_REFERER", "")
         # if referer and "?" in referer:
         query_params = parse_qs(urlparse(referer).query)
-        original_filters = {k: v[0] for k, v in query_params.items()}
-        logger.info(f"Original filter parameters: {original_filters}")
+
+        original_filters = {k: v for k, v in query_params.items()}
 
         request.GET = request.GET.copy()
         request.GET.update(original_filters)

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def extract_filters_from_django_admin_request(
-    request: HttpRequest, dataset_filter_key: str = "ingest__bigquery_dataset__id__exact"
+    request: HttpRequest, dataset_filter_key: str = "bigquery_dataset__id__exact"
 ) -> tuple[dict[str, Any], BigQueryDataset | None]:
     """
     Extract filters from Django admin request parameters and determine the BigQuery dataset.
@@ -59,48 +59,70 @@ def extract_filters_from_django_admin_request(
             continue
 
         # Skip parameters that don't correspond to model fields
-        if key.endswith("_exclude") or key.endswith("_from") or key.endswith("_to"):
+        if key.endswith("_exclude"):
             continue
 
         # Get the base key and check for exclude flag
         is_exclude = False
-        base_key = key
+
         exclude_value = request.GET.get(f"{key}_exclude")
-        if exclude_value == "on":
+        if exclude_value == ["on"]:
             is_exclude = True
             logger.info(f"Found exclude flag for {key}")
 
         # Handle range filters
-        from_value = request.GET.get(f"{key}_from")
-        to_value = request.GET.get(f"{key}_to")
-        if from_value or to_value:
-            if from_value:
-                try:
-                    numeric_value = float(from_value)
-                    filters[f"c.{base_key}__gte"] = numeric_value
-                except ValueError:
-                    filters[f"c.{base_key}__gte"] = from_value
+        # if key.endswith("from") or key.endswith("to"):
+        if "from" in key or "to" in key:
+            value = value[0]
+            from_value = value if key.endswith("_from") else None
+            to_value = value if key.endswith("_to") else None
+            base_key = key.replace("_from", "").replace("_to", "")
 
-            if to_value:
-                try:
-                    numeric_value = float(to_value)
-                    filters[f"c.{base_key}__lte"] = numeric_value
-                except ValueError:
-                    filters[f"c.{base_key}__lte"] = to_value
-            continue
+            if from_value or to_value:
+                if from_value:
+                    try:
+                        numeric_value = float(from_value)
+                        filters[f"c.{base_key}__gte"] = numeric_value
+                    except ValueError:
+                        filters[f"c.{base_key}__gte"] = from_value
+
+                if to_value:
+                    try:
+                        numeric_value = float(to_value)
+                        filters[f"c.{base_key}__lte"] = numeric_value
+                    except ValueError:
+                        filters[f"c.{base_key}__lte"] = to_value
+                continue
 
         # Handle multiple values
-        if "," in value:
-            values = [v.strip() for v in value.split(",") if v.strip()]
-            if values:
-                filter_key = f"c.{key}__not_in" if is_exclude else f"c.{key}__in"
-                filters[filter_key] = values
-        else:
-            # Handle single value
-            if is_exclude:
-                filters[f"c.{key}__not_eq"] = value
+        def update_filters_with_multiple_values(
+            _filters: dict[str, Any], _is_exclude: bool, _key: str, _values: list[str]
+        ):
+            if _values:
+                _filter_key = f"c.{_key}__not_in" if _is_exclude else f"c.{_key}__in"
+                _filters[_filter_key] = _values
+
+        def update_filters_with_single_value(_filters: dict[str, Any], _is_exclude: bool, _key: str, _value: str):
+            if _is_exclude:
+                _filters[f"c.{_key}__not_eq"] = _value
             else:
-                filters[f"c.{key}__eq"] = value
+                _filters[f"c.{_key}__eq"] = _value
+
+        if isinstance(value, list):
+            # Handle list values
+            if len(value) > 1:
+                values = value
+                update_filters_with_multiple_values(filters, is_exclude, key, values)
+            else:
+                value = value[0]
+                update_filters_with_single_value(filters, is_exclude, key, value)
+        else:
+            # Handle string value
+            if "," in value:
+                values = [v.strip() for v in value.split(",") if v.strip()]
+                update_filters_with_multiple_values(filters, is_exclude, key, values)
+            else:
+                update_filters_with_single_value(filters, is_exclude, key, value)
 
     # Log the final filters
     logger.info(f"Extracted filters: {filters}")
