@@ -4,7 +4,7 @@ Provide a centralized controller for BigQuery operations in the Nexus datastore.
 
 import logging
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, ContextManager, Sequence
 
 from google.cloud import bigquery
 
@@ -15,7 +15,7 @@ from cellarium.nexus.omics_datastore.bq_ops.extract.extract import extract_bins
 from cellarium.nexus.omics_datastore.bq_ops.extract.metadata_extractor import MetadataExtractor
 from cellarium.nexus.omics_datastore.bq_ops.extract.prepare_extract import prepare_extract_tables
 from cellarium.nexus.omics_datastore.bq_ops.ingest.create_ingest_files import create_ingest_files
-from cellarium.nexus.omics_datastore.bq_ops.ingest.ingest_data_to_bigquery import ingest_data_to_bigquery
+from cellarium.nexus.omics_datastore.bq_ops.ingest.ingest_data_to_bigquery import bigquery_ingest_context
 from cellarium.nexus.shared import schemas
 
 logger = logging.getLogger(__name__)
@@ -113,7 +113,7 @@ class BigQueryDataOperator:
         *,
         gcs_bucket_name: str,
         gcs_stage_dir: str,
-    ) -> None:
+    ) -> ContextManager:
         """
         Ingest data from GCS into BigQuery tables.
 
@@ -121,12 +121,11 @@ class BigQueryDataOperator:
         :param gcs_stage_dir: Directory in the bucket containing staged files
 
         :raise google.api_core.exceptions.GoogleAPIError: If ingestion fails
+
+        :return: Context manager for the BigQuery ingestion job.
         """
-        ingest_data_to_bigquery(
-            project_id=self.project,
-            dataset=self.dataset,
-            gcs_bucket_name=gcs_bucket_name,
-            gcs_stage_dir=gcs_stage_dir,
+        return bigquery_ingest_context(
+            project_id=self.project, dataset=self.dataset, gcs_bucket_name=gcs_bucket_name, gcs_stage_dir=gcs_stage_dir
         )
 
     def extract_metadata(

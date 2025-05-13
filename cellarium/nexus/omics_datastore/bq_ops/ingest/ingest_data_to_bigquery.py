@@ -1,14 +1,15 @@
 import logging
 import uuid
+from contextlib import contextmanager
 from datetime import datetime
-from typing import List, Tuple
+from typing import Any, Generator, List, Tuple
 
 from google.api_core.exceptions import NotFound
 from google.cloud import bigquery
 from tenacity import before_log, retry, stop_after_attempt, wait_exponential
 
 from cellarium.nexus.omics_datastore.bq_avro_schemas import cell_management, converter
-from cellarium.nexus.omics_datastore.bq_ops import constants
+from cellarium.nexus.omics_datastore.bq_ops import constants, exceptions
 from cellarium.nexus.omics_datastore.bq_ops.create_bq_tables import create_staging_table
 
 # Configure logging
@@ -116,8 +117,8 @@ def load_table_from_gcs(
 
 
 @retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=1, max=10),
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=5, max=30),
     before=before_log(logger, logging.INFO),
 )
 def perform_load_table_from_gcs(
@@ -272,55 +273,57 @@ def cleanup_staging_tables(
             logger.warning(f"Failed to drop staging table '{staging_table_id}': {e}")
 
 
-def ingest_data_to_bigquery(
+def get_schema_for_table(final_table: str) -> list[bigquery.SchemaField]:
+    schema_map = {
+        constants.BQ_INGEST_TABLE_NAME: cell_management.IngestInfoBQAvroSchema,
+        constants.BQ_CELL_INFO_TABLE_NAME: cell_management.CellInfoBQAvroSchema,
+        constants.BQ_FEATURE_INFO_TABLE_NAME: cell_management.FeatureInfoBQAvroSchema,
+        constants.BQ_RAW_COUNT_MATRIX_COO_TABLE_NAME: cell_management.RawCountMatrixCOOBQAvroSchema,
+    }
+
+    if final_table not in schema_map:
+        raise exceptions.BigQuerySchemaError(f"No schema defined for table '{final_table}'")
+
+    return converter.pydantic_to_bigquery(pydantic_model=schema_map[final_table])
+
+
+@contextmanager
+def bigquery_ingest_context(
+    *,
     project_id: str,
     dataset: str,
     gcs_bucket_name: str,
     gcs_stage_dir: str,
-) -> None:
+) -> Generator[None, Any, None]:
     """
-    Ingest Avro and CSV files from GCS into BigQuery atomically.
+    Create a context to manage the BigQuery data ingestion process.
 
-    This function orchestrates the entire ingestion process:
-    1. Creates staging tables
-    2. Loads data from GCS into staging tables
-    3. Commits data to production tables in a transaction
-    4. Cleans up staging tables
+    Handles the full lifecycle of ingesting data from GCS to BigQuery including:
+    creating staging tables, loading data, committing to production tables, and cleanup.
+    Data is loaded into staging tables during context entry, but commits to main
+    production tables happen only when exiting the context manager successfully.
 
-    :param project_id: The ID of the Google Cloud project
+    :param project_id: GCP project ID
     :param dataset: BigQuery dataset name
-    :param gcs_bucket_name: GCS Bucket name
-    :param gcs_stage_dir: GCS directory containing the data files
+    :param gcs_bucket_name: Name of the GCS bucket containing data files
+    :param gcs_stage_dir: Directory within GCS bucket containing the data files
 
-    :raise BigQueryError: If any BigQuery operation fails
-    :raise RuntimeError: If data loading or commit fails
+    :raise exceptions.BigQueryLoadError: If loading data to staging tables fails
+    :raise exceptions.BigQueryCommitError: If committing data to production fails
+    :raise Exception: If any other error occurs during the ingestion process
+
+    :yield: None
     """
-    # Initialize BigQuery client
     client = initialize_bigquery_client(project_id, dataset)
-
-    # Generate unique suffix for staging tables
     staging_suffix = generate_staging_suffix()
     ingestion_specs = define_ingestion_specs(staging_suffix)
 
     try:
-        # Create staging tables
-        for final_table, staging_table, _, _ in ingestion_specs:
-            # Define schema based on the table
-            if final_table == constants.BQ_INGEST_TABLE_NAME:
-                schema = converter.pydantic_to_bigquery(pydantic_model=cell_management.IngestInfoBQAvroSchema)
-            elif final_table == constants.BQ_CELL_INFO_TABLE_NAME:
-                schema = converter.pydantic_to_bigquery(pydantic_model=cell_management.CellInfoBQAvroSchema)
-            elif final_table == constants.BQ_FEATURE_INFO_TABLE_NAME:
-                schema = converter.pydantic_to_bigquery(pydantic_model=cell_management.FeatureInfoBQAvroSchema)
-            elif final_table == constants.BQ_RAW_COUNT_MATRIX_COO_TABLE_NAME:
-                schema = converter.pydantic_to_bigquery(pydantic_model=cell_management.RawCountMatrixCOOBQAvroSchema)
-            else:
-                raise RuntimeError(f"No schema defined for table '{final_table}'")
-
-            # Set clustering fields for specific tables
+        logger.info("Creating staging tables...")
+        for final_table, _, _, _ in ingestion_specs:
+            schema = get_schema_for_table(final_table)
             clustering_fields = ["cell_id"] if final_table == constants.BQ_RAW_COUNT_MATRIX_COO_TABLE_NAME else None
 
-            # Create the staging table
             create_staging_table(
                 client=client,
                 project=project_id,
@@ -331,7 +334,7 @@ def ingest_data_to_bigquery(
                 clustering_fields=clustering_fields,
             )
 
-        # Load data into staging tables
+        logger.info("Loading data into staging tables...")
         all_loads_succeeded = load_data_into_staging(
             client=client,
             project_id=project_id,
@@ -342,25 +345,27 @@ def ingest_data_to_bigquery(
         )
 
         if not all_loads_succeeded:
-            raise RuntimeError("Not all staging loads succeeded. No final transaction was executed.")
+            raise exceptions.BigQueryLoadError("Not all staging loads succeeded. Skipping commit to production.")
 
-        # Attempt to commit data to production tables
+        yield
+
+        logger.info("Committing data to production tables...")
         commit_success = commit_to_production(
             client=client,
             dataset=dataset,
             ingestion_specs=ingestion_specs,
         )
-        if not commit_success:
-            raise RuntimeError("Commit to production failed. No data was appended.")
 
-        logger.info("Data ingestion process completed successfully.")
+        if not commit_success:
+            raise exceptions.BigQueryCommitError("Commit to production failed. No data was appended.")
+
+        logger.info("BigQuery ingest committed to production successfully.")
 
     except Exception as e:
-        logger.error(f"Error during data ingestion: {str(e)}")
+        logger.error(f"BigQuery ingest failed: {e}")
         raise
 
     finally:
-        # Clean up staging tables regardless of success or failure
         try:
             cleanup_staging_tables(
                 client=client,
@@ -368,6 +373,5 @@ def ingest_data_to_bigquery(
                 dataset=dataset,
                 ingestion_specs=ingestion_specs,
             )
-        except Exception as e:
-            logger.error(f"Failed to cleanup staging tables: {str(e)}")
-            # Don't raise this error as we want the original error to propagate if there was one
+        except Exception as cleanup_error:
+            logger.error(f"Failed to cleanup staging tables: {cleanup_error}")

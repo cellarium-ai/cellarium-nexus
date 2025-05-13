@@ -9,16 +9,17 @@ import logging
 import os
 import pathlib
 import tempfile
-from typing import Any, Sequence
+from typing import Any, ContextManager, Sequence
 
 import fastavro
 import smart_open
 from google.cloud import bigquery
-from nexus.clients import NexusBackendAPIClient
-from nexus.omics_datastore.bq_ops import BigQueryDataOperator, BigQueryDataValidator
-from nexus.omics_datastore.bq_ops.ingest.create_ingest_files import optimized_read_anndata
+from tenacity import before_log, retry, stop_after_attempt, wait_exponential
 
+from cellarium.nexus.clients import NexusBackendAPIClient
 from cellarium.nexus.coordinator import constants, exceptions
+from cellarium.nexus.omics_datastore.bq_ops import BigQueryDataOperator, BigQueryDataValidator
+from cellarium.nexus.omics_datastore.bq_ops.ingest.create_ingest_files import optimized_read_anndata
 from cellarium.nexus.shared import schemas, utils
 from cellarium.nexus.shared.schemas.omics_datastore import ExtractMetadata
 
@@ -219,13 +220,18 @@ class NexusDataOpsCoordinator:
             avro_reader = fastavro.reader(f)
             return [record for record in avro_reader]
 
-    def _ingest_data_to_bigquery(self, bucket_name: str, bucket_stage_dir: str) -> None:
-        logger.info(f"Ingesting data to Bigquery...")
-        self.bq_data_operator.ingest_data(
+    def _ingest_data_to_bigquery(self, bucket_name: str, bucket_stage_dir: str) -> ContextManager:
+        logger.info("Starting BigQuery data ingest...")
+        return self.bq_data_operator.ingest_data(
             gcs_bucket_name=bucket_name,
             gcs_stage_dir=bucket_stage_dir,
         )
 
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=5, max=30),
+        before=before_log(logger, logging.INFO),
+    )
     def _ingest_data_in_nexus_backend(self, bucket_stage_dir: str, ingest_id: int) -> None:
         logging.info(f"Ingesting data to Nexus backend...")
         self.backend_client.ingest_from_avro(
@@ -279,8 +285,10 @@ class NexusDataOpsCoordinator:
             raise
 
         try:
-            self._ingest_data_to_bigquery(bucket_name=bucket_name, bucket_stage_dir=bucket_stage_dir)
-            self._ingest_data_in_nexus_backend(bucket_stage_dir=bucket_stage_dir, ingest_id=ingest_id)
+            with self._ingest_data_to_bigquery(bucket_name=bucket_name, bucket_stage_dir=bucket_stage_dir):
+                # If nexus backend does not return a success status, data will not be ingested in BigQuery as well
+                self._ingest_data_in_nexus_backend(bucket_stage_dir=bucket_stage_dir, ingest_id=ingest_id)
+
             self._cleanup_ingest_files(bucket_name=bucket_name, bucket_stage_dir=bucket_stage_dir)
         except Exception as e:
             self._update_ingest_info_with_error(ingest_id=ingest_id, error_message=str(e))
