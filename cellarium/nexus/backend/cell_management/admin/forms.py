@@ -11,6 +11,7 @@ from unfold.widgets import (
     UnfoldAdminTextInputWidget,
 )
 
+from cellarium.nexus.backend.cell_management.admin.utils import check_curriculum_exists
 from cellarium.nexus.backend.cell_management.models import BigQueryDataset, FeatureSchema
 from cellarium.nexus.backend.curriculum.models import Curriculum
 
@@ -244,15 +245,23 @@ class ExtractCurriculumForm(forms.Form):
 
     def clean_name(self):
         """
-        Validate that no curriculum with this name exists.
+        Validate that no curriculum with this name exists in the database or in the GCS bucket.
 
-        :raise: forms.ValidationError
+        :raise: forms.ValidationError: If a curriculum with this name already exists
+        :raise: google.cloud.exceptions.GoogleCloudError: If there's an error communicating with Google Cloud Storage
 
         :return: Validated name
         """
         name = self.cleaned_data.get("name")
+
+        # Check if curriculum exists in the database
         if Curriculum.objects.filter(name=name).exists():
-            raise forms.ValidationError(_("A curriculum with this name already exists"))
+            raise forms.ValidationError(_("A curriculum with this name already exists in the database"))
+
+        # Check if curriculum exists in the GCS bucket
+        if check_curriculum_exists(name=name):
+            raise forms.ValidationError(_("A curriculum with this name already exists in the storage bucket"))
+
         return name
 
     def clean_filters(self):

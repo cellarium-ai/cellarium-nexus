@@ -77,7 +77,7 @@ def compose_extract_curriculum_configs(
 
     obs_columns = constants.CELL_INFO_EXTRACT_COLUMNS
 
-    extract_bucket_path = f"{settings.BACKEND_PIPELINE_DIR}/data-extracts/{name}"
+    extract_bucket_path = f"{settings.BACKEND_PIPELINE_DIR}/{settings.PIPELINE_DATA_EXTRACTS_DIR}/{name}"
 
     prepare_extract_config = schemas.component_configs.BQOpsPrepareExtract(
         extract_name=name,
@@ -169,7 +169,7 @@ def compose_and_dump_configs(
         filters=filters,
         metadata_extra_columns=metadata_extra_columns,
     )
-    configs_stage_dir = f"gs://{settings.BUCKET_NAME_PRIVATE}/pipeline-configs"
+    configs_stage_dir = f"gs://{settings.BUCKET_NAME_PRIVATE}/{settings.PIPELINE_CONFIGS_DIR}"
 
     prepare_extract_config_path = workflows_configs.dump_configs_to_bucket(
         configs=[prepare_extract_config], bucket_path=configs_stage_dir
