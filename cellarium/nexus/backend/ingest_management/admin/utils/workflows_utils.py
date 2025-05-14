@@ -64,6 +64,7 @@ def submit_ingest_pipeline(
                 column_mapping=column_mapping,
                 max_input_data_size=settings.INGEST_INPUT_FILE_MAX_SIZE,
                 validation_methods=validation_methods,
+                uns_keys_to_keep=settings.INGEST_UNS_KEYS_TO_KEEP,
             )
         )
 

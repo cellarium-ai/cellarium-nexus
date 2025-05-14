@@ -16,6 +16,7 @@ class CreateIngestFilesConfig(BaseModel):
     max_input_data_size: int
     column_mapping: dict[str, Any] | None = None
     validation_methods: list[str] | None = None
+    uns_keys_to_keep: list[str] | None = None
 
 
 class IngestFilesConfig(BaseModel):

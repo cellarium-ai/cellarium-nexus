@@ -438,6 +438,9 @@ def _remove_large_values_from_uns(adata_uns: MutableMapping, uns_key_limit_size_
         if value_size > uns_key_limit_size_bytes:
             keys_to_replace.append(uns_key)
 
+    if keys_to_replace:
+        logger.info(f"Removing uns keys with large values: {keys_to_replace}")
+
     for key in keys_to_replace:
         old_value = adata_uns[key]
         value_type = type(old_value)
@@ -447,11 +450,19 @@ def _remove_large_values_from_uns(adata_uns: MutableMapping, uns_key_limit_size_
         )
 
 
+def _remove_uns_keys(adata_uns: MutableMapping, keys_to_keep: list[str]) -> None:
+    keys_to_remove = [key for key in adata_uns.keys() if key not in keys_to_keep]
+    logger.info(f"Removing uns keys: {keys_to_remove}")
+    for key in keys_to_remove:
+        del adata_uns[key]
+
+
 def dump_ingest_info(
     ingest_id: int,
     adata_uns: MutableMapping,
     output_dir: pathlib.Path,
     metadata_limit_size: int = INGEST_METADATA_LIMIT_SIZE,
+    uns_keys_to_keep: list[str] | None = None,
 ):
     logger.info("Dumping ingest info...")
     ingest_info_obj_to_dump = IngestInfoBQAvroSchema(id=ingest_id)
@@ -462,6 +473,10 @@ def dump_ingest_info(
     parsed_schema = parse_schema(avro_schema)
 
     _remove_large_values_from_uns(adata_uns=adata_uns, uns_key_limit_size_bytes=metadata_limit_size)
+
+    if uns_keys_to_keep is not None:
+        _remove_uns_keys(adata_uns=adata_uns, keys_to_keep=uns_keys_to_keep)
+
     uns_json_dump = json.dumps(obj=adata_uns, cls=NumpyJSONEncoder)
 
     ingest_info_obj_to_dump.metadata_extra = uns_json_dump
@@ -596,6 +611,7 @@ def create_ingest_files(
     output_dir: pathlib.Path,
     column_mapping: dict | None = None,
     metadata_limit_size: int = INGEST_METADATA_LIMIT_SIZE,
+    uns_keys_to_keep: list[str] | None = None,
 ) -> dict:
     """
     Create ingest files locally.
@@ -610,6 +626,7 @@ def create_ingest_files(
     :param output_dir: Where to store the avro and csv outputs
     :param column_mapping: Optional mapping of input column names to schema names
     :param metadata_limit_size: Max size for uns metadata, etc.
+    :param uns_keys_to_keep: List of uns keys to keep in the uns metadata. If None, all keys are kept.
 
     :raise ValueError: If required columns are missing after mapping
 
@@ -637,9 +654,14 @@ def create_ingest_files(
     adata_uns = adata.uns
     adata.file.close()
     del adata
-    _remove_large_values_from_uns(adata_uns=adata_uns, uns_key_limit_size_bytes=metadata_limit_size)
 
-    dump_ingest_info(ingest_id=ingest_id, adata_uns=adata_uns, output_dir=output_dir)
+    dump_ingest_info(
+        ingest_id=ingest_id,
+        adata_uns=adata_uns,
+        output_dir=output_dir,
+        metadata_limit_size=metadata_limit_size,
+        uns_keys_to_keep=uns_keys_to_keep,
+    )
     dump_cell_info(
         df_obs_schema_data=df_obs_schema_data, df_obs_metadata_extra=df_obs_metadata_extra, output_dir=output_dir
     )

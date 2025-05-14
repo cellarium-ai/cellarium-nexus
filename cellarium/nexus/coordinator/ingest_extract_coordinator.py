@@ -104,6 +104,7 @@ class NexusDataOpsCoordinator:
         bucket_stage_dir: str,
         max_input_data_size: int = constants.MAX_INPUT_INGEST_FILE_SIZE_BYTES,
         column_mapping: dict[str, Any] | None = None,
+        uns_keys_to_keep: list[str] | None = None,
         validation_methods: list[str] | None = None,
     ) -> tuple[int, str]:
         """
@@ -117,6 +118,8 @@ class NexusDataOpsCoordinator:
         :param max_input_data_size: Maximum size of input file in bytes. If the file is larger than this, an exception
             will be raised.
         :param column_mapping: Optional dictionary containing obs and var column mappings
+        :param uns_keys_to_keep: Optional list of keys to keep in the `uns` JSON blob. If not provided,
+            all keys will be kept
         :param validation_methods: Optional list of validation methods to run on the data. If not provided, none applied
 
         :raise Exception: If file creation or upload fails
@@ -185,6 +188,7 @@ class NexusDataOpsCoordinator:
                     ingest_id=ingest_info_api_struct.id,
                     output_dir=local_output_dir,
                     column_mapping=column_mapping,
+                    uns_keys_to_keep=uns_keys_to_keep,
                 )
 
                 # Update ingest_info "metadata_extra" on the backend

@@ -78,6 +78,7 @@ class BigQueryDataOperator:
         ingest_id: int,
         output_dir: Path,
         column_mapping: dict[str, Any] | None = None,
+        uns_keys_to_keep: list[str] | None = None,
     ) -> dict[str, Any]:
         """
         Create ingest files for BigQuery ingestion.
@@ -91,6 +92,8 @@ class BigQueryDataOperator:
         :param ingest_id: ID of the ingest
         :param output_dir: Directory to write output files
         :param column_mapping: Optional dictionary containing obs and var column mappings
+        :param uns_keys_to_keep: Optional list of keys to keep in the `uns` JSON blob. If not provided,
+            all keys will be kept
 
         :raise Exception: If file creation fails
 
@@ -106,6 +109,7 @@ class BigQueryDataOperator:
             ingest_id=ingest_id,
             output_dir=output_dir,
             column_mapping=column_mapping,
+            uns_keys_to_keep=uns_keys_to_keep,
         )
 
     def ingest_data(
