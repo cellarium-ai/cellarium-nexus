@@ -43,6 +43,12 @@ python /app/cellarium/nexus/backend/manage.py migrate --noinput
 check_command
 echo -e "${GREEN}Database migrations completed successfully!${NC}"
 
+# Create cache table
+echo -e "\n${YELLOW}Creating cache table...${NC}"
+python /app/cellarium/nexus/backend/manage.py createcachetable
+check_command
+echo -e "${GREEN}Cache table created successfully!${NC}"
+
 # Collect static files
 echo -e "\n${YELLOW}Collecting static files...${NC}"
 python /app/cellarium/nexus/backend/manage.py collectstatic --noinput

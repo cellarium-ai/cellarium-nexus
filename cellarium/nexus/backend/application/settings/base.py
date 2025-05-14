@@ -66,6 +66,8 @@ TEMPLATES = [
     },
 ]
 
+# Database Configuration
+# ----------------------
 default_db_config = {
     "ENGINE": "django.db.backends.postgresql",
     "NAME": env("DB_NAME"),
@@ -82,6 +84,22 @@ else:
     default_db_config["PORT"] = env("DB_PORT", default="5432")  # Add default for local
 
 DATABASES = {"default": default_db_config}
+
+
+# Cache Configuration
+# -------------------
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.db.DatabaseCache",
+        "LOCATION": "core_nexuscache",
+    }
+}
+
+# Cache TTL values (in seconds)
+# 30 days = 60 seconds * 60 minutes * 24 hours * 30 days
+FILTER_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30
+COUNT_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30
+
 
 # Authentication and Security
 # --------------------------

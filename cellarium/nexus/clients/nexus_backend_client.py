@@ -19,6 +19,7 @@ class ApiEndpoints:
     REGISTER_CURRICULUM: str = "api/curriculum/curriculums/"
     UPDATE_CURRICULUM: str = "api/curriculum/curriculums/{name}/"
     CREATE_VALIDATION_REPORT_ITEM: str = "api/ingest-management/validation-report-item/create/"
+    RESET_CACHE: str = "api/ingest-management/reset-cache/"
 
 
 class ReserveIndexesModelType(Enum):
@@ -264,3 +265,17 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
 
         api_out = self.post_json(endpoint=ApiEndpoints.CREATE_VALIDATION_REPORT_ITEM, data=data)
         return ValidationReportItemAPISchema(**api_out)
+
+    def reset_backend_cache(self) -> dict[str, Any]:
+        """
+        Reset and repopulate the cache for all cached filters.
+
+        This method triggers a complete cache reset and repopulation of all
+        cached filters used in the admin interface. It requires admin privileges
+        to execute.
+
+        :raise: HTTPError if the request fails or if the user doesn't have admin privileges
+
+        :return: Dictionary containing status, message, repopulated keys, and count
+        """
+        return self.post_json(endpoint=ApiEndpoints.RESET_CACHE)

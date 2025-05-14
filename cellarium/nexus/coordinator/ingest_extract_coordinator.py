@@ -337,8 +337,11 @@ class NexusDataOpsCoordinator:
                     error_happened = True
                     logger.error(f"Failed to ingest data from {stage_dir}: {exc}")
 
-            if error_happened:
-                raise exceptions.NexusDataOpsIngestError("Some ingest operations failed")
+        logger.info("Resetting Backend cache...")
+        self.backend_client.reset_backend_cache()
+
+        if error_happened:
+            raise exceptions.NexusDataOpsIngestError("Some ingest operations failed")
 
     def prepare_extract_tables(
         self,

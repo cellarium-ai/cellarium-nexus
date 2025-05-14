@@ -21,4 +21,9 @@ urlpatterns = [
         views.ValidationReportItemCreateAPIView.as_view(),
         name="validation-report-item-create",
     ),
+    path(
+        "reset-cache/",
+        views.ResetCacheAPIView.as_view(),
+        name="reset-cache",
+    ),
 ]

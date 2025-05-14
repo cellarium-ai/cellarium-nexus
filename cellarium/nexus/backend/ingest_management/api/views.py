@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from cellarium.nexus.backend.cell_management import models as cell_models
+from cellarium.nexus.backend.core.utils.reset_cache import reset_cache_and_repopulate
 from cellarium.nexus.backend.ingest_management import models
 from cellarium.nexus.backend.ingest_management.api import serializers
 from cellarium.nexus.backend.ingest_management.services import import_from_avro, index_tracking
@@ -115,3 +116,32 @@ class ValidationReportItemCreateAPIView(CreateAPIView):
     """
 
     serializer_class = serializers.ValidationReportItemSerializer
+
+
+class ResetCacheAPIView(APIView):
+    """
+    API view for resetting and repopulating the cache.
+
+    This endpoint triggers a complete cache reset and repopulation of all
+    cached filters. It requires admin privileges to execute.
+    """
+
+    def post(self, request: Request) -> Response:
+        """
+        Handle POST request to reset and repopulate the cache.
+
+        :param request: HTTP request
+
+        :return: Response with the list of repopulated cache keys
+        """
+        repopulated_keys = reset_cache_and_repopulate()
+
+        return Response(
+            {
+                "status": "success",
+                "message": "Cache reset and repopulation completed successfully",
+                "repopulated_keys": repopulated_keys,
+                "count": len(repopulated_keys),
+            },
+            status=status.HTTP_200_OK,
+        )

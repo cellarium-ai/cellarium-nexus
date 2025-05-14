@@ -17,6 +17,7 @@ from unfold.decorators import action
 from cellarium.nexus.backend.cell_management.admin import constants, filters, forms
 from cellarium.nexus.backend.cell_management.admin import utils as admin_utils
 from cellarium.nexus.backend.cell_management.models import CellInfo
+from cellarium.nexus.backend.core.admin.helpers import CachingChangeList
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +98,19 @@ class CellInfoAdmin(ModelAdmin):
         :return: False to prevent editing
         """
         return False
+
+    def get_changelist(self, request: HttpRequest, **kwargs):
+        """
+        Return the CachingChangeList class for this admin.
+
+        This ensures that all count operations use caching for better performance.
+
+        :param request: The HTTP request
+        :param kwargs: Additional keyword arguments
+
+        :return: The CachingChangeList class
+        """
+        return CachingChangeList
 
     @action(description=_("Extract Curriculum"), url_path="extract-curriculum")
     def extract_curriculum_action(self, request: HttpRequest) -> HttpResponse:

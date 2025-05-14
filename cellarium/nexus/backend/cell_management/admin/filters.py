@@ -15,8 +15,9 @@ from django.http import HttpRequest
 from django.http.request import HttpRequest as WSGIRequest
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
-from unfold.contrib.filters.admin import DropdownFilter, MultipleDropdownFilter
 from unfold.widgets import UnfoldAdminTextInputWidget
+
+from cellarium.nexus.backend.core.admin.filters import GenericDropdownFilter, GenericMultiDropdownFilter
 
 logger = logging.getLogger(__name__)
 
@@ -101,19 +102,9 @@ class OntologyTermFilter(admin.FieldListFilter):
         self.lookup_kwarg = field_path
         self.lookup_kwarg_exclude = f"{field_path}_exclude"
 
-        # Log the raw request parameters for debugging
-        logger.info(f"OntologyTermFilter init: field_path={field_path}")
-        logger.info(f"OntologyTermFilter raw params: {request.GET}")
-
         # Get the values directly from the request GET parameters
         self.lookup_val = request.GET.get(self.lookup_kwarg, "")
         self.lookup_val_exclude = request.GET.get(self.lookup_kwarg_exclude, "")
-
-        # Log the lookup values for debugging
-        logger.info(
-            f"OntologyTermFilter lookup values from request: lookup_kwarg={self.lookup_kwarg}, "
-            f"lookup_val={self.lookup_val}"
-        )
 
         # Call parent init
         super().__init__(field, request, params, model, model_admin, field_path)
@@ -121,9 +112,6 @@ class OntologyTermFilter(admin.FieldListFilter):
         # Set a more descriptive title based on the field path
         field_name = field_path.replace("_ontology_term_id", "")
         self.title = _(f"{field_name.replace('_', ' ').title()} Ontology Term ID")
-
-        # Log the final lookup values for debugging
-        logger.info(f"OntologyTermFilter final values: lookup_kwarg={self.lookup_kwarg}, lookup_val={self.lookup_val}")
 
     def has_output(self) -> bool:
         """
@@ -149,12 +137,6 @@ class OntologyTermFilter(admin.FieldListFilter):
         :return: A tuple containing a dictionary with the form
         """
         exclude_active = self.value_exclude()
-
-        # Log the form data for debugging
-        logger.info(
-            f"OntologyTermFilter choices: lookup_kwarg={self.lookup_kwarg}, value={self.value()}, "
-            f"exclude={exclude_active}"
-        )
 
         return (
             {
@@ -198,9 +180,6 @@ class OntologyTermFilter(admin.FieldListFilter):
         value = self.value()
         exclude = self.value_exclude()
 
-        # Log the actual filter parameters being used
-        logger.info(f"OntologyTermFilter queryset: field_path={self.field_path}, value={value}, exclude={exclude}")
-
         if not value:
             return queryset
 
@@ -214,16 +193,11 @@ class OntologyTermFilter(admin.FieldListFilter):
             # Use __in lookup for multiple values
             filter_kwargs = {f"{self.field_path}__in": values}
 
-            # Debug logging
-            logger.info(f"OntologyTermFilter: field_path={self.field_path}, values={values}, exclude={exclude}")
-
             # Apply filter or exclude based on the exclude checkbox
             if exclude:
                 filtered_qs = queryset.exclude(**filter_kwargs)
-                logger.info(f"Excluding with: {filter_kwargs}")
             else:
                 filtered_qs = queryset.filter(**filter_kwargs)
-                logger.info(f"Filtering with: {filter_kwargs}")
 
             return filtered_qs
 
@@ -233,45 +207,10 @@ class OntologyTermFilter(admin.FieldListFilter):
         # Apply filter or exclude based on the exclude checkbox
         if exclude:
             filtered_qs = queryset.exclude(**filter_kwargs)
-            logger.info(f"Excluding with: {filter_kwargs}")
         else:
             filtered_qs = queryset.filter(**filter_kwargs)
-            logger.info(f"Filtering with: {filter_kwargs}")
 
         return filtered_qs
-
-
-class GenericDropdownFilter(DropdownFilter):
-    title = None
-    parameter_name = None
-    field_name = None
-
-    def lookups(self, request, model_admin):
-        assert self.field_name, "field_name must be set"
-        values = model_admin.model.objects.values_list(self.field_name, flat=True).distinct()
-        return [(x, x) for x in values if x not in ["", None]]
-
-    def queryset(self, request, queryset):
-        if self.value() not in ["", None]:
-            return queryset.filter(**{self.field_name: self.value()})
-        return queryset
-
-
-class GenericMultiDropdownFilter(MultipleDropdownFilter):
-    title = None
-    parameter_name = None
-    field_name = None
-
-    def lookups(self, request, model_admin):
-        assert self.field_name, "You must set 'field_name'"
-        values = model_admin.model.objects.values_list(self.field_name, flat=True).distinct()
-        return [(v, v) for v in values if v not in ["", None]]
-
-    def queryset(self, request, queryset):
-        values = self.value()
-        if values:
-            return queryset.filter(**{f"{self.field_name}__in": values})
-        return queryset
 
 
 class SexDropdownFilter(GenericDropdownFilter):
