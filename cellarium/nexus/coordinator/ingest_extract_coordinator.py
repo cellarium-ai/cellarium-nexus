@@ -14,7 +14,6 @@ from typing import Any, ContextManager, Sequence
 import fastavro
 import smart_open
 from google.cloud import bigquery
-from tenacity import before_log, retry, stop_after_attempt, wait_exponential
 
 from cellarium.nexus.clients import NexusBackendAPIClient
 from cellarium.nexus.coordinator import constants, exceptions
@@ -231,11 +230,6 @@ class NexusDataOpsCoordinator:
             gcs_stage_dir=bucket_stage_dir,
         )
 
-    @retry(
-        stop=stop_after_attempt(5),
-        wait=wait_exponential(multiplier=5, max=30),
-        before=before_log(logger, logging.INFO),
-    )
     def _ingest_data_in_nexus_backend(self, bucket_stage_dir: str, ingest_id: int) -> None:
         logging.info(f"Ingesting data to Nexus backend...")
         self.backend_client.ingest_from_avro(

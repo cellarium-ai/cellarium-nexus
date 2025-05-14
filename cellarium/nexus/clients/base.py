@@ -1,8 +1,15 @@
 import json
+import logging
 from typing import Any
 
 import requests
-from nexus.clients import exceptions, status_codes
+from tenacity import before_log, retry, stop_after_attempt, wait_exponential
+
+from cellarium.nexus.clients import exceptions, status_codes
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 JsonObject = dict[str, Any]
 JsonData = JsonObject | list[JsonObject]
@@ -77,7 +84,6 @@ class BaseAPIHTTPClient:
         """
         status_code = response.status_code
         if not (status_codes.STATUS_200_OK <= status_code <= status_codes.STATUS_226_IM_USED):
-            # When response status code is not 2XX
             try:
                 response_detail = response.json()["detail"]
             except (json.decoder.JSONDecodeError, KeyError):
@@ -85,6 +91,11 @@ class BaseAPIHTTPClient:
 
             self._raise_response_exception(status_code=status_code, detail=response_detail)
 
+    @retry(
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=5, max=30),
+        before=before_log(logger, logging.INFO),
+    )
     def _request_json(
         self, method: str, endpoint: str, data: JsonData | None = None
     ) -> dict[str, Any] | list[dict[str, Any]]:

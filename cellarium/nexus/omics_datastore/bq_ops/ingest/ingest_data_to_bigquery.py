@@ -204,6 +204,11 @@ def load_data_into_staging(
     return all_loads_succeeded
 
 
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=5, max=30),
+    before=before_log(logger, logging.INFO),
+)
 def commit_to_production(
     client: bigquery.Client,
     dataset: str,
