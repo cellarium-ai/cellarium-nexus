@@ -407,6 +407,18 @@ retry_operation "Creating Cloud SQL instance ${DB_INSTANCE_NAME}" \
     --labels=application=${GCP_APPLICATION_BILLING_LABEL} \
     --project=\"${GCP_PROJECT_ID}\""
 
+echo -e "\n${YELLOW}Configuring database autovacuum settings...${NC}"
+retry_operation "Configuring autovacuum settings for ${DB_INSTANCE_NAME}" \
+    "gcloud sql instances patch \"${DB_INSTANCE_NAME}\" \
+    --database-flags \
+        autovacuum_naptime=30 \
+        autovacuum_vacuum_threshold=100 \
+        autovacuum_vacuum_scale_factor=0.01 \
+        autovacuum_analyze_scale_factor=0.005 \
+        autovacuum_max_workers=5 \
+        autovacuum_vacuum_cost_limit=1000 \
+    --project=\"${GCP_PROJECT_ID}\""
+
 echo -e "\n${YELLOW}Creating database and user...${NC}"
 # Create database
 retry_operation "Creating database ${DB_NAME}" \
