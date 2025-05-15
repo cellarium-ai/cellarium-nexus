@@ -48,6 +48,27 @@ class CurriculumAdmin(GCSDisplayMixin, ModelAdmin):
         {"name": "metadata_file_path", "is_directory": False},
     ]
 
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """
+        Disable the ability to create new cell info instances directly.
+
+        :param request: The HTTP request
+
+        :return: False to prevent direct creation
+        """
+        return False
+
+    def has_change_permission(self, request: HttpRequest, obj=None) -> bool:
+        """
+        Disable the ability to edit cell info instances.
+
+        :param request: The HTTP request
+        :param obj: The object being changed
+
+        :return: False to prevent editing
+        """
+        return False
+
     def get_queryset(self, request: HttpRequest) -> models.QuerySet[Curriculum]:
         """
         Get the queryset for the admin view.
