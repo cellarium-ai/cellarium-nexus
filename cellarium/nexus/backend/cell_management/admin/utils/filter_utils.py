@@ -33,12 +33,7 @@ def extract_filters_from_django_admin_request(
     filters = {}
     bigquery_dataset = None
 
-    # Log all GET parameters for debugging
-    logger.info(f"All request GET parameters: {dict(request.GET.items())}")
-
-    # Skip processing if no GET parameters
     if not request.GET:
-        logger.info("No GET parameters found in request")
         return filters, bigquery_dataset
 
     # Process all GET parameters to build filters
@@ -48,9 +43,9 @@ def extract_filters_from_django_admin_request(
             logger.debug(f"Skipping parameter {key}={value}")
             continue
 
-        # Handle the BigQuery dataset filter separately
         if key == dataset_filter_key:
             try:
+                value = value[0]
                 bigquery_dataset = BigQueryDataset.objects.get(id=int(value))
                 logger.info(f"Using dataset from filter: {bigquery_dataset.name}")
             except (BigQueryDataset.DoesNotExist, ValueError) as e:
