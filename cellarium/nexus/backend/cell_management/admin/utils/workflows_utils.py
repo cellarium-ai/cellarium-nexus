@@ -241,5 +241,5 @@ def submit_extract_pipeline(
         },
         service_account=settings.PIPELINE_SERVICE_ACCOUNT,
         pipeline_root_path=settings.PIPELINE_ROOT_PATH,
-        labels={"application": settings.GCP_APPLICATION_BILLING_LABEL},
+        labels={"application": settings.GCP_APPLICATION_BILLING_LABEL, "method": "extract"},
     )

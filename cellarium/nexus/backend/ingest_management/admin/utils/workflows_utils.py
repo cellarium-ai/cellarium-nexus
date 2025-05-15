@@ -88,10 +88,8 @@ def submit_ingest_pipeline(
         create_ingest_files_configs, configs_stage_dir
     )
 
-    # Save ingest_data_to_bigquery config
     ingest_config_paths = utils.workflows_configs.dump_configs_to_bucket([ingest_config], configs_stage_dir)
 
-    # Submit pipeline and return the pipeline URL
     return submit_pipeline(
         pipeline_component=ingest_data_to_bigquery_pipeline,
         display_name=f"Nexus Ingest Data - {bigquery_dataset.name}",
@@ -102,7 +100,7 @@ def submit_ingest_pipeline(
         },
         service_account=settings.PIPELINE_SERVICE_ACCOUNT,
         pipeline_root_path=settings.PIPELINE_ROOT_PATH,
-        labels={"application": settings.GCP_APPLICATION_BILLING_LABEL},
+        labels={"application": settings.GCP_APPLICATION_BILLING_LABEL, "method": "extract"},
     )
 
 

@@ -32,7 +32,7 @@ def run_extracts_pipeline(extract_configs: t.List[str]) -> None:
 
     :raise: RuntimeError if any component fails
     """
-    with dsl.ParallelFor(items=extract_configs, name="extract-workers", parallelism=64) as item:
+    with dsl.ParallelFor(items=extract_configs, name="extract-workers", parallelism=128) as item:
         components.extract_job(gcs_config_path=item)
 
 

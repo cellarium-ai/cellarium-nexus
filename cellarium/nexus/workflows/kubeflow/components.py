@@ -1,13 +1,16 @@
 from cellarium.nexus.workflows.kubeflow import conf
 from cellarium.nexus.workflows.kubeflow.utils import job
 
+INGEST_LABELS = {**conf.LABELS, "method": "ingest"}
+EXTRACT_LABELS = {**conf.LABELS, "method": "extract"}
+
 
 @job.dsl_component_job(
     machine_type="e2-highmem-8",
     display_name="create_ingest_files",
     base_image=conf.BASE_IMAGE,
     service_account=conf.SERVICE_ACCOUNT,
-    labels=conf.LABELS,
+    labels=INGEST_LABELS,
 )
 def create_ingest_files_job(gcs_config_path: str):
     """
@@ -51,7 +54,7 @@ def create_ingest_files_job(gcs_config_path: str):
     display_name="ingest_data_to_bigquery",
     base_image=conf.BASE_IMAGE,
     service_account=conf.SERVICE_ACCOUNT,
-    labels=conf.LABELS,
+    labels=INGEST_LABELS,
 )
 def ingest_data_to_bigquery_job(gcs_config_path: str):
     """
@@ -87,7 +90,7 @@ def ingest_data_to_bigquery_job(gcs_config_path: str):
     display_name="prepare_extract",
     base_image=conf.BASE_IMAGE,
     service_account=conf.SERVICE_ACCOUNT,
-    labels=conf.LABELS,
+    labels=EXTRACT_LABELS,
 )
 def prepare_extract_job(gcs_config_path: str):
     """
@@ -131,7 +134,7 @@ def prepare_extract_job(gcs_config_path: str):
     display_name="extract",
     base_image=conf.BASE_IMAGE,
     service_account=conf.SERVICE_ACCOUNT,
-    labels=conf.LABELS,
+    labels=EXTRACT_LABELS,
 )
 def extract_job(gcs_config_path: str):
     """
@@ -170,7 +173,7 @@ def extract_job(gcs_config_path: str):
     display_name="nexus_mark_curriculum_as_finished",
     base_image=conf.BASE_IMAGE,
     service_account=conf.SERVICE_ACCOUNT,
-    labels=conf.LABELS,
+    labels=EXTRACT_LABELS,
 )
 def mark_curriculum_as_finished_job(gcs_config_path: str):
     """
