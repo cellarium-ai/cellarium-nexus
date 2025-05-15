@@ -338,7 +338,8 @@ class NexusDataOpsCoordinator:
                     logger.error(f"Failed to ingest data from {stage_dir}: {exc}")
 
         logger.info("Resetting Backend cache...")
-        self.backend_client.reset_backend_cache()
+        backend_reset_result = self.backend_client.reset_backend_cache()
+        logger.info(f"Reset cache keys: {backend_reset_result.repopulated_keys}")
 
         if error_happened:
             raise exceptions.NexusDataOpsIngestError("Some ingest operations failed")

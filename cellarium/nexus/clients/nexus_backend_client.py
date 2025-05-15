@@ -3,6 +3,7 @@ from enum import Enum
 from typing import Any, Literal
 
 from nexus.clients.api_schemas import (
+    BackendResetAPISchema,
     CurriculumAPISchema,
     IngestInfoAPISchema,
     ValidationReportItemAPISchema,
@@ -188,6 +189,7 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
 
         if filters_json is not None:
             data["filters_json"] = filters_json
+
         api_out = self.post_json(endpoint=ApiEndpoints.REGISTER_CURRICULUM, data=data)
         return CurriculumAPISchema(**api_out)
 
@@ -266,7 +268,7 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
         api_out = self.post_json(endpoint=ApiEndpoints.CREATE_VALIDATION_REPORT_ITEM, data=data)
         return ValidationReportItemAPISchema(**api_out)
 
-    def reset_backend_cache(self) -> dict[str, Any]:
+    def reset_backend_cache(self) -> BackendResetAPISchema:
         """
         Reset and repopulate the cache for all cached filters.
 
@@ -278,4 +280,5 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
 
         :return: Dictionary containing status, message, repopulated keys, and count
         """
-        return self.post_json(endpoint=ApiEndpoints.RESET_CACHE)
+        api_out = self.post_json(endpoint=ApiEndpoints.RESET_CACHE)
+        return BackendResetAPISchema(**api_out)

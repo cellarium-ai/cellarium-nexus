@@ -1,17 +1,8 @@
 import json
 from datetime import datetime
-from typing import Annotated, Any, Literal
+from typing import Any
 
-from pydantic import BaseModel, BeforeValidator
-
-
-def parse_dict(value: Any) -> dict[str, Any]:
-    if isinstance(value, str):
-        try:
-            return json.loads(value)
-        except json.JSONDecodeError:
-            raise ValueError("Invalid JSON string for dictionary field")
-    return value
+from pydantic import BaseModel
 
 
 class IngestInfoAPISchema(BaseModel):
@@ -33,42 +24,7 @@ class FeatureInfoAPISchema(BaseModel):
     metadata_extra: dict[str, Any] | None = None
 
 
-class CellInfoAPISchema(BaseModel):
-    id: int
-    original_id: str
-    ingest_id: int
-    tag: str | None = None
-    metadata_extra: dict[str, Any] | None = None
-
-    # Cell Features
-    donor_id: str | None = None
-    cell_type: str | None = None
-    assay: str | None = None
-    development_stage: str | None = None
-    tissue: str | None = None
-    disease: str | None = None
-    organism: str | None = None
-    self_reported_ethnicity: str | None = None
-    sex: str | None = None
-    suspension_type: str | None = None
-    total_mrna_umis: int | None = None
-
-    # Cell Features Ontology Term IDs
-    cell_type_ontology_term_id: str | None = None
-    assay_ontology_term_id: str | None = None
-    development_stage_ontology_term_id: str | None = None
-    tissue_ontology_term_id: str | None = None
-    disease_ontology_term_id: str | None = None
-    organism_ontology_term_id: str | None = None
-    self_reported_ethnicity_ontology_term_id: str | None = None
-    sex_ontology_term_id: str | None = None
-
-
 class CurriculumAPISchema(BaseModel):
-    """
-    API schema for Curriculum model.
-    """
-
     id: int
     creator_id: int
     created_at: datetime
@@ -82,10 +38,6 @@ class CurriculumAPISchema(BaseModel):
 
 
 class ValidationReportItemAPISchema(BaseModel):
-    """
-    API schema for ValidationReportItem model.
-    """
-
     id: int
     report_id: int
     input_file_gcs_path: str
@@ -93,3 +45,10 @@ class ValidationReportItemAPISchema(BaseModel):
     is_valid: bool
     message: str | None = None
     created_at: datetime
+
+
+class BackendResetAPISchema(BaseModel):
+    status: str
+    message: str
+    repopulated_keys: list[str]
+    count: int
