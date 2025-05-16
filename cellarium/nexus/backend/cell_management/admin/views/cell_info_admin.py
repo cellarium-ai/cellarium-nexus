@@ -35,7 +35,6 @@ class CellInfoAdmin(ModelAdmin):
     list_display = (
         "id",
         "original_id",
-        "ingest",
         "donor_id",
         "cell_type",
         "assay",
@@ -48,7 +47,6 @@ class CellInfoAdmin(ModelAdmin):
         "suspension_type",
         "total_mrna_umis",
         "tag",
-        "bigquery_dataset",
     )
     list_filter_submit = True
     search_fields = ("id", "original_id", "cell_type", "assay", "organism", "tissue", "disease", "tag")
@@ -98,6 +96,25 @@ class CellInfoAdmin(ModelAdmin):
         :return: False to prevent editing
         """
         return False
+
+    def get_queryset(self, request: HttpRequest):
+        qs = super().get_queryset(request=request)
+        return qs.only(
+            "id",
+            "original_id",
+            "donor_id",
+            "cell_type",
+            "assay",
+            "development_stage",
+            "tissue",
+            "disease",
+            "organism",
+            "self_reported_ethnicity",
+            "sex",
+            "suspension_type",
+            "total_mrna_umis",
+            "tag",
+        )
 
     def get_changelist(self, request: HttpRequest, **kwargs):
         """
