@@ -139,13 +139,14 @@ class FeatureInfo(models.Model):
     Model for storing feature information like ensemble IDs and symbols.
     """
 
-    ensemble_id = models.CharField(max_length=255, verbose_name=_("ensemble id"), unique=True)
+    ensemble_id = models.CharField(max_length=255, verbose_name=_("ensemble id"))
     symbol = models.CharField(max_length=255, verbose_name=_("symbol"))
 
     class Meta:
         verbose_name = _("feature info")
         verbose_name_plural = _("feature info objects")
         app_label = "cell_management"
+        unique_together = ("ensemble_id", "symbol")
 
     def __str__(self):
         return f"{self.symbol} ({self.ensemble_id})"

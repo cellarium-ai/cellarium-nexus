@@ -52,5 +52,5 @@ CELL_INFO_EXTRACT_COLUMNS = [
     "organism_ontology_term_id",
     "self_reported_ethnicity_ontology_term_id",
     "sex_ontology_term_id",
-    "tag"
+    "tag",
 ]
