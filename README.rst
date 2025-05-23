@@ -87,9 +87,9 @@ Project Structure
     cellarium/
     ├── nexus/
     │   ├── backend/              # Django-based API server
-    │   ├── clients/              # Client libraries for external services
+    │   ├── client/               # Client library for communicating with backend
     │   ├── coordinator/          # Data processing coordination
-    │   ├── omics_datastore/      # Specialized data storage for omics data
+    │   ├── omics_datastore/      # Specialized data storage for omics data (powered by BigQuery)
     │   ├── shared/               # Shared utilities and schemas
     │   └── workflows/            # Kubeflow pipeline definitions
     │       └── kubeflow/

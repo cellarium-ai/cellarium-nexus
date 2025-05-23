@@ -73,7 +73,7 @@ class OntologyTermFilter(admin.FieldListFilter):
 
     title = _("Ontology Term ID")
     form_class = SearchWithExcludeForm
-    template = "cell_management/filters/ontology_filter.html"
+    template = "admin/cell_management/filters/ontology_filter.html"
 
     # Define lookup parameters at class level to ensure they exist before expected_parameters is called
     lookup_kwarg = ""

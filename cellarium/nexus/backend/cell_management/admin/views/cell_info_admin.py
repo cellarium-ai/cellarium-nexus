@@ -3,11 +3,14 @@ Admin module for cell information management.
 """
 
 import logging
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from django.contrib import admin, messages
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
+from django.utils.http import urlencode
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin
@@ -16,8 +19,8 @@ from unfold.decorators import action
 
 from cellarium.nexus.backend.cell_management.admin import constants, filters, forms
 from cellarium.nexus.backend.cell_management.admin import utils as admin_utils
-from cellarium.nexus.backend.cell_management.models import CellInfo
-from cellarium.nexus.backend.core.admin.helpers import CachingChangeList
+from cellarium.nexus.backend.cell_management.models import BigQueryDataset, CellInfo
+from cellarium.nexus.backend.core.admin.helpers.change_lists import BigQueryCountPaginator
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +52,6 @@ class CellInfoAdmin(ModelAdmin):
         "tag",
     )
     list_filter_submit = True
-    search_fields = ("id", "original_id", "cell_type", "assay", "organism", "tissue", "disease", "tag")
     list_filter = (
         # Text filters for fields without ontology term IDs
         ("id", RangeNumericFilter),
@@ -97,37 +99,45 @@ class CellInfoAdmin(ModelAdmin):
         """
         return False
 
+    def changelist_view(self, request, extra_context=None):
+        if "bigquery_dataset__id__exact" not in request.GET:
+            bigquery_dataset_first = BigQueryDataset.objects.first()
+            base_url = reverse(f"admin:{self.model._meta.app_label}_{self.model._meta.model_name}_changelist")
+            query_string = urlencode({"bigquery_dataset__id__exact": bigquery_dataset_first.id})
+            return redirect(f"{base_url}?{query_string}")
+        return super().changelist_view(request, extra_context=extra_context)
+
     def get_queryset(self, request: HttpRequest):
-        qs = super().get_queryset(request=request)
-        return qs.only(
-            "id",
-            "original_id",
-            "donor_id",
-            "cell_type",
-            "assay",
-            "development_stage",
-            "tissue",
-            "disease",
-            "organism",
-            "self_reported_ethnicity",
-            "sex",
-            "suspension_type",
-            "total_mrna_umis",
-            "tag",
+        return self.model.objects.none()
+
+    @staticmethod
+    def _get_filters_and_bigquery_dataset(request: HttpRequest) -> tuple[dict[str, Any], BigQueryDataset | None]:
+        # Start with any filters in current GET
+        query_params: dict[str, list[str]] = {k: request.GET.getlist(k) for k in request.GET}
+
+        # If empty (e.g. follow-up view from action), try referrer
+        if not query_params:
+            referer = request.META.get("HTTP_REFERER", "")
+            if referer:
+                query_params = parse_qs(urlparse(referer).query)
+
+        # Update request.GET to include filters so downstream logic works
+        request.GET = request.GET.copy()
+        request.GET.update(query_params)
+
+        bq_filters, bigquery_dataset = admin_utils.extract_filters_from_django_admin_request(request=request)
+        return bq_filters, bigquery_dataset
+
+    def get_paginator(self, request, queryset, per_page, orphans=0, allow_empty_first_page=True):
+        bq_filters, bigquery_dataset = self._get_filters_and_bigquery_dataset(request)
+        return BigQueryCountPaginator(
+            object_list=queryset,
+            per_page=per_page,
+            orphans=orphans,
+            allow_empty_first_page=allow_empty_first_page,
+            bq_filters=bq_filters,
+            bigquery_dataset_name=bigquery_dataset.name if bigquery_dataset else None,
         )
-
-    def get_changelist(self, request: HttpRequest, **kwargs):
-        """
-        Return the CachingChangeList class for this admin.
-
-        This ensures that all count operations use caching for better performance.
-
-        :param request: The HTTP request
-        :param kwargs: Additional keyword arguments
-
-        :return: The CachingChangeList class
-        """
-        return CachingChangeList
 
     @action(description=_("Extract Curriculum"), url_path="extract-curriculum")
     def extract_curriculum_action(self, request: HttpRequest) -> HttpResponse:
@@ -142,7 +152,6 @@ class CellInfoAdmin(ModelAdmin):
         :return: HTTP response
         """
         referer = request.META.get("HTTP_REFERER", "")
-        # if referer and "?" in referer:
         query_params = parse_qs(urlparse(referer).query)
 
         original_filters = {k: v for k, v in query_params.items()}

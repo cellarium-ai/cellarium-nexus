@@ -1,0 +1,22 @@
+<div class="flex flex-col items-center justify-center text-muted-foreground py-10 space-y-4">
+  <span class="material-symbols-outlined text-gray-500" style="font-size: 150px;">
+    science
+  </span>
+
+  <h2 class="text-center font-extrabold tracking-tight" style="font-size: 50px; line-height: 1.1;">
+    🦠 {{ cl.result_count|default:"0" }} Cells
+  </h2>
+
+  <p class="text-lg text-gray-400 text-center max-w-md">
+    in the Data Store by selected filters
+  </p>
+
+  <a
+      href="{% url 'admin:cell_management_cellinfo_extract_curriculum_action' %}?{{ request.GET.urlencode }}"
+      class="bg-primary-600 border-primary-600 text-white border cursor-pointer flex items-center gap-2 font-medium px-3 py-2 rounded shadow-sm text-sm"
+  >
+    <span class="material-symbols-outlined text-base">menu_book</span>
+    Extract Curriculum
+  </a>
+
+</div>

@@ -1,7 +1,11 @@
+from typing import Any, Generator
+
 from django.contrib import admin
+from django.contrib.admin.views.main import ChangeList
 from django.core.cache import cache
 from django.db import models
 from django.http import HttpRequest
+from django.utils.translation import gettext_lazy as _
 from unfold.contrib.filters.admin import DropdownFilter, MultipleDropdownFilter
 
 CACHE_KEY_FORMAT = "generic_dropdown_filter:{parameter_name}"
@@ -16,6 +20,11 @@ class CachedLookupsMixin:
     """
 
     field_name: str = None
+
+    def __init__(self, request, params, model, model_admin):
+        super().__init__(request, params, model, model_admin)  # <-- this must come first!
+        self.request = request
+        self.model_admin = model_admin
 
     def _get_cache_key(self) -> str:
         """
@@ -60,6 +69,50 @@ class CachedLookupsMixin:
         cache_key = self._get_cache_key()
         values = self._get_unique_values_from_db_or_cache(cache_key=cache_key, model=model_admin.model)
         return [(v, v) for v in values if v not in ["", None]]
+
+    def get_filter_choices(self, request):
+        cache_key = f"generic_dropdown_filter:{self.parameter_name}"
+        values = cache.get(cache_key)
+
+        if values is None:
+            values = self.model.objects.values_list(self.field_name, flat=True).distinct()
+            values = [v for v in values if v not in ["", None]]
+            cache.set(cache_key, values, timeout=3600)
+
+        return [(v, v) for v in values]
+
+    def get_form(self, request):
+        choices = self.get_filter_choices(request)
+        name = getattr(self, "lookup_kwarg", self.parameter_name)
+        raw = self.value()
+
+        # Flatten possibly nested list
+        if isinstance(raw, list):
+            flat = []
+            for v in raw:
+                if isinstance(v, list):
+                    flat.extend(v)
+                else:
+                    flat.append(v)
+            value = flat
+        else:
+            value = raw
+
+        return self.form_class(
+            label=_("By %(filter_title)s") % {"filter_title": self.title},
+            name=name,
+            choices=[("", _("All"))] + choices,
+            data={name: value},
+            multiple=True,
+        )
+
+    def choices(self, changelist):
+        """
+        This overrides Unfold’s default .choices() which yields the form.
+        """
+        yield {
+            "form": self.get_form(self.request),
+        }
 
 
 class GenericDropdownFilter(CachedLookupsMixin, DropdownFilter):

@@ -53,7 +53,7 @@ MIDDLEWARE = [
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "cellarium/nexus/backend/templates"],
+        "DIRS": [BASE_DIR / "cellarium/nexus/backend/application/templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [

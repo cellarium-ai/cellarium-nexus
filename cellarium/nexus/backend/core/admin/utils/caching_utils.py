@@ -1,14 +1,19 @@
 import hashlib
 import logging
+from typing import Any
 
 from django.conf import settings
 from django.core.cache import cache
-from django.db.models import QuerySet
+from google.cloud import bigquery
+
+from cellarium.nexus.omics_datastore.bq_ops import BigQueryDataOperator
 
 logger = logging.getLogger(__name__)
 
 
-def get_cached_count(queryset: QuerySet, timeout: int = settings.COUNT_CACHE_TTL_SECONDS) -> int:
+def get_cached_count_bq(
+    filters_dict: dict[str, Any], bigquery_dataset_name: str, timeout: int = settings.COUNT_CACHE_TTL_SECONDS
+) -> int:
     """
     Get count of queryset with caching.
 
@@ -16,15 +21,15 @@ def get_cached_count(queryset: QuerySet, timeout: int = settings.COUNT_CACHE_TTL
     the count is already cached. If not, performs the count operation and caches
     the result.
 
-    :param queryset: The queryset to count
+    :param filters_dict: Dictionary of filters to apply to the queryset
+    :param bigquery_dataset_name: Name of the BigQuery dataset
     :param timeout: Cache timeout in seconds, defaults to 30 days
 
     :raise: ValueError: If queryset is not a valid QuerySet instance
 
     :return: Count of objects in the queryset
     """
-    sql, params = queryset.query.sql_with_params()
-    raw = sql + str(params)
+    raw = str(filters_dict)
     key = f"countcache_{hashlib.md5(raw.encode()).hexdigest()}"
 
     # Try to get the cached count
@@ -32,7 +37,11 @@ def get_cached_count(queryset: QuerySet, timeout: int = settings.COUNT_CACHE_TTL
     if cached is not None:
         return cached
 
-    count = queryset.count()
+    bq_client = bigquery.Client(project=settings.GCP_PROJECT_ID)
+    bq_data_operator = BigQueryDataOperator(
+        client=bq_client, project=settings.GCP_PROJECT_ID, dataset=bigquery_dataset_name
+    )
+    count = bq_data_operator.count_cells(filter_statements=filters_dict)
 
     cache.set(key, count, timeout)
     return count

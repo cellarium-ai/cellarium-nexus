@@ -38,7 +38,6 @@ def extract_filters_from_django_admin_request(
 
     # Process all GET parameters to build filters
     for key, value in request.GET.items():
-        # Skip empty values and pagination parameters
         if not value or key in ("p", "e", "o") or key.startswith("_"):
             logger.debug(f"Skipping parameter {key}={value}")
             continue
@@ -66,8 +65,7 @@ def extract_filters_from_django_admin_request(
             logger.info(f"Found exclude flag for {key}")
 
         # Handle range filters
-        # if key.endswith("from") or key.endswith("to"):
-        if "from" in key or "to" in key:
+        if key.endswith("from") or key.endswith("to"):
             value = value[0]
             from_value = value if key.endswith("_from") else None
             to_value = value if key.endswith("_to") else None
@@ -104,20 +102,18 @@ def extract_filters_from_django_admin_request(
                 _filters[f"c.{_key}__eq"] = _value
 
         if isinstance(value, list):
-            # Handle list values
             if len(value) > 1:
                 values = value
                 update_filters_with_multiple_values(filters, is_exclude, key, values)
+                continue
             else:
                 value = value[0]
-                update_filters_with_single_value(filters, is_exclude, key, value)
+
+        if "," in value:
+            values = [v.strip() for v in value.split(",") if v.strip()]
+            update_filters_with_multiple_values(filters, is_exclude, key, values)
         else:
-            # Handle string value
-            if "," in value:
-                values = [v.strip() for v in value.split(",") if v.strip()]
-                update_filters_with_multiple_values(filters, is_exclude, key, values)
-            else:
-                update_filters_with_single_value(filters, is_exclude, key, value)
+            update_filters_with_single_value(filters, is_exclude, key, value)
 
     # Log the final filters
     logger.info(f"Extracted filters: {filters}")

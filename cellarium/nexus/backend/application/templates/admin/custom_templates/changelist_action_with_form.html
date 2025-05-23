@@ -5,25 +5,25 @@
 {% block breadcrumbs %}{% endblock %}
 
 {% block extrahead %}
-{{ block.super }}
-<script src="{% url 'admin:jsi18n' %}"></script>
-{{ form.media }}
+  {{ block.super }}
+  <script src="{% url 'admin:jsi18n' %}"></script>
+  {{ form.media }}
 {% endblock %}
 
 {% block content %}
-<form action="" method="post" novalidate enctype="multipart/form-data">
+  <form action="" method="post" novalidate enctype="multipart/form-data">
     <div class="aligned border border-base-200 mb-8 rounded pt-3 px-3 shadow-sm dark:border-base-800">
-        {% csrf_token %}
+      {% csrf_token %}
 
-        {% for field in form %}
+      {% for field in form %}
         {% include "unfold/helpers/field.html" with field=field %}
-        {% endfor %}
+      {% endfor %}
     </div>
 
     <div class="flex justify-end">
-        {% component "unfold/components/button.html" with submit=1 %}
+      {% component "unfold/components/button.html" with submit=1 %}
         {{ submit_button_title }}
-        {% endcomponent %}
+      {% endcomponent %}
     </div>
-</form>
+  </form>
 {% endblock %}

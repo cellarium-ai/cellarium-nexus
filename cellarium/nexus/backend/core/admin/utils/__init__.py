@@ -1,1 +1,1 @@
-from cellarium.nexus.backend.core.admin.utils.caching_utils import get_cached_count  # noqa
+from cellarium.nexus.backend.core.admin.utils.caching_utils import get_cached_count_bq  # noqa
