@@ -26,9 +26,8 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - id: checkout
-      name: Checkout
-      uses: actions/checkout@v4
+    # Note: Checkout is intentionally omitted in this composite action.
+    # The caller workflow is responsible for running actions/checkout@v4.
 
     - id: get-dockerfile
       name: Get Dockerfile
