@@ -26,9 +26,8 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - id: checkout
-      name: Checkout
-      uses: actions/checkout@v4
+    # Note: Checkout is intentionally omitted in this composite action.
+    # The caller workflow is responsible for running actions/checkout@v4.
 
     - id: get-dockerfile
       name: Get Dockerfile
@@ -56,6 +55,14 @@ runs:
         username: oauth2accesstoken
         password: ${{ steps.google-login.outputs.access_token }}
 
+    - id: compute-latest-tag
+      name: Compute optional latest tag
+      run: |
+        if [[ "${{ inputs.add-latest-tag }}" == "true" ]]; then
+          echo "LATEST_TAG=${{ inputs.image-name }}:latest" >> $GITHUB_ENV
+        fi
+      shell: bash
+
     - id: docker-push
       name: Create and push Nexus images in Google Artifact Registry
       uses: docker/build-push-action@v5
@@ -64,7 +71,7 @@ runs:
         file: ./deploy/${{ env.DOCKERFILE }}
         tags: |
           ${{ inputs.image-name }}:${{ inputs.image-tag }}
-          ${{ inputs.add-latest-tag && format('{0}:{1}', inputs.image-name, 'latest') || ''}}
+          ${{ env.LATEST_TAG }}
 
     - id: log-information
       name: Log image information
