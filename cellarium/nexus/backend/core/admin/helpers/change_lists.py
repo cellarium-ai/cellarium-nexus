@@ -35,17 +35,3 @@ class BigQueryCountPaginator(Paginator):
     def page(self, number):
         # Return an empty page
         return super().page(1)
-
-
-# TODO: Remove this class if not needed
-class BigQueryChangeList(ChangeList):
-    def get_results(self, request):
-        # Instantiate your paginator only once
-        self.paginator = self.model_admin.get_paginator(request, self.queryset, self.list_per_page)
-
-        self.result_count = self.paginator.count
-        self.full_result_count = self.result_count
-
-        self.result_list = list(self.paginator.page(self.page_num + 1).object_list)
-        self.can_show_all = self.result_count <= self.list_max_show_all
-        self.multi_page = self.result_count > self.list_per_page

@@ -13,6 +13,7 @@ from cellarium.nexus.backend.cell_management.models import BigQueryDataset
 logger = logging.getLogger(__name__)
 
 
+# TODO: Revision if it needs to be used and remove if not
 def extract_filters_from_django_admin_request(
     request: HttpRequest, dataset_filter_key: str = "bigquery_dataset__id__exact"
 ) -> tuple[dict[str, Any], BigQueryDataset | None]:
