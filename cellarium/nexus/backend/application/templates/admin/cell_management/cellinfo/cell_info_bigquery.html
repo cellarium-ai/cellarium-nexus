@@ -22,31 +22,34 @@
       <h1 class="mb-4 text-2xl font-bold"> Cell Omics Data </h1>
 
       <!-- Dataset selector (mocked) -->
-      <div class="mb-8">
-        <div id="dataset-selector" class="flex flex-wrap gap-4 justify-start max-h-80 overflow-y-auto">
+      <div class="mb-6">
+        <div id="dataset-selector" class="flex flex-wrap gap-3 justify-start max-h-80 overflow-y-auto">
           {% for ds in datasets %}
-            {% if ds == selected_dataset %}
+            {% if ds.name == selected_dataset %}
               <button
                 type="button"
-                class="dataset-card flex h-24 w-auto items-center justify-center rounded-md px-4 text-center font-medium shadow-sm border border-primary-600 bg-primary-50 text-primary-800 ring-1 ring-primary-600 dark:bg-primary-900/20 dark:text-primary-300"
+                class="dataset-card flex w-auto items-center justify-center rounded-lg px-4 py-2 text-center font-medium shadow-sm border border-primary-600 bg-primary-50 text-primary-800 ring-1 ring-primary-600 dark:bg-primary-900/20 dark:text-primary-300"
                 aria-selected="true"
-                data-dataset="{{ ds }}"
+                data-dataset="{{ ds.name }}"
+                data-description="{{ ds.description|default:'' }}"
               >
-                {{ ds }}
+                {{ ds.name }}
               </button>
             {% else %}
               <button
                 type="button"
-                class="dataset-card flex h-24 w-auto items-center justify-center rounded-md px-4 text-center font-medium shadow-sm border border-base-200 hover:border-primary-400 dark:border-base-800 dark:hover:border-primary-600"
+                class="dataset-card flex w-auto items-center justify-center rounded-lg px-4 py-2 text-center font-medium shadow-sm border border-base-200 hover:border-primary-400 dark:border-base-800 dark:hover:border-primary-600"
                 aria-selected="false"
-                data-dataset="{{ ds }}"
+                data-dataset="{{ ds.name }}"
+                data-description="{{ ds.description|default:'' }}"
               >
-                {{ ds }}
+                {{ ds.name }}
               </button>
-
             {% endif %}
           {% endfor %}
         </div>
+        <p id="selected-dataset-description" class="mt-2 text-sm text-base-500 dark:text-base-400"></p>
+        <button id="dataset-desc-toggle" type="button" class="inline-flex items-center gap-1 bg-transparent border-0 p-0">Show more</button>
       </div>
 
       {# Include filters block here #}
@@ -85,6 +88,7 @@
   <script src="{% static 'admin/cell_management/cellinfo/js/cell_info.js' %}"></script>
   <script src="{% static 'admin/cell_management/cellinfo/js/filters.constants.js' %}"></script>
   <script src="{% static 'admin/cell_management/cellinfo/js/filters.meta.js' %}"></script>
+  <script src="{% static 'admin/cell_management/cellinfo/js/filters.suggestions.js' %}"></script>
   <script src="{% static 'admin/cell_management/cellinfo/js/filters.select2.js' %}"></script>
   <script src="{% static 'admin/cell_management/cellinfo/js/filters.utils.js' %}"></script>
   <script src="{% static 'admin/cell_management/cellinfo/js/filters.widgets.js' %}"></script>

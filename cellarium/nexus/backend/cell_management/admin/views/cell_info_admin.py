@@ -44,7 +44,10 @@ class CellInfoAdminView(generic.TemplateView):
 
         # Load datasets from the database
         bq_datasets_qs = cell_models.BigQueryDataset.objects.all().order_by("name")
-        datasets: list[str] = [ds.name for ds in bq_datasets_qs]
+        datasets_list: list[dict[str, str]] = [
+            {"name": ds.name, "description": ds.description or ""} for ds in bq_datasets_qs
+        ]
+        datasets: list[str] = [ds["name"] for ds in datasets_list]
 
         # Choose a default selection: use singleton default if present, else first
         default_ds_obj = bq_datasets_qs.get_default_dataset() if hasattr(bq_datasets_qs, "get_default_dataset") else None
@@ -86,7 +89,7 @@ class CellInfoAdminView(generic.TemplateView):
         formset = FilterRowFormSet(prefix="filters")
 
         context.update({
-            "datasets": datasets,
+            "datasets": datasets_list,
             "selected_dataset": selected_dataset,
             "dataset_counts": dataset_counts,
             "filters_formset": formset,
@@ -230,3 +233,60 @@ def cellinfo_filters_suggest(request):
     truncated = len(candidates) > len(suggestions)
 
     return http_JsonResponse(data={"suggestions": suggestions, "truncated": truncated})
+
+
+@http_decorators.require_GET
+def cellinfo_filters_suggestions_all(request):
+    """
+    Return mocked full suggestions per dataset for all string fields.
+
+    :param request: The HTTP request with query parameter ``dataset``.
+
+    :raise: None
+
+    :return: A JSON response mapping field key to list of suggestions.
+    """
+    dataset = (request.GET.get("dataset") or "").strip()
+
+    # Base vocab shared across datasets
+    base_vocab = {
+        "cell_type": [
+            "T cell",
+            "T regulatory cell",
+            "B cell",
+            "Neuron",
+            "Astrocyte",
+            "Macrophage",
+            "Endothelial cell",
+            "Oligodendrocyte",
+            "Microglia",
+            "Epithelial cell",
+        ],
+        "assay": [
+            "10x",
+            "smart-seq",
+            "Drop-seq",
+            "microwell-seq",
+            "BD Rhapsody",
+            "Seq-Well",
+            "sci-RNA-seq",
+        ],
+    }
+
+    # Mock dataset-specific variation: deterministically shuffle/extend based on dataset name
+    def vary(items: list[str], seed: int) -> list[str]:
+        # Simple deterministic variation without importing random
+        items2 = list(items)
+        if not items2:
+            return items2
+        rot = seed % len(items2)
+        varied = items2[rot:] + items2[:rot]
+        # extend with a couple of dataset-tagged items for demonstration
+        tag = dataset or "dataset"
+        extra = [f"{tag} extra {i+1}" for i in range(3)]
+        return varied + extra
+
+    seed = abs(hash(dataset)) if dataset else 0
+    data = {k: vary(v, seed) for k, v in base_vocab.items()}
+
+    return http_JsonResponse(data={"dataset": dataset, "suggestions": data})

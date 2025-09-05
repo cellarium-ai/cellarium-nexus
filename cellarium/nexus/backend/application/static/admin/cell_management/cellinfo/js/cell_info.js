@@ -14,6 +14,8 @@
     if (!selector) return;
 
     const label = document.getElementById('selected-dataset-label');
+    const descEl = document.getElementById('selected-dataset-description');
+    const descToggle = document.getElementById('dataset-desc-toggle');
     const countEl = document.getElementById('cell-count');
 
     let counts = {};
@@ -30,6 +32,13 @@
     const selectedClassName = initialSelected ? initialSelected.className : '';
     const unselectedClassName = initialUnselected ? initialUnselected.className : '';
 
+    function needsToggle(el) {
+      if (!el) return false;
+      if (!el.textContent || !el.textContent.trim()) return false;
+      // If content overflows the element's current box, we need a toggle
+      return el.scrollHeight > el.clientHeight + 1; // allow for sub-pixel rounding
+    }
+
     function select(btn) {
       const cards = selector.querySelectorAll('.dataset-card');
       cards.forEach(function (card) {
@@ -40,12 +49,29 @@
         }
       });
       const ds = btn && btn.dataset ? btn.dataset.dataset : null;
+      const desc = btn && btn.dataset ? (btn.dataset.description || '') : '';
       if (label && ds) label.textContent = ds;
+      if (descEl) {
+        descEl.textContent = desc;
+        descEl.classList.remove('expanded');
+      }
+      if (descToggle) {
+        descToggle.textContent = 'Show more';
+        // Defer measurement until next frame to ensure layout updated
+        requestAnimationFrame(function () {
+          const show = needsToggle(descEl);
+          descToggle.style.visibility = show ? 'visible' : 'hidden';
+        });
+      }
       if (countEl && ds && counts && Object.prototype.hasOwnProperty.call(counts, ds)) {
         countEl.textContent = fmt(counts[ds]);
       }
       // Reset filters on dataset change
       try {
+        // Preload suggestions for this dataset so value widgets initialize with local data
+        if (window.CellInfoFilters && typeof window.CellInfoFilters.readySuggestions === 'function') {
+          window.CellInfoFilters.readySuggestions(ds);
+        }
         if (window.CellInfoFilters && typeof window.CellInfoFilters.resetFilters === 'function') {
           window.CellInfoFilters.resetFilters();
         }
@@ -57,6 +83,20 @@
       if (!btn) return;
       select(btn);
     });
+
+    if (descToggle && descEl) {
+      descToggle.addEventListener('click', function () {
+        const isExpanded = descEl.classList.toggle('expanded');
+        descToggle.textContent = isExpanded ? 'Show less' : 'Show more';
+        // If collapsed again and text actually fits without truncation, hide the toggle
+        if (!isExpanded) {
+          requestAnimationFrame(function () {
+            const show = descEl.scrollHeight > descEl.clientHeight + 1;
+            descToggle.style.visibility = show ? 'visible' : 'hidden';
+          });
+        }
+      });
+    }
 
     if (initialSelected) select(initialSelected);
   }

@@ -121,10 +121,12 @@
     console.debug('[Cell Info Filters][widgets] appended value widget', { index, type, fieldKey });
 
     if (type === 'categorical') {
+      // Let specialized initializer attach Select2 with local suggestions
       ns.configureCategoricalSelect(input, fieldMeta || {}, fieldKey);
+    } else {
+      // Initialize Unfold/Select2 for other input types (field/operator/value singles)
+      ns.initSelect2IfAvailable(cell);
     }
-
-    ns.initSelect2IfAvailable(cell);
     console.debug('[Cell Info Filters][widgets] initialized select2 if available for value cell', { index, type });
   };
 

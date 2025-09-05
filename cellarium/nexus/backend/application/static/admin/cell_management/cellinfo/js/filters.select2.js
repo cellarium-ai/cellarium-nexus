@@ -73,35 +73,31 @@
     selectEl.classList.add('unfold-admin-autocomplete', 'admin-autocomplete');
     selectEl.setAttribute('data-theme', 'admin-autocomplete');
 
-    const minChars = typeof fieldMeta.suggest_min_chars === 'number' ? fieldMeta.suggest_min_chars : 1;
     const $ = window.jQuery || (window.django && window.django.jQuery);
-
     if ($ && typeof $(selectEl).select2 === 'function') {
-      $(selectEl).select2({
-        width: 'style',
-        multiple: true,
-        ajax: {
-          transport: function (params, success, failure) {
-            const term = params.data.term || '';
-            if (term.length < minChars) {
-              success({ results: [] });
-              return;
-            }
-            const url = ns.URLS.suggest;
-            const ds = ns.getDataset();
-            const qs = new URLSearchParams({ field: fieldKey, q: term, dataset: ds });
-            fetch(url + '?' + qs.toString(), { credentials: 'same-origin' })
-              .then(r => r.json())
-              .then(data => {
-                const results = (data.suggestions || []).map(v => ({ id: v, text: v }));
-                success({ results });
-              })
-              .catch(failure);
+      // Ensure suggestions for current dataset are loaded
+      ns.readySuggestions(ns.getDataset()).then(function () {
+        $(selectEl).select2({
+          width: 'style',
+          multiple: true,
+          ajax: {
+            transport: function (params, success /*, failure */) {
+              const term = (params && params.data && params.data.term) ? String(params.data.term) : '';
+              const all = ns.getSuggestions(fieldKey, ns.getDataset());
+              const t = term.toLowerCase();
+              const filtered = t
+                ? all.filter(v => String(v).toLowerCase().includes(t))
+                : all.slice();
+              const limited = filtered.slice(0, 40);
+              const results = limited.map(v => ({ id: v, text: v }));
+              success({ results });
+            },
+            processResults: function (data) { return data; },
           },
-          processResults: function (data) { return data; },
-        },
-        tags: false,
-        allowClear: false,
+          minimumInputLength: 0,
+          allowClear: false,
+          tags: false,
+        });
       });
     }
   };

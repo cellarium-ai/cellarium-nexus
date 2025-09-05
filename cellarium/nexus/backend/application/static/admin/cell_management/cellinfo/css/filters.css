@@ -99,3 +99,38 @@ html.dark #filters-block .filter-remove:hover {
 #filters-block #filters-rows .filter-row + .filter-row {
   margin-top: 0.5rem; /* ~ space-y-2 */
 }
+
+/* Dataset selector styles */
+#dataset-selector .dataset-card {
+  min-height: 2.75rem; /* ensure tap target but not too tall */
+  border-radius: 0.75rem; /* rounded-lg */
+  white-space: nowrap; /* keep names on one line */
+}
+
+/* Selected dataset description with truncation and expansion */
+#selected-dataset-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 1; /* show one line by default */
+  line-clamp: 1; /* standard property for compatibility */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+}
+
+#selected-dataset-description.expanded {
+  display: block;
+  -webkit-line-clamp: initial;
+  line-clamp: initial; /* standard property for compatibility */
+  -webkit-box-orient: initial;
+  overflow: visible;
+}
+
+#dataset-desc-toggle {
+  margin-top: 0.25rem;
+  font-size: 0.75rem; /* text-xs */
+  color: rgb(var(--color-primary-600));
+  visibility: hidden; /* JS will set to visible if truncation occurs */
+}
+html.dark #dataset-desc-toggle {
+  color: rgb(var(--color-primary-400));
+}
