@@ -24,6 +24,22 @@ def _inject_custom_admin_urls(orig_get_urls):
                 admin.site.admin_view(cell_info_admin_module.CellInfoAdminView.as_view()),
                 name="cell_management_cellinfo_changelist",
             ),
+            # Mocked filter endpoints for the Cell Info page
+            path(
+                "cell_management/cellinfo/filters/fields/",
+                admin.site.admin_view(cell_info_admin_module.cellinfo_filters_fields),
+                name="cell_management_cellinfo_filters_fields",
+            ),
+            path(
+                "cell_management/cellinfo/filters/count/",
+                admin.site.admin_view(cell_info_admin_module.cellinfo_filters_count),
+                name="cell_management_cellinfo_filters_count",
+            ),
+            path(
+                "cell_management/cellinfo/filters/suggest/",
+                admin.site.admin_view(cell_info_admin_module.cellinfo_filters_suggest),
+                name="cell_management_cellinfo_filters_suggest",
+            ),
         ]
         return custom_urls + orig_get_urls()
 

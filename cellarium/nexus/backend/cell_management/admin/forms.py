@@ -10,7 +10,7 @@ from unfold.widgets import (
     UnfoldAdminSelectWidget,
     UnfoldAdminTextInputWidget,
 )
-
+from unfold import widgets as unfold_widgets
 from cellarium.nexus.backend.cell_management.admin.utils import check_curriculum_exists
 from cellarium.nexus.backend.cell_management.models import BigQueryDataset, FeatureSchema
 from cellarium.nexus.backend.curriculum.models import Curriculum
@@ -295,3 +295,148 @@ class ExtractCurriculumForm(forms.Form):
         """
         columns = self.cleaned_data.get("metadata_extra_columns")
         return columns if columns else []
+
+
+class FilterRowForm(forms.Form):
+    """
+    Render a single filter row for the Cell Info admin page.
+
+    :param args: Positional arguments forwarded to ``forms.Form``
+    :param kwargs: Keyword arguments forwarded to ``forms.Form``
+
+    :raise: None
+
+    :return: None
+    """
+
+    # Field choices and operator choices are provided at runtime through ``__init__``
+    field = forms.ChoiceField(
+        label=_("Field"),
+        choices=(),
+        widget=UnfoldAdminSelectWidget(
+            attrs={
+                "style": "width: 100%;",
+                "data-theme": "admin-autocomplete",
+                "class": "unfold-admin-autocomplete admin-autocomplete",
+            }
+        ),
+        required=True,
+    )
+    operator = forms.ChoiceField(
+        label=_("Operator"),
+        choices=(),
+        widget=UnfoldAdminSelectWidget(
+            attrs={
+                "style": "width: 100%;",
+                "data-theme": "admin-autocomplete",
+                "class": "unfold-admin-autocomplete admin-autocomplete",
+            }
+        ),
+        required=True,
+    )
+    value = forms.CharField(
+        label=_("Value"),
+        widget=unfold_widgets.UnfoldAdminTextInputWidget(
+            attrs={
+                "style": "width: 100%;",
+                "placeholder": "Enter value",
+            }
+        ),
+        required=True,
+    )
+
+    # Prototype-only fields to expose proper Unfold widgets and Media for cloning in JS.
+    # These are not validated (required=False) and are rendered hidden in the template.
+    value_text = forms.CharField(
+        label=_("Value (text)"),
+        widget=unfold_widgets.UnfoldAdminTextInputWidget(
+            attrs={
+                "style": "width: 100%;",
+                "class": "vTextField w-full h-9 px-3 py-2 rounded border border-base-200 dark:border-base-700 bg-white dark:bg-base-900 text-base-700 dark:text-base-200 placeholder-base-400 focus:outline-none focus:ring focus:ring-primary-300 focus:border-primary-600 shadow-sm appearance-none",
+                "placeholder": "Enter value",
+            }
+        ),
+        required=False,
+    )
+
+    value_categorical = forms.ChoiceField(
+        label=_("Value (categorical)"),
+        choices=(),
+        widget=UnfoldAdminSelectWidget(
+            attrs={
+                "style": "width: 100%;",
+                "data-theme": "admin-autocomplete",
+                "class": "unfold-admin-autocomplete admin-autocomplete",
+            }
+        ),
+        required=False,
+    )
+
+    value_boolean = forms.ChoiceField(
+        label=_("Value (boolean)"),
+        choices=(
+            ("", "Select value"),
+            ("true", "true"),
+            ("false", "false"),
+        ),
+        widget=UnfoldAdminSelectWidget(
+            attrs={
+                "style": "width: 100%;",
+                "data-theme": "admin-autocomplete",
+                "class": "unfold-admin-autocomplete admin-autocomplete",
+            }
+        ),
+        required=False,
+    )
+
+    def __init__(self, *args, **kwargs):
+        """
+        Initialize the filter row form with dynamic choices.
+
+        ``field`` choices come from ``kwargs['field_choices']`` if provided, otherwise remain empty.
+        ``operator`` choices default to a union of supported operators unless ``operator_choices`` is provided.
+
+        :param args: Positional arguments
+        :param kwargs: Keyword arguments; may include ``field_choices`` and ``operator_choices``
+
+        :raise: None
+
+        :return: None
+        """
+        field_choices = kwargs.pop("field_choices", ())
+        operator_choices = kwargs.pop("operator_choices", ())
+        super().__init__(*args, **kwargs)
+
+        if field_choices:
+            self.fields["field"].choices = field_choices
+
+        if operator_choices:
+            self.fields["operator"].choices = operator_choices
+        else:
+            # Provide a sensible default union of operators used in the UI
+            default_ops = [
+                ("eq", _("equals")),
+                ("not_eq", _("not equals")),
+                ("in", _("in")),
+                ("not_in", _("not in")),
+                ("gt", ">"),
+                ("gte", "\u2265"),
+                ("lt", "<"),
+                ("lte", "\u2264"),
+            ]
+            self.fields["operator"].choices = default_ops
+
+    class Media:
+        js = (
+            "admin/js/vendor/jquery/jquery.js",
+            "admin/js/vendor/select2/select2.full.js",
+            "admin/js/jquery.init.js",
+            "unfold/js/select2.init.js",
+        )
+        css = {
+            "screen": (
+                "admin/css/vendor/select2/select2.css",
+                "admin/css/autocomplete.css",
+            )
+        }
+
