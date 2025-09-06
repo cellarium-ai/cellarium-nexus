@@ -3,9 +3,6 @@
   const ns = window.CellInfoFilters;
 
   ns.URLS = {
-    fields: '/admin/cell_management/cellinfo/filters/fields/',
-    suggest: '/admin/cell_management/cellinfo/filters/suggest/',
-    suggestions_all: '/admin/cell_management/cellinfo/filters/suggestions_all/',
     count: '/admin/cell_management/cellinfo/filters/count/',
   };
 

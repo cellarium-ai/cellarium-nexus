@@ -96,9 +96,14 @@ CACHES = {
 }
 
 # Cache TTL values (in seconds)
-# 30 days = 60 seconds * 60 minutes * 24 hours * 30 days
-FILTER_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30
-COUNT_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30
+FILTER_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30 # 30 days
+COUNT_CACHE_TTL_SECONDS = 60 * 60 * 7 # 7 days
+# Suggestions cache TTL (defaults to 1 day)
+SUGGEST_CACHE_TTL_SECONDS = 60 * 60 * 24
+
+# Threshold for treating string columns as categorical for suggestions
+# Columns with distinct value count <= this limit are considered categorical
+FILTERS_CATEGORICAL_UNIQUE_LIMIT = 2000
 
 
 # Authentication and Security

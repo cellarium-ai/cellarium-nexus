@@ -9,12 +9,20 @@ from django.http import JsonResponse as http_JsonResponse
 import django.views.decorators.http as http_decorators
 import django.views.generic as generic
 import google.api_core as google_api_core
+from django.conf import settings
+import builtins
+import decimal as py_decimal
+import types as py_types
 import json as py_json
 import typing as t
 
 from cellarium.nexus.backend.cell_management import models as cell_models
 from cellarium.nexus.backend.cell_management.admin.utils import bigquery_utils
 from cellarium.nexus.backend.cell_management.admin import forms as admin_forms
+from cellarium.nexus.backend.cell_management.admin import schemas as admin_schemas
+from cellarium.nexus.backend.cell_management.admin.views.utils import filters as filters_utils
+from cellarium.nexus.omics_datastore.bq_avro_schemas import cell_management as bq_schemas
+from cellarium.nexus.omics_datastore.bq_ops import constants as bq_constants
 
 
 class CellInfoAdminView(generic.TemplateView):
@@ -50,7 +58,9 @@ class CellInfoAdminView(generic.TemplateView):
         datasets: list[str] = [ds["name"] for ds in datasets_list]
 
         # Choose a default selection: use singleton default if present, else first
-        default_ds_obj = bq_datasets_qs.get_default_dataset() if hasattr(bq_datasets_qs, "get_default_dataset") else None
+        default_ds_obj = (
+            bq_datasets_qs.get_default_dataset() if hasattr(bq_datasets_qs, "get_default_dataset") else None
+        )
         selected_dataset = default_ds_obj.name if default_ds_obj else (datasets[0] if datasets else "")
 
         # Compute counts with caching; handle BigQuery errors gracefully
@@ -69,10 +79,8 @@ class CellInfoAdminView(generic.TemplateView):
             )
 
         # Build server-rendered filters formset
-        fields_meta = _get_cellinfo_filters_fields()
-        field_choices: list[tuple[str, str]] = [
-            (f["key"], f.get("label") or f["key"]) for f in fields_meta
-        ]
+        fields_meta = _get_cellinfo_filters_fields(dataset=selected_dataset)
+        field_choices: list[tuple[str, str]] = [(f["key"], f.get("label") or f["key"]) for f in fields_meta]
 
         class _BaseFilterFormSet(dj_forms.formsets.BaseFormSet):
             def get_form_kwargs(self_inner, index: int) -> dict:
@@ -88,18 +96,67 @@ class CellInfoAdminView(generic.TemplateView):
         )
         formset = FilterRowFormSet(prefix="filters")
 
-        context.update({
-            "datasets": datasets_list,
-            "selected_dataset": selected_dataset,
-            "dataset_counts": dataset_counts,
-            "filters_formset": formset,
-            "filters_fields_meta": fields_meta,
-            **admin.site.each_context(self.request),
-        })
+        # Precompute across all datasets for instant switching
+        precomputed_categorical_all: dict[str, list[str]] = {}
+        precomputed_suggestions_all: dict[str, dict[str, list[str]]] = {}
+        try:
+            if selected_dataset:
+                # Determine string columns from schema
+                schema_fields = bq_schemas.CellInfoBQAvroSchema.model_fields
+                type_hints = t.get_type_hints(bq_schemas.CellInfoBQAvroSchema, include_extras=True)
+                string_columns: list[str] = []
+                for key, field_info in schema_fields.items():
+                    if key == "metadata_extra" or key.endswith("_ontology_term_id"):
+                        continue
+                    anno = type_hints.get(key, field_info.annotation)
+                    base = filters_utils.resolve_base_type(anno)
+                    if base in (str,):
+                        string_columns.append(key)
+
+                # Compute per-dataset maps
+                for ds in datasets:
+                    if not ds:
+                        continue
+                    cat = manager.get_cached_categorical_columns_bq(
+                        dataset_name=ds,
+                        table_name=bq_constants.BQ_CELL_INFO_TABLE_NAME,
+                        distinct_threshold=settings.FILTERS_CATEGORICAL_UNIQUE_LIMIT,
+                    )
+                    precomputed_categorical_all[ds] = sorted(list(cat))
+                    ds_map: dict[str, list[str]] = {}
+                    for col in string_columns:
+                        if col not in cat:
+                            continue
+                        vals = manager.get_cached_distinct_values_bq(
+                            dataset_name=ds,
+                            column_name=col,
+                            table_name=bq_constants.BQ_CELL_INFO_TABLE_NAME,
+                            limit=settings.FILTERS_CATEGORICAL_UNIQUE_LIMIT,
+                        )
+                        if vals:
+                            ds_map[col] = vals
+                    precomputed_suggestions_all[ds] = ds_map
+        except Exception:
+            # Do not block page rendering if suggestions warm-up fails
+            precomputed_categorical_all = {}
+            precomputed_suggestions_all = {}
+
+        context.update(
+            {
+                "datasets": datasets_list,
+                "selected_dataset": selected_dataset,
+                "dataset_counts": dataset_counts,
+                "filters_formset": formset,
+                "filters_fields_meta": fields_meta,
+                "precomputed_categorical_columns_all": precomputed_categorical_all,
+                "precomputed_suggestions_all": precomputed_suggestions_all,
+                **admin.site.each_context(self.request),
+            }
+        )
         return context
 
 
-def _get_cellinfo_filters_fields() -> list[dict]:
+def _get_cellinfo_filters_fields(*, dataset: str | None = None) -> list[dict]:
     """
     Return filters metadata used by the server-rendered formset and API endpoints.
 
@@ -107,55 +164,64 @@ def _get_cellinfo_filters_fields() -> list[dict]:
 
     :return: List of field metadata dictionaries
     """
-    return [
-        {
-            "key": "cell_type",
-            "label": "Cell Type",
-            "type": "string",
-            "operators": ["eq", "not_eq", "in", "not_in"],
-            "suggest": True,
-            "suggest_mode": "prefix",
-            "suggest_min_chars": 2,
-        },
-        {
-            "key": "assay",
-            "label": "Assay",
-            "type": "string",
-            "operators": ["eq", "in"],
-            "suggest": True,
-            "suggest_mode": "prefix",
-            "suggest_min_chars": 2,
-        },
-        {
-            "key": "total_mrna_umis",
-            "label": "Total mRNA UMIs",
-            "type": "number",
-            "operators": ["eq", "gt", "gte", "lt", "lte"],
-            "suggest": False,
-        },
-        {
-            "key": "is_high_quality",
-            "label": "High Quality",
-            "type": "boolean",
-            "operators": ["eq", "not_eq"],
-            "suggest": False,
-        },
-    ]
+    # Dynamically build fields from CellInfoBQAvroSchema, excluding metadata_extra and ontology term ids
+    schema_fields = bq_schemas.CellInfoBQAvroSchema.model_fields
+    type_hints = t.get_type_hints(bq_schemas.CellInfoBQAvroSchema, include_extras=True)
+    exclude_keys = {"metadata_extra"}
+    results: list[dict] = []
 
+    # Determine which string columns are categorical based on distinct count per dataset
+    # Use cached manager instead of querying directly from the view
+    categorical_columns: set[str] = set()
+    if dataset:
+        manager = bigquery_utils.BigQueryCachedDataManager()
+        categorical_columns = manager.get_cached_categorical_columns_bq(
+            dataset_name=dataset,
+            table_name=bq_constants.BQ_CELL_INFO_TABLE_NAME,
+            distinct_threshold=settings.FILTERS_CATEGORICAL_UNIQUE_LIMIT,
+        )
 
-@http_decorators.require_GET
-def cellinfo_filters_fields(request):
-    """
-    Return filters metadata for the filter builder UI.
+    for key, field_info in schema_fields.items():
+        if key in exclude_keys or key.endswith("_ontology_term_id"):
+            continue
 
-    :param request: The HTTP request.
+        # Determine type and operators
+        anno = type_hints.get(key, field_info.annotation)
+        ftype: str
+        operators: list[str]
+        suggest: bool = False
 
-    :raise: None
+        base = filters_utils.resolve_base_type(anno)
 
-    :return: A JSON response with fields metadata including operators and suggestion hints.
-    """
-    fields = _get_cellinfo_filters_fields()
-    return http_JsonResponse(data={"fields": fields})
+        match base:
+            # --- scalar primitives (note: bool is a subclass of int; handle it first)
+            case builtins.bool:
+                ftype = "boolean"
+                operators = ["eq", "not_eq"]
+            case builtins.float | py_decimal.Decimal | builtins.int:
+                ftype = "number"
+                operators = ["eq", "gt", "gte", "lt", "lte"]
+            case builtins.str:
+                ftype = "string"
+                operators = ["eq", "not_eq", "in", "not_in"]
+                # suggest only for categorical string columns (<= limit distinct values)
+                suggest = key in categorical_columns if dataset else False
+            case _:
+                # Skip unsupported/complex types
+                continue
+
+        results.append(
+            {
+                "key": key,
+                "label": (field_info.title or key.replace("_", " ").title()),
+                "type": ftype,
+                "operators": operators,
+                "suggest": suggest,
+                **({"suggest_mode": "prefix", "suggest_min_chars": 2} if suggest else {}),
+            }
+        )
+
+    return results
 
 
 @http_decorators.require_POST
@@ -170,123 +236,23 @@ def cellinfo_filters_count(request):
     :return: A JSON response containing a mocked count integer.
     """
     try:
-        payload: t.Dict[str, t.Any] = py_json.loads(request.body or b"{}")
+        raw: t.Dict[str, t.Any] = py_json.loads(request.body or b"{}")
+        parsed = admin_schemas.FiltersPayload(**raw)
     except Exception as exc:  # noqa: BLE001 - keep simple for mocked endpoint
         return http_JsonResponse(data={"error": "invalid_json", "detail": str(exc)}, status=400)
 
-    dataset = payload.get("dataset") or ""
-    filters = payload.get("filters") or {}
+    dataset = (parsed.dataset or "").strip()
+    if not dataset:
+        return http_JsonResponse(data={"error": "invalid_dataset", "detail": "Dataset is required."}, status=400)
 
-    # Simple deterministic mock: base on dataset name hash and number of filters
-    base = abs(hash(dataset)) % 10000
-    multiplier = max(1, len(filters) or 1)
-    mocked_count = 50000 + (base // 10) + (multiplier * 123)
+    filter_statements = parsed.to_filter_statements()
+    normalized_filters = filters_utils.normalize_filter_statements(filter_statements=filter_statements)
 
-    return http_JsonResponse(data={"count": mocked_count})
-
-
-@http_decorators.require_GET
-def cellinfo_filters_suggest(request):
-    """
-    Return mocked suggestions for a given string field and query.
-
-    :param request: The HTTP request with query parameters: field, dataset, q, limit, filters.
-
-    :raise: None
-
-    :return: A JSON response containing a list of suggestion strings and a truncated flag.
-    """
-    field = request.GET.get("field", "")
-    q = (request.GET.get("q", "") or "").strip()
+    manager = bigquery_utils.BigQueryCachedDataManager()
     try:
-        limit = int(request.GET.get("limit", "20"))
-    except ValueError:
-        limit = 20
-    limit = max(1, min(limit, 50))
+        count = manager.get_cached_count_bq(dataset_name=dataset, filters_dict=normalized_filters)
+    except google_api_core.exceptions.GoogleAPICallError as exc:
+        return http_JsonResponse(data={"error": "bigquery_error", "detail": str(exc)}, status=502)
 
-    # Very simple mock dictionary
-    mock_vocab = {
-        "cell_type": [
-            "T cell",
-            "T regulatory cell",
-            "B cell",
-            "Neuron",
-            "Astrocyte",
-            "Macrophage",
-            "Endothelial cell",
-        ],
-        "assay": [
-            "10x",
-            "smart-seq",
-            "Drop-seq",
-            "microwell-seq",
-            "BD Rhapsody",
-        ],
-    }
-
-    candidates = mock_vocab.get(field, [])
-    if q:
-        q_lower = q.lower()
-        candidates = [c for c in candidates if c.lower().startswith(q_lower)]
-
-    suggestions = candidates[:limit]
-    truncated = len(candidates) > len(suggestions)
-
-    return http_JsonResponse(data={"suggestions": suggestions, "truncated": truncated})
-
-
-@http_decorators.require_GET
-def cellinfo_filters_suggestions_all(request):
-    """
-    Return mocked full suggestions per dataset for all string fields.
-
-    :param request: The HTTP request with query parameter ``dataset``.
-
-    :raise: None
-
-    :return: A JSON response mapping field key to list of suggestions.
-    """
-    dataset = (request.GET.get("dataset") or "").strip()
-
-    # Base vocab shared across datasets
-    base_vocab = {
-        "cell_type": [
-            "T cell",
-            "T regulatory cell",
-            "B cell",
-            "Neuron",
-            "Astrocyte",
-            "Macrophage",
-            "Endothelial cell",
-            "Oligodendrocyte",
-            "Microglia",
-            "Epithelial cell",
-        ],
-        "assay": [
-            "10x",
-            "smart-seq",
-            "Drop-seq",
-            "microwell-seq",
-            "BD Rhapsody",
-            "Seq-Well",
-            "sci-RNA-seq",
-        ],
-    }
-
-    # Mock dataset-specific variation: deterministically shuffle/extend based on dataset name
-    def vary(items: list[str], seed: int) -> list[str]:
-        # Simple deterministic variation without importing random
-        items2 = list(items)
-        if not items2:
-            return items2
-        rot = seed % len(items2)
-        varied = items2[rot:] + items2[:rot]
-        # extend with a couple of dataset-tagged items for demonstration
-        tag = dataset or "dataset"
-        extra = [f"{tag} extra {i+1}" for i in range(3)]
-        return varied + extra
-
-    seed = abs(hash(dataset)) if dataset else 0
-    data = {k: vary(v, seed) for k, v in base_vocab.items()}
-
-    return http_JsonResponse(data={"dataset": dataset, "suggestions": data})
+    resp = admin_schemas.CountResponse(count=int(count))
+    return http_JsonResponse(data=resp.model_dump())

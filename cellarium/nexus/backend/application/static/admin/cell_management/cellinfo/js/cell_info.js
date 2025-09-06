@@ -68,10 +68,6 @@
       }
       // Reset filters on dataset change
       try {
-        // Preload suggestions for this dataset so value widgets initialize with local data
-        if (window.CellInfoFilters && typeof window.CellInfoFilters.readySuggestions === 'function') {
-          window.CellInfoFilters.readySuggestions(ds);
-        }
         if (window.CellInfoFilters && typeof window.CellInfoFilters.resetFilters === 'function') {
           window.CellInfoFilters.resetFilters();
         }

@@ -2,6 +2,20 @@
   window.CellInfoFilters = window.CellInfoFilters || {};
   const ns = window.CellInfoFilters;
 
+  // Load precomputed suggestions from the template JSON script tag
+  let PRECOMPUTED_SUGGESTIONS = {};
+  let PRECOMPUTED_SUGGESTIONS_ALL = {};
+  try {
+    const tag = document.getElementById('precomputed-suggestions');
+    if (tag && tag.textContent) {
+      PRECOMPUTED_SUGGESTIONS = JSON.parse(tag.textContent) || {};
+    }
+    const tagAll = document.getElementById('precomputed-suggestions-all');
+    if (tagAll && tagAll.textContent) {
+      PRECOMPUTED_SUGGESTIONS_ALL = JSON.parse(tagAll.textContent) || {};
+    }
+  } catch (_) { /* noop */ }
+
   ns.initSelect2IfAvailable = function (container) {
     try {
       if (typeof window.unfoldInitSelect2 === 'function') {
@@ -75,29 +89,33 @@
 
     const $ = window.jQuery || (window.django && window.django.jQuery);
     if ($ && typeof $(selectEl).select2 === 'function') {
-      // Ensure suggestions for current dataset are loaded
-      ns.readySuggestions(ns.getDataset()).then(function () {
-        $(selectEl).select2({
-          width: 'style',
-          multiple: true,
-          ajax: {
-            transport: function (params, success /*, failure */) {
-              const term = (params && params.data && params.data.term) ? String(params.data.term) : '';
-              const all = ns.getSuggestions(fieldKey, ns.getDataset());
-              const t = term.toLowerCase();
-              const filtered = t
-                ? all.filter(v => String(v).toLowerCase().includes(t))
-                : all.slice();
-              const limited = filtered.slice(0, 40);
-              const results = limited.map(v => ({ id: v, text: v }));
-              success({ results });
-            },
-            processResults: function (data) { return data; },
+      // Resolve the suggestions map per current dataset if ALL is present
+      function resolveDsMap() {
+        const ds = (ns.getDataset && ns.getDataset()) || '';
+        if (PRECOMPUTED_SUGGESTIONS_ALL && ds && PRECOMPUTED_SUGGESTIONS_ALL[ds]) {
+          return PRECOMPUTED_SUGGESTIONS_ALL[ds] || {};
+        }
+        return PRECOMPUTED_SUGGESTIONS || {};
+      }
+      $(selectEl).select2({
+        width: 'style',
+        multiple: true,
+        ajax: {
+          transport: function (params, success /*, failure */) {
+            const term = (params && params.data && params.data.term) ? String(params.data.term) : '';
+            const DS_MAP = resolveDsMap();
+            const arr = (DS_MAP && DS_MAP[fieldKey]) ? DS_MAP[fieldKey] : [];
+            const t = term.toLowerCase();
+            const filtered = t ? arr.filter(v => String(v).toLowerCase().includes(t)) : arr.slice();
+            const limited = filtered.slice(0, 100);
+            const results = limited.map(v => ({ id: v, text: v }));
+            success({ results });
           },
-          minimumInputLength: 0,
-          allowClear: false,
-          tags: false,
-        });
+          processResults: function (data) { return data; },
+        },
+        minimumInputLength: 0,
+        allowClear: false,
+        tags: false,
       });
     }
   };

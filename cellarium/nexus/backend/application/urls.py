@@ -26,24 +26,9 @@ def _inject_custom_admin_urls(orig_get_urls):
             ),
             # Mocked filter endpoints for the Cell Info page
             path(
-                "cell_management/cellinfo/filters/fields/",
-                admin.site.admin_view(cell_info_admin_module.cellinfo_filters_fields),
-                name="cell_management_cellinfo_filters_fields",
-            ),
-            path(
                 "cell_management/cellinfo/filters/count/",
                 admin.site.admin_view(cell_info_admin_module.cellinfo_filters_count),
                 name="cell_management_cellinfo_filters_count",
-            ),
-            path(
-                "cell_management/cellinfo/filters/suggest/",
-                admin.site.admin_view(cell_info_admin_module.cellinfo_filters_suggest),
-                name="cell_management_cellinfo_filters_suggest",
-            ),
-            path(
-                "cell_management/cellinfo/filters/suggestions_all/",
-                admin.site.admin_view(cell_info_admin_module.cellinfo_filters_suggestions_all),
-                name="cell_management_cellinfo_filters_suggestions_all",
             ),
         ]
         return custom_urls + orig_get_urls()

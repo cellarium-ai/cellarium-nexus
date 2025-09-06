@@ -281,3 +281,143 @@ class BigQueryDataOperator:
 
         logger.info(f"Found {count} matching cells.")
         return count
+
+    def get_distinct_count(self, *, table_name: str, column_name: str, dataset: str | None = None) -> int:
+        """
+        Count distinct values for a column in a base table.
+
+        :param table_name: Base table name to query
+        :param column_name: Column to count distinct values for
+        :param dataset: Optional override dataset; defaults to operator's dataset
+
+        :raise google.api_core.exceptions.GoogleAPIError: If query execution fails
+
+        :return: Distinct values count for the column
+        """
+        target_dataset = dataset if dataset else self.dataset
+        template_path = (
+            Path(__file__).parent.parent / "sql_templates" / "general" / "column_distinct_count.sql.mako"
+        )
+        template_data = bq_sql.TemplateData(
+            project=self.project, dataset=target_dataset, table_name=table_name, column_name=column_name
+        )
+        sql = bq_sql.render(str(template_path), template_data)
+        query_job = self.client.query(sql)
+        results = list(query_job.result())
+        return int(results[0][0]) if results else 0
+
+    def get_distinct_values(
+        self, *, table_name: str, column_name: str, limit: int = 1000, dataset: str | None = None
+    ) -> list[str]:
+        """
+        Fetch distinct values for a column in a base table.
+
+        :param table_name: Base table name to query
+        :param column_name: Column to retrieve values for
+        :param limit: Maximum number of values to return
+        :param dataset: Optional override dataset; defaults to operator's dataset
+
+        :raise google.api_core.exceptions.GoogleAPIError: If query execution fails
+
+        :return: List of distinct values
+        """
+        target_dataset = dataset if dataset else self.dataset
+        template_path = (
+            Path(__file__).parent.parent / "sql_templates" / "general" / "column_distinct_values.sql.mako"
+        )
+        template_data = bq_sql.TemplateData(
+            project=self.project,
+            dataset=target_dataset,
+            table_name=table_name,
+            column_name=column_name,
+            limit=limit,
+        )
+        sql = bq_sql.render(str(template_path), template_data)
+        query_job = self.client.query(sql)
+        results = list(query_job.result())
+        return [str(row[0]) for row in results if row[0] is not None]
+
+    def get_categorical_string_columns(
+        self,
+        *,
+        table_name: str,
+        threshold: int,
+        exclude: list[str] | None = None,
+        dataset: str | None = None,
+    ) -> set[str]:
+        """
+        Determine categorical string columns for a base table by distinct count threshold.
+
+        :param table_name: Base table name to analyze
+        :param threshold: Maximum distinct values to consider a column categorical
+        :param exclude: Optional list of column names to skip
+        :param dataset: Optional override dataset; defaults to operator's dataset
+
+        :raise google.api_core.exceptions.GoogleAPIError: If schema or query fails
+
+        :return: Set of column names that are categorical
+        """
+        target_dataset = dataset if dataset else self.dataset
+        exclude_set = set(exclude or [])
+        table_ref = f"{self.project}.{target_dataset}.{table_name}"
+        table = self.client.get_table(table_ref)
+
+        # Collect string columns to evaluate
+        string_columns: list[str] = [
+            f.name for f in table.schema if f.field_type == "STRING" and f.name not in exclude_set
+        ]
+
+        if not string_columns:
+            return set()
+
+        # Use a single query to get distinct counts for all columns
+        counts = self.get_multi_distinct_counts(
+            table_name=table_name, column_names=string_columns, dataset=target_dataset
+        )
+
+        categorical: set[str] = set()
+        for col, cnt in counts.items():
+            if int(cnt) <= threshold:
+                categorical.add(col)
+        return categorical
+
+    def get_multi_distinct_counts(
+        self, *, table_name: str, column_names: list[str], dataset: str | None = None
+    ) -> dict[str, int]:
+        """
+        Count distinct values for multiple columns in a single query.
+
+        :param table_name: Base table name to query
+        :param column_names: List of column names to include in the count
+        :param dataset: Optional override dataset; defaults to operator's dataset
+
+        :raise google.api_core.exceptions.GoogleAPIError: If query execution fails
+
+        :return: Mapping of column name -> distinct count
+        """
+        if not column_names:
+            return {}
+
+        target_dataset = dataset if dataset else self.dataset
+        template_path = (
+            Path(__file__).parent.parent / "sql_templates" / "general" / "multi_column_distinct_counts.sql.mako"
+        )
+        template_data = bq_sql.TemplateData(
+            project=self.project,
+            dataset=target_dataset,
+            table_name=table_name,
+            column_names=column_names,
+        )
+        sql = bq_sql.render(str(template_path), template_data)
+        query_job = self.client.query(sql)
+        results = list(query_job.result())
+        if not results:
+            return {}
+
+        row = results[0]
+        out: dict[str, int] = {}
+        # Aliases are produced as distinct_<column>
+        for col in column_names:
+            alias = f"distinct_{col}"
+            out[col] = int(row[alias]) if alias in row else int(row.get(alias, 0))
+        return out

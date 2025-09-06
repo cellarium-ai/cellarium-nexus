@@ -7,6 +7,19 @@
 
   ns.readyFieldsMeta = function () {
     if (_fieldsPromise) return _fieldsPromise;
+    // Prefer embedded JSON from the template for zero-latency init
+    try {
+      const script = document.getElementById('filters-fields-meta');
+      if (script && script.textContent) {
+        const data = JSON.parse(script.textContent);
+        _fieldsMeta = Array.isArray(data) ? data : (data.fields || []);
+        _fieldsPromise = Promise.resolve(_fieldsMeta);
+        console.debug('[Cell Info Filters][meta] using embedded fields meta');
+        return _fieldsPromise;
+      }
+    } catch (_) { /* noop */ }
+
+    // Fallback to API if embedding is not present
     _fieldsPromise = fetch(ns.URLS.fields, { credentials: 'same-origin' })
       .then(r => r.json())
       .then(data => {
@@ -15,15 +28,8 @@
         return _fieldsMeta;
       })
       .catch((e) => {
-        console.warn('[Cell Info Filters][meta] failed to fetch fields meta from API, falling back to embedded JSON if present', e);
-        const script = document.getElementById('filters-fields-meta');
-        if (!script) { _fieldsMeta = []; return _fieldsMeta; }
-        try {
-          const data = JSON.parse(script.textContent);
-          _fieldsMeta = Array.isArray(data) ? data : (data.fields || []);
-        } catch (err) {
-          _fieldsMeta = [];
-        }
+        console.warn('[Cell Info Filters][meta] failed to load fields meta from API and no embedded JSON present', e);
+        _fieldsMeta = [];
         return _fieldsMeta;
       });
     return _fieldsPromise;

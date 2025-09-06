@@ -85,10 +85,14 @@
   {{ block.super }}
   {# Provide counts mapping as JSON in a safe script tag #}
   {{ dataset_counts|json_script:"dataset-counts" }}
+  {# Provide fields metadata so the frontend can initialize without an API call #}
+  {{ filters_fields_meta|json_script:"filters-fields-meta" }}
+  {# Provide precomputed maps for all datasets to enable instant switching #}
+  {{ precomputed_categorical_columns_all|json_script:"precomputed-categorical-columns-all" }}
+  {{ precomputed_suggestions_all|json_script:"precomputed-suggestions-all" }}
   <script src="{% static 'admin/cell_management/cellinfo/js/cell_info.js' %}"></script>
   <script src="{% static 'admin/cell_management/cellinfo/js/filters.constants.js' %}"></script>
   <script src="{% static 'admin/cell_management/cellinfo/js/filters.meta.js' %}"></script>
-  <script src="{% static 'admin/cell_management/cellinfo/js/filters.suggestions.js' %}"></script>
   <script src="{% static 'admin/cell_management/cellinfo/js/filters.select2.js' %}"></script>
   <script src="{% static 'admin/cell_management/cellinfo/js/filters.utils.js' %}"></script>
   <script src="{% static 'admin/cell_management/cellinfo/js/filters.widgets.js' %}"></script>

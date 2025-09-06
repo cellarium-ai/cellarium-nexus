@@ -29,7 +29,13 @@
           ns.postCount(payload)
             .then((data) => {
               const count = (data && typeof data.count === 'number') ? data.count : 0;
-              if (countEl) countEl.textContent = String(count);
+              if (countEl) {
+                try {
+                  countEl.textContent = Number(count).toLocaleString(undefined);
+                } catch (_) {
+                  countEl.textContent = String(count);
+                }
+              }
             })
             .catch((err) => {
               console.error('[Cell Info Filters] Count request failed:', err);
