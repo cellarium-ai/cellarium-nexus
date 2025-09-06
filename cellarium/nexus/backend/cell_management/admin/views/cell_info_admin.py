@@ -12,7 +12,6 @@ import google.api_core as google_api_core
 from django.conf import settings
 import builtins
 import decimal as py_decimal
-import types as py_types
 import json as py_json
 import typing as t
 
@@ -69,7 +68,7 @@ class CellInfoAdminView(generic.TemplateView):
         try:
             for ds in datasets:
                 dataset_counts[ds] = manager.get_cached_count_bq(dataset_name=ds, filters_dict={})
-        except google_api_core.exceptions.GoogleAPICallError as exc:
+        except google_api_core.exceptions.GoogleAPICallError:
             messages.error(
                 request=self.request,
                 message=(
@@ -113,7 +112,6 @@ class CellInfoAdminView(generic.TemplateView):
                     if base in (str,):
                         string_columns.append(key)
 
-                # Compute per-dataset maps
                 for ds in datasets:
                     if not ds:
                         continue

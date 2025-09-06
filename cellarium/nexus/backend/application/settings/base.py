@@ -97,7 +97,7 @@ CACHES = {
 
 # Cache TTL values (in seconds)
 FILTER_CACHE_TTL_SECONDS = 60 * 60 * 24 * 30 # 30 days
-COUNT_CACHE_TTL_SECONDS = 60 * 60 * 7 # 7 days
+COUNT_CACHE_TTL_SECONDS = 60 * 60 * 7 # 7 hours
 # Suggestions cache TTL (defaults to 1 day)
 SUGGEST_CACHE_TTL_SECONDS = 60 * 60 * 24
 
