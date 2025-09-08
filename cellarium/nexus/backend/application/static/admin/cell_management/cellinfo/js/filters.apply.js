@@ -16,7 +16,7 @@
   ns.collectFiltersPayload = function () {
     const rows = Array.from(document.querySelectorAll('#filters-rows .filter-row'));
     const fieldsMeta = ns.getFieldsMeta();
-    const payload = [];
+    const filters = {};
     for (const row of rows) {
       const index = row.getAttribute('data-index');
       const fieldSel = row.querySelector(`select[name="filters-${index}-field"]`);
@@ -25,8 +25,8 @@
       const valueEl = row.querySelector(`[name="${valueName}"]`);
       if (!fieldSel || !operSel || !valueEl) continue;
 
-      const fieldKey = fieldSel.value;
-      const operator = operSel.value;
+      let fieldKey = fieldSel.value;
+      let operator = operSel.value;
       const meta = ns.findFieldMeta(fieldsMeta, fieldKey);
       const type = meta ? meta.type : 'string';
 
@@ -40,18 +40,39 @@
         if (v !== 'true' && v !== 'false') continue;
         value = v === 'true';
       } else {
-        // categorical multi-select
+        // string/categorical
         if (valueEl instanceof HTMLSelectElement) {
-          value = Array.from(valueEl.selectedOptions).map(o => o.value);
+          const arr = Array.from(valueEl.selectedOptions).map((o) => o.value).filter((v) => v !== '');
+          value = arr;
         } else {
-          value = valueEl.value ? [valueEl.value] : [];
+          const v = valueEl.value || '';
+          value = v;
         }
-        if (!Array.isArray(value)) value = [];
       }
 
-      payload.push({ field: fieldKey, operator, value });
+      // Normalize to backend format "column__operator": value
+      // Adjust operator/value for categorical lists under eq/not_eq
+      if (operator === 'eq' || operator === 'not_eq') {
+        if (Array.isArray(value)) {
+          if (value.length === 0) {
+            continue; // nothing to apply
+          } else if (value.length === 1) {
+            value = value[0];
+          } else {
+            operator = operator === 'eq' ? 'in' : 'not_in';
+          }
+        }
+      }
+
+      // Ensure membership operators have array values
+      if ((operator === 'in' || operator === 'not_in') && !Array.isArray(value)) {
+        value = value === '' || value === null || value === undefined ? [] : [String(value)];
+      }
+
+      const key = `${fieldKey}__${operator}`;
+      filters[key] = value;
     }
-    return payload;
+    return filters;
   };
 
   ns.postCount = function (payload) {

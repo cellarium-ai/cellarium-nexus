@@ -243,7 +243,7 @@ def cellinfo_filters_count(request):
     if not dataset:
         return http_JsonResponse(data={"error": "invalid_dataset", "detail": "Dataset is required."}, status=400)
 
-    filter_statements = parsed.to_filter_statements()
+    filter_statements = parsed.filters
     normalized_filters = filters_utils.normalize_filter_statements(filter_statements=filter_statements)
 
     manager = bigquery_utils.BigQueryCachedDataManager()

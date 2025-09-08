@@ -9,31 +9,12 @@ import typing as t
 import pydantic as pydantic
 
 
-class FilterItem(pydantic.BaseModel):
-    """
-    Describe a single filter condition.
-
-    :param field: Field key the filter applies to
-    :param operator: Operator to apply (eq, in, gt, etc.)
-    :param value: Filter value; for categorical provide list[str], for numbers provide float, for booleans provide bool
-
-    :raise: pydantic.ValidationError
-
-    :return: None
-    """
-
-    field: str
-    operator: str
-    value: t.Union[list[str], float, bool]
-
-
 class FiltersPayload(pydantic.BaseModel):
     """
     Represent the filters request payload sent from the front-end.
 
     :param dataset: Selected dataset name
-    :param filters: Filter conditions; accept either a mapping of
-        ``{"column__op": value}`` or a list of FilterItem objects.
+    :param filters: Filter conditions as a mapping of ``{"column__op": value}``.
 
     :raise: pydantic.ValidationError
 
@@ -41,23 +22,7 @@ class FiltersPayload(pydantic.BaseModel):
     """
 
     dataset: str
-    filters: t.Union[dict[str, t.Any], list[FilterItem]] = pydantic.Field(default_factory=dict)
-
-    def to_filter_statements(self) -> dict[str, t.Any]:
-        """
-        Convert filters to a BigQuery-compatible statements mapping.
-
-        :raise: pydantic.ValidationError
-
-        :return: A dictionary with keys in the form ``column__op`` mapping to values.
-        """
-        if isinstance(self.filters, dict):
-            return self.filters
-        statements: dict[str, t.Any] = {}
-        for item in self.filters:
-            key = f"{item.field}__{item.operator}"
-            statements[key] = item.value
-        return statements
+    filters: dict[str, t.Any] = pydantic.Field(default_factory=dict)
 
 
 class CountResponse(pydantic.BaseModel):

@@ -22,7 +22,7 @@
         applyBtn.addEventListener('click', () => {
           const dataset = ns.getDataset();
           const filters = ns.collectFiltersPayload();
-          const payload = { dataset, filters };
+          const payload = { dataset: dataset, filters: filters };
           const countEl = document.getElementById('cell-count');
           if (countEl) countEl.textContent = '…';
           applyBtn.disabled = true;
