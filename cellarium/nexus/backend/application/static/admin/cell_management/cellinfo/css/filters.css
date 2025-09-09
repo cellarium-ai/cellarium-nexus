@@ -1,5 +1,22 @@
 /* Filters page custom styles */
 
+/* Make the Value cell span remaining horizontal space */
+.filter-row .value-cell {
+  flex: 1 1 40rem; /* grow, shrink, preferred width */
+  min-width: 24rem;
+}
+
+/* Ensure the control inside the value cell stretches fully */
+.filter-row .value-cell > * {
+  width: 100% !important;
+  max-width: none;
+}
+
+/* When Select2 or other widgets render containers, force them to fill */
+.filter-row .value-cell .select2-container {
+  width: 100% !important;
+}
+
 /* Normalize and vertically center Select2 single selects within filters block */
 #filters-block .select2-container .select2-selection--single {
   height: 36px !important;
