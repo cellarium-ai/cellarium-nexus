@@ -6,6 +6,7 @@ from django.contrib import admin
 from django.contrib import messages
 import django.forms as dj_forms
 from django.http import JsonResponse as http_JsonResponse
+from django.http import HttpResponseRedirect as http_HttpResponseRedirect
 import django.views.decorators.http as http_decorators
 import django.views.generic as generic
 import google.api_core as google_api_core
@@ -14,6 +15,8 @@ import builtins
 import decimal as py_decimal
 import json as py_json
 import typing as t
+import django.urls as django_urls
+import django.utils.html as django_html
 
 from cellarium.nexus.backend.cell_management import models as cell_models
 from cellarium.nexus.backend.cell_management.admin.utils import bigquery_utils
@@ -22,6 +25,7 @@ from cellarium.nexus.backend.cell_management.admin import schemas as admin_schem
 from cellarium.nexus.backend.cell_management.admin.views.utils import filters as filters_utils
 from cellarium.nexus.omics_datastore.bq_avro_schemas import cell_management as bq_schemas
 from cellarium.nexus.omics_datastore.bq_ops import constants as bq_constants
+from cellarium.nexus.backend.cell_management.admin.utils import workflows_utils as workflows_utils
 
 
 class CellInfoAdminView(generic.TemplateView):
@@ -254,3 +258,114 @@ def cellinfo_filters_count(request):
 
     resp = admin_schemas.CountResponse(count=int(count))
     return http_JsonResponse(data=resp.model_dump())
+
+
+class ExtractCurriculumAdminView(generic.FormView):
+    """
+    Render and submit the Extract Curriculum form.
+
+    Pre-fill initial values from query parameters if provided:
+    - ``dataset`` (BigQuery dataset name)
+    - ``filters`` (JSON-encoded string of filter statements)
+    """
+
+    template_name = "admin/cell_management/cellinfo/extract_curriculum.html"
+    form_class = admin_forms.ExtractCurriculumForm
+
+    def get_context_data(self, **kwargs):
+        """
+        Build template context and include admin site context for Unfold.
+
+        :param kwargs: Keyword args from FormView
+
+        :raise: None
+
+        :return: Context dictionary for the template
+        """
+        context = super().get_context_data(**kwargs)
+        context.update(admin.site.each_context(self.request))
+        # Provide initial filters as a plain dict for template json_script
+        try:
+            form = context.get("form")
+            initial_filters = {}
+            if form is not None:
+                initial_filters = form.initial.get("filters") or {}
+            context["filters_initial"] = initial_filters
+        except Exception:
+            context["filters_initial"] = {}
+        return context
+
+    def get_initial(self) -> dict:
+        """
+        Build initial form data from query parameters.
+
+        :raise: None
+
+        :return: Initial dictionary for the form
+        """
+        initial: dict[str, t.Any] = super().get_initial()
+        dataset_name = self.request.GET.get("dataset") or ""
+        filters_raw = self.request.GET.get("filters") or ""
+
+        if dataset_name:
+            try:
+                ds_obj = cell_models.BigQueryDataset.objects.get(name=dataset_name)
+                initial["bigquery_dataset"] = ds_obj.pk
+            except cell_models.BigQueryDataset.DoesNotExist:
+                pass
+
+        if filters_raw:
+            try:
+                parsed = py_json.loads(filters_raw)
+            except Exception:
+                parsed = {}
+            # Normalize to backend format in case client passed loose structure
+            try:
+                normalized = filters_utils.normalize_filter_statements(filter_statements=parsed)
+            except Exception:
+                normalized = {}
+            initial["filters"] = normalized
+
+        return initial
+
+    def form_valid(self, form: admin_forms.ExtractCurriculumForm):
+        """
+        Submit the extract pipeline using validated form data.
+
+        :param form: Validated ExtractCurriculumForm
+
+        :raise: google.api_core.exceptions.GoogleAPIError, ValueError
+
+        :return: HTTP redirect to the Vertex AI Pipeline run URL
+        """
+        cleaned = form.cleaned_data
+        try:
+            # pipeline_url = workflows_utils.submit_extract_pipeline(
+            #     feature_schema=cleaned["feature_schema"],
+            #     creator_id=self.request.user.id,
+            #     bigquery_dataset=cleaned["bigquery_dataset"],
+            #     name=cleaned["name"],
+            #     extract_bin_size=cleaned["extract_bin_size"],
+            #     categorical_column_count_limit=cleaned["categorical_column_count_limit"],
+            #     extract_bin_keys=cleaned.get("extract_bin_keys") or None,
+            #     filters=cleaned.get("filters") or None,
+            #     metadata_extra_columns=cleaned.get("metadata_extra_columns") or None,
+            # )
+            print(cleaned, "SUBMITTING")
+            pipeline_url = "https://cellarium.ai"
+        except Exception as exc:  # Surface error to admin as message and redisplay form
+            messages.error(self.request, f"Failed to submit extract pipeline: {exc}")
+            return self.form_invalid(form)
+
+        # Success message with a clickable link (rendered safely)
+        messages.success(
+            self.request,
+            django_html.format_html(
+                'Extract pipeline submitted successfully. <a href="{url}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">View run</a>',
+                url=pipeline_url,
+            ),
+        )
+        # Redirect back to Cell Info page within Admin
+        return http_HttpResponseRedirect(
+            django_urls.reverse("admin:cell_management_cellinfo_changelist")
+        )

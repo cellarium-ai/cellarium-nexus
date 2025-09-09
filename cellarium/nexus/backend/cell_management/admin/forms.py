@@ -208,20 +208,7 @@ class ExtractCurriculumForm(forms.Form):
     filters = forms.JSONField(
         label=_("Filters"),
         required=False,
-        widget=CustomJSONEditorWidget(
-            attrs={
-                "height": "400px",
-                "width": "100%",
-            },
-            options={
-                "modes": ["tree", "code"],
-                "mode": "tree",
-                "search": True,
-                "sortObjectKeys": True,
-                "enableSort": False,
-                "enableTransform": False,
-            },
-        ),
+        widget=unfold_widgets.UnfoldAdminTextInputWidget(attrs={"type": "hidden"}),
         help_text=_("JSON formatted filters to apply during extraction. Use tree view for easier editing."),
     )
 
@@ -242,6 +229,14 @@ class ExtractCurriculumForm(forms.Form):
                     pass
 
         super().__init__(*args, **kwargs)
+
+        # If initial filters is a dict but widget is a hidden text input, stringify it for correct rendering
+        try:
+            init_filters = self.initial.get("filters")
+            if isinstance(init_filters, dict):
+                self.initial["filters"] = json.dumps(init_filters)
+        except Exception:
+            pass
 
     def clean_name(self):
         """
@@ -295,6 +290,14 @@ class ExtractCurriculumForm(forms.Form):
         """
         columns = self.cleaned_data.get("metadata_extra_columns")
         return columns if columns else []
+
+    class Media:
+        css = {
+            "all": (
+                "admin/cell_management/cellinfo/css/extract.css",
+            )
+        }
+        js: tuple[str, ...] = ()
 
 
 class FilterRowForm(forms.Form):

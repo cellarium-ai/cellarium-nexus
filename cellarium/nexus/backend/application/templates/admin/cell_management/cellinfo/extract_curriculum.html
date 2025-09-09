@@ -1,0 +1,133 @@
+{% extends "admin/base.html" %}
+{% load i18n static %}
+
+{% block breadcrumbs %}{% if not is_popup %}
+  <div class="px-4">
+    <div class="container mb-6 mx-auto -my-3 lg:mb-12">
+      <ul class="flex flex-wrap">
+        {% url 'admin:index' as link %}
+        {% trans 'Home' as name %}
+        {% include 'unfold/helpers/breadcrumb_item.html' with link=link name=name %}
+
+        {% trans 'Cell Information' as name %}
+        {% url 'admin:cell_management_cellinfo_changelist' as link %}
+        {% include 'unfold/helpers/breadcrumb_item.html' with name=name link=link %}
+
+        {% trans 'Extract Curriculum' as name %}
+        {% include 'unfold/helpers/breadcrumb_item.html' with name=name link='' %}
+      </ul>
+    </div>
+  </div>
+{% endif %}{% endblock %}
+
+{% block content %}
+  <div class="px-4">
+    <div class="container mx-auto max-w-5xl">
+      <h1 class="mb-6 text-2xl font-bold">{% trans "Extract Curriculum" %}</h1>
+
+      {% if messages %}
+        <ul class="mb-4">
+          {% for message in messages %}
+            <li class="text-sm {% if message.tags %}{{ message.tags }}{% endif %}">{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+
+      <form method="post" novalidate class="nexus-extract-form space-y-6">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        {# Ensure hidden fields (like filters) are posted without being shown #}
+        {% for hidden in form.hidden_fields %}
+          {{ hidden }}
+        {% endfor %}
+        <div class="grid grid-cols-1 gap-6">
+          <div class="form-row">
+            {{ form.feature_schema.label_tag }}
+            {{ form.feature_schema }}
+            {% if form.feature_schema.help_text %}
+              <p class="text-xs text-base-500 dark:text-base-400 mt-1">{{ form.feature_schema.help_text }}</p>
+            {% endif %}
+            {{ form.feature_schema.errors }}
+          </div>
+
+          <div class="form-row">
+            {{ form.name.label_tag }}
+            {{ form.name }}
+            {% if form.name.help_text %}
+              <p class="text-xs text-base-500 dark:text-base-400 mt-1">{{ form.name.help_text }}</p>
+            {% endif %}
+            {{ form.name.errors }}
+          </div>
+
+          <div class="form-row grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="form-col">
+              {{ form.extract_bin_size.label_tag }}
+              {{ form.extract_bin_size }}
+              {% if form.extract_bin_size.help_text %}
+                <p class="text-xs text-base-500 dark:text-base-400 mt-1">{{ form.extract_bin_size.help_text }}</p>
+              {% endif %}
+              {{ form.extract_bin_size.errors }}
+            </div>
+            <div class="form-col">
+              {{ form.categorical_column_count_limit.label_tag }}
+              {{ form.categorical_column_count_limit }}
+              {% if form.categorical_column_count_limit.help_text %}
+                <p class="text-xs text-base-500 dark:text-base-400 mt-1">{{ form.categorical_column_count_limit.help_text }}</p>
+              {% endif %}
+              {{ form.categorical_column_count_limit.errors }}
+            </div>
+          </div>
+
+          <div class="form-row">
+            {{ form.extract_bin_keys.label_tag }}
+            {{ form.extract_bin_keys }}
+            {% if form.extract_bin_keys.help_text %}
+              <p class="text-xs text-base-500 dark:text-base-400 mt-1">{{ form.extract_bin_keys.help_text }}</p>
+            {% endif %}
+            {{ form.extract_bin_keys.errors }}
+          </div>
+
+          <div class="form-row">
+            {{ form.bigquery_dataset.label_tag }}
+            {{ form.bigquery_dataset }}
+            {% if form.bigquery_dataset.help_text %}
+              <p class="text-xs text-base-500 dark:text-base-400 mt-1">{{ form.bigquery_dataset.help_text }}</p>
+            {% endif %}
+            {{ form.bigquery_dataset.errors }}
+          </div>
+
+          <div class="form-row">
+            {{ form.metadata_extra_columns.label_tag }}
+            {{ form.metadata_extra_columns }}
+            {% if form.metadata_extra_columns.help_text %}
+              <p class="text-xs text-base-500 dark:text-base-400 mt-1">{{ form.metadata_extra_columns.help_text }}</p>
+            {% endif %}
+            {{ form.metadata_extra_columns.errors }}
+          </div>
+        </div>
+
+        <div class="mt-8 flex items-center gap-3">
+          <a href="{% url 'admin:cell_management_cellinfo_changelist' %}"
+             class="border border-base-300 dark:border-base-700 px-4 py-2 rounded text-sm">
+            {% trans "Back" %}
+          </a>
+          <button type="submit"
+                  class="bg-primary-600 border-primary-600 text-white border cursor-pointer flex items-center gap-2 font-medium px-4 py-2 rounded shadow-sm text-sm">
+            <span class="material-symbols-outlined text-base">play_arrow</span>
+            {% trans "Submit Extract" %}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  {{ form.media.css }}
+{% endblock %}
+
+{% block footer %}
+  {{ block.super }}
+  {{ form.media.js }}
+{% endblock %}

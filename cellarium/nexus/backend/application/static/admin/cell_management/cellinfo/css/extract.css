@@ -1,0 +1,88 @@
+/* Extract Curriculum page specific tweaks */
+/* Base form wrapper */
+.nexus-extract-form {
+  --nexus-form-max-width: 48rem; /* ~768px */
+}
+
+/* Generic row spacing */
+.nexus-extract-form .form-row {
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+/* Two-column row spacing handled by grid classes in template */
+.nexus-extract-form .form-row .form-col {
+  display: block;
+}
+
+/* Increase gap between columns inside two-col rows */
+.nexus-extract-form .form-row.grid {
+  gap: 1rem;
+}
+
+/* Labels */
+.nexus-extract-form .form-row label {
+  display: block;              /* stack label above input */
+  margin-bottom: 0.5rem;       /* a bit more space under label */
+  font-weight: 500;
+}
+
+/* Help text */
+.nexus-extract-form .form-row p {
+  margin-top: 0.35rem;
+  max-width: var(--nexus-form-max-width);
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* Errors */
+.nexus-extract-form .form-row .errorlist,
+.nexus-extract-form .form-row .errors {
+  margin-top: 0.35rem;
+  max-width: var(--nexus-form-max-width);
+  overflow-wrap: anywhere;
+}
+
+/* Inputs/selects/textarea full-width, within a sensible max width for readability */
+.nexus-extract-form .form-row input[type="text"],
+.nexus-extract-form .form-row input[type="number"],
+.nexus-extract-form .form-row input[type="email"],
+.nexus-extract-form .form-row input[type="url"],
+.nexus-extract-form .form-row input[type="search"],
+.nexus-extract-form .form-row select,
+.nexus-extract-form .form-row textarea {
+  width: 100%;
+  max-width: var(--nexus-form-max-width);
+}
+
+/* Ensure Unfold select2 widgets stretch to container width */
+.nexus-extract-form .select2-container {
+  width: 100% !important;
+  max-width: var(--nexus-form-max-width);
+}
+
+/* Reduce overly narrow default input paddings if any theme overrides */
+.nexus-extract-form .form-row input,
+.nexus-extract-form .form-row select,
+.nexus-extract-form .form-row textarea {
+  box-sizing: border-box;
+  min-height: 2.25rem; /* subtle normalization */
+}
+
+/* Keep consistent vertical rhythm between stacked fields */
+.nexus-extract-form .grid > .form-row + .form-row {
+  margin-top: 0.25rem;
+}
+
+/* If any widgets bring their own max-width classes, let our max-width apply */
+.nexus-extract-form .form-row .max-w-2xl {
+  max-width: var(--nexus-form-max-width);
+}
+
+/* If JSON editor ever returns, keep a reasonable minimum height */
+.jsoneditor,
+.jsoneditor-outer,
+.jsoneditor-tree,
+.jsoneditor-table {
+  min-height: 420px !important;
+}

@@ -30,6 +30,12 @@ def _inject_custom_admin_urls(orig_get_urls):
                 admin.site.admin_view(cell_info_admin_module.cellinfo_filters_count),
                 name="cell_management_cellinfo_filters_count",
             ),
+            # Extract Curriculum page
+            path(
+                "cell_management/cellinfo/extract/",
+                admin.site.admin_view(cell_info_admin_module.ExtractCurriculumAdminView.as_view()),
+                name="cell_management_cellinfo_extract",
+            ),
         ]
         return custom_urls + orig_get_urls()
 
