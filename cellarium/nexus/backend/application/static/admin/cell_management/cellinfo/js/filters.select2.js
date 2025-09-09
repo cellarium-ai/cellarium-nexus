@@ -100,13 +100,29 @@
       $(selectEl).select2({
         width: 'style',
         multiple: true,
+        // Keep dropdown open after each selection for faster multi-pick UX
+        closeOnSelect: false,
         ajax: {
+          cache: false,
           transport: function (params, success /*, failure */) {
             const term = (params && params.data && params.data.term) ? String(params.data.term) : '';
             const DS_MAP = resolveDsMap();
             const arr = (DS_MAP && DS_MAP[fieldKey]) ? DS_MAP[fieldKey] : [];
+            // Exclude currently selected values to satisfy: hide once selected, reappear if deselected
+            // Use jQuery value (more reliable with Select2's async state than reading <option selected>)
+            const $jq = window.jQuery || (window.django && window.django.jQuery);
+            const selectedVals = ($jq && typeof $jq.fn.val === 'function') ? ($jq(selectEl).val() || []) : Array.from(selectEl.options).filter(o => o.selected).map(o => o.value);
+            // Also consult Select2's data immediately (handles timing where .val() hasn't updated yet)
+            let selectedFromData = [];
+            try {
+              if ($jq && typeof $jq(selectEl).select2 === 'function') {
+                selectedFromData = ($jq(selectEl).select2('data') || []).map(x => x && (x.id != null ? String(x.id) : String(x.text)));
+              }
+            } catch (_) { /* noop */ }
+            const selected = new Set([...(selectedVals || []).map(v => String(v)), ...selectedFromData]);
             const t = term.toLowerCase();
-            const filtered = t ? arr.filter(v => String(v).toLowerCase().includes(t)) : arr.slice();
+            const base = t ? arr.filter(v => String(v).toLowerCase().includes(t)) : arr.slice();
+            const filtered = base.filter(v => !selected.has(String(v)));
             const limited = filtered.slice(0, 100);
             const results = limited.map(v => ({ id: v, text: v }));
             success({ results });
@@ -117,6 +133,58 @@
         allowClear: false,
         tags: false,
       });
+
+      // Force results refresh in the still-open dropdown after each select/unselect
+      // Minimal and safe: simulate input in the search field to re-run the transport
+      try {
+        $(selectEl).on('select2:select select2:unselect', function () {
+          const $el = $(this);
+          const inst = $el.data('select2');
+          // Try multiple locations for the search field depending on theme/mode
+          let $search = null;
+          if (inst && inst.dropdown && inst.dropdown.$search) {
+            $search = inst.dropdown.$search;
+          } else if (inst && inst.selection && inst.selection.$search) {
+            $search = inst.selection.$search;
+          } else if (inst && inst.$dropdown) {
+            $search = inst.$dropdown.find('.select2-search__field');
+          }
+          // Nudge the search input to retrigger transport filtering
+          if ($search && $search.length) {
+            const current = $search.val();
+            // Staggered triggers to avoid debounce swallowing updates
+            setTimeout(function () {
+              $search.val(String(current || '') + ' ').trigger('input').trigger('keyup');
+            }, 0);
+            setTimeout(function () {
+              $search.val(current || '').trigger('input').trigger('keyup');
+            }, 20);
+          }
+          // Also explicitly re-open (keeps open, but forces results render in some Select2 themes)
+          setTimeout(function () {
+            try { $el.select2('open'); } catch (_) { /* noop */ }
+          }, 0);
+
+          // As an immediate fallback, prune any options in the currently visible
+          // dropdown that are now selected, so they disappear without needing a
+          // transport re-query (covers themes/modes without a live search box).
+          try {
+            const selectedNow = new Set((($el.val() || [])).map(String));
+            if (inst && inst.$dropdown) {
+              inst.$dropdown.find('.select2-results__option').each(function () {
+                const $opt = $(this);
+                const data = $opt.data('data');
+                const id = data && (data.id != null ? String(data.id) : String(data.text || ''));
+                if (id && selectedNow.has(id)) {
+                  $opt.remove();
+                }
+              });
+              // Additionally remove any option flagged selected by Select2 ARIA state
+              inst.$dropdown.find('.select2-results__option[aria-selected="true"]').remove();
+            }
+          } catch (_) { /* noop */ }
+        });
+      } catch (e) { /* noop */ }
     }
   };
 
