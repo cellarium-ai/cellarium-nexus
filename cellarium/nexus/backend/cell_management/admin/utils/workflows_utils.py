@@ -37,6 +37,7 @@ def compose_extract_curriculum_configs(
     bigquery_dataset: models.BigQueryDataset,
     extract_bin_size: int,
     categorical_column_count_limit: int,
+    obs_columns: list[str],
     extract_bin_keys: list[str] | None = None,
     filters: dict | None = None,
     metadata_extra_columns: list[str] | None = None,
@@ -52,6 +53,7 @@ def compose_extract_curriculum_configs(
     :param categorical_column_count_limit: Maximum number of categories per categorical column to be considered as
             categorical. If the number of categories exceeds this limit, the column will not be unified across all
             extract files.
+    :param obs_columns: Obs columns to include in output anndata files
     :param extract_bin_keys: Optional list of keys to use for binning the extract. If not provided, the keys will be
         assigned randomly.
     :param filters: Optional dictionary of filter statements to apply
@@ -74,8 +76,6 @@ def compose_extract_curriculum_configs(
 
     if total_cells == 0:
         raise exceptions.ZeroCellsReturnedError("BigQuery dataset contains no cells matching the filters.")
-
-    obs_columns = constants.CELL_INFO_EXTRACT_COLUMNS
 
     extract_bucket_path = f"{settings.BACKEND_PIPELINE_DIR}/{settings.PIPELINE_DATA_EXTRACTS_DIR}/{name}"
 
@@ -128,6 +128,7 @@ def compose_and_dump_configs(
     name: str,
     extract_bin_size: int,
     categorical_column_count_limit: int,
+    obs_columns: list[str],
     extract_bin_keys: list[str] | None = None,
     filters: dict | None = None,
     metadata_extra_columns: list[str] | None = None,
@@ -143,6 +144,7 @@ def compose_and_dump_configs(
     :param bigquery_dataset: BigQuery dataset to extract data from
     :param name: Name for the extract
     :param extract_bin_size: Number of cells per extract bin
+    :param obs_columns: Obs columns to include in output anndata files
     :param extract_bin_keys: Optional list of keys to use for binning the extract. If not provided, the keys will be
         assigned randomly.
     :param filters: Optional dictionary of filter statements to apply
@@ -165,6 +167,7 @@ def compose_and_dump_configs(
         name=name,
         extract_bin_size=extract_bin_size,
         categorical_column_count_limit=categorical_column_count_limit,
+        obs_columns=obs_columns,
         extract_bin_keys=extract_bin_keys,
         filters=filters,
         metadata_extra_columns=metadata_extra_columns,
@@ -188,6 +191,7 @@ def submit_extract_pipeline(
     name: str,
     extract_bin_size: int,
     categorical_column_count_limit: int,
+    obs_columns: list[str],
     extract_bin_keys: list[str] | None = None,
     filters: dict | None = None,
     metadata_extra_columns: list[str] | None = None,
@@ -205,6 +209,7 @@ def submit_extract_pipeline(
     :param categorical_column_count_limit: Maximum number of categories per categorical column to be considered as
             categorical. If the number of categories exceeds this limit, the column will not be unified across all
             extract files.
+    :param obs_columns: Obs columns to include in output anndata files
     :param extract_bin_keys: Optional list of keys to use for binning the extract. If not provided, the keys will be
         assigned randomly.
     :param filters: Optional dictionary of filter statements to apply
@@ -227,6 +232,7 @@ def submit_extract_pipeline(
         name=name,
         categorical_column_count_limit=categorical_column_count_limit,
         extract_bin_size=extract_bin_size,
+        obs_columns=obs_columns,
         extract_bin_keys=extract_bin_keys,
         filters=filters,
         metadata_extra_columns=metadata_extra_columns,

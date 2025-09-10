@@ -1,86 +1,15 @@
 import json
 
 from django import forms
-from django.forms.widgets import TextInput
 from django.utils.translation import gettext_lazy as _
 from django_json_widget.widgets import JSONEditorWidget as BaseJSONEditorWidget
-from unfold.widgets import (
-    UnfoldAdminFileFieldWidget,
-    UnfoldAdminIntegerFieldWidget,
-    UnfoldAdminSelectWidget,
-    UnfoldAdminTextInputWidget,
-)
+from django.utils.html import escape
+
 from unfold import widgets as unfold_widgets
 from cellarium.nexus.backend.cell_management.admin.utils import check_curriculum_exists
 from cellarium.nexus.backend.cell_management.models import BigQueryDataset, FeatureSchema
 from cellarium.nexus.backend.curriculum.models import Curriculum
-
-
-class CommaSeparatedWidget(UnfoldAdminTextInputWidget):
-    """
-    Widget that displays a list of strings as comma-separated values.
-    """
-
-    def __init__(self, attrs=None):
-        """
-        Initialize the widget with placeholder text.
-
-        :param attrs: HTML attributes
-        """
-        default_attrs = {
-            "class": "vTextField",
-            "placeholder": "Enter column names separated by commas",
-            "style": "width: 100%;",
-        }
-        if attrs:
-            default_attrs.update(attrs)
-        super().__init__(attrs=default_attrs)
-
-    def format_value(self, value):
-        """
-        Format the value for display in the widget.
-
-        :param value: Value to format
-
-        :return: Formatted value
-        """
-        if value is None:
-            return ""
-        if isinstance(value, list):
-            return ", ".join(str(v) for v in value)
-        return value
-
-
-class CommaSeparatedField(forms.CharField):
-    """
-    Field that converts comma-separated input to a list of strings.
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Initialize the field with the CommaSeparatedWidget.
-
-        :param args: Positional arguments
-        :param kwargs: Keyword arguments
-        """
-        kwargs.setdefault("widget", CommaSeparatedWidget)
-        super().__init__(*args, **kwargs)
-
-    def to_python(self, value):
-        """
-        Convert the input value to a list of strings.
-
-        :param value: Input value
-
-        :raise: forms.ValidationError
-
-        :return: List of strings
-        """
-        if not value:
-            return []
-        if isinstance(value, list):
-            return value
-        return [item.strip() for item in value.split(",") if item.strip()]
+from cellarium.nexus.backend.cell_management.admin import constants
 
 
 class CustomJSONEditorWidget(BaseJSONEditorWidget):
@@ -143,13 +72,60 @@ class CreateSchemaFromCSVForm(forms.Form):
         label=_("Schema Name"),
         max_length=255,
         help_text=_("Name for the new feature schema"),
-        widget=UnfoldAdminTextInputWidget,
+        widget=unfold_widgets.UnfoldAdminTextInputWidget,
     )
     csv_file = forms.FileField(
         label=_("Features CSV"),
         help_text=_("CSV file with ensemble_id and symbol columns"),
-        widget=UnfoldAdminFileFieldWidget,
+        widget=unfold_widgets.UnfoldAdminFileFieldWidget,
     )
+
+
+class UnfoldReadOnlyJSONWidget(unfold_widgets.UnfoldAdminTextareaWidget):
+    """
+    Theme-aware (Unfold) read-only JSON:
+      • rows = number of JSON lines (clamped)
+      • scrolls inside the field
+      • selectable/copyable
+    """
+
+    min_rows = 3
+    max_rows = 40
+
+    def render(self, name, value, attrs=None, renderer=None):
+        attrs = attrs or {}
+
+        # Parse + pretty print
+        if value in (None, ""):
+            value = {}
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except Exception:
+                # it's a raw string, show as-is
+                pretty = value
+            else:
+                pretty = json.dumps(value, indent=2, ensure_ascii=False)
+        else:
+            pretty = json.dumps(value, indent=2, ensure_ascii=False)
+
+        # rows = number of lines (clamped)
+        line_count = pretty.count("\n") + 1
+        rows = max(self.min_rows, min(self.max_rows, line_count))
+        attrs["rows"] = rows
+        attrs["readonly"] = True
+
+        style = attrs.get("style", "")
+        style += ";resize:none;overflow:auto;max-height:28rem"
+        attrs["style"] = style.lstrip(";")
+
+        return super().render(name, escape(pretty), attrs, renderer)
+
+
+class FreeListField(forms.MultipleChoiceField):
+    def validate(self, value):
+        # skip default check against self.choices
+        pass
 
 
 class ExtractCurriculumForm(forms.Form):
@@ -160,56 +136,92 @@ class ExtractCurriculumForm(forms.Form):
     feature_schema = forms.ModelChoiceField(
         label=_("Feature Schema"),
         queryset=FeatureSchema.objects.all(),
-        widget=UnfoldAdminSelectWidget,
+        widget=unfold_widgets.UnfoldAdminSelect2Widget,
         help_text=_("Feature schema to use for extraction"),
     )
     name = forms.CharField(
         label=_("Curriculum Name"),
         max_length=255,
         help_text=_("Name for the new curriculum"),
-        widget=UnfoldAdminTextInputWidget,
+        widget=unfold_widgets.UnfoldAdminTextInputWidget,
     )
     extract_bin_size = forms.IntegerField(
         label=_("Extract Bin Size"),
         min_value=1,
         max_value=100_000,
+        initial=10_000,
         help_text=_("Bin size for the extract tables"),
-        widget=UnfoldAdminIntegerFieldWidget,
+        widget=unfold_widgets.UnfoldAdminIntegerFieldWidget,
     )
     bigquery_dataset = forms.ModelChoiceField(
         label=_("BigQuery Dataset"),
         queryset=BigQueryDataset.objects.all(),
-        widget=UnfoldAdminSelectWidget,
+        widget=unfold_widgets.UnfoldAdminSelect2Widget,
         help_text=_("BigQuery Dataset to extract data from"),
     )
-    metadata_extra_columns = CommaSeparatedField(
+    obs_columns = forms.MultipleChoiceField(
+        label=_("Observation Columns"),
+        choices=constants.CELL_INFO_EXTRACT_COLUMNS_CHOICES,
+        widget=unfold_widgets.UnfoldAdminSelect2MultipleWidget(
+            attrs={
+                "data-placeholder": "Select columns…",
+                "data-minimum-results-for-search": "0",
+                "data-allow-clear": "true",
+                "data-close-on-select": "false",
+            }
+        ),
+    )
+
+    metadata_extra_columns = FreeListField(
         label=_("Extra Metadata Columns"),
         required=False,
         help_text=_("Enter column names separated by commas to include as additional metadata in the extract."),
+        widget=unfold_widgets.UnfoldAdminSelect2MultipleWidget(
+            attrs={
+                "data-tags": "true",
+                "data-placeholder": "Start typing…",
+                "data-close-on-select": "false",
+                "data-allow-clear": "true",
+                "data-minimum-results-for-search": "0",
+                "data-token-separators": ",",
+            }
+        ),
     )
     categorical_column_count_limit = forms.IntegerField(
         label=_("Categorical Column Count Limit"),
         min_value=1,
         max_value=25_000,
-        initial=5000,
-        widget=UnfoldAdminIntegerFieldWidget,
+        initial=2000,
+        widget=unfold_widgets.UnfoldAdminIntegerFieldWidget,
         help_text=_(
             "Maximum number of categories per categorical column to be considered as categorical. "
             "If the number of categories exceeds this limit, the column will not be unified across all extract files."
         ),
     )
-    extract_bin_keys = CommaSeparatedField(
+    extract_bin_keys = forms.MultipleChoiceField(
         label=_("Extract Bin Keys"),
         required=False,
         help_text=_(
             "Optional list of comma-separated keys to bin by. If not provided, bins will be assigned randomly."
         ),
+        choices=constants.CELL_INFO_EXTRACT_BIN_KEYS_COLUMNS_CHOICES,
+        widget=unfold_widgets.UnfoldAdminSelect2MultipleWidget(
+            attrs={
+                "data-placeholder": "Select columns…",
+                "data-minimum-results-for-search": "0",
+                "data-allow-clear": "true",
+                "data-close-on-select": "false",
+            }
+        ),
     )
-    filters = forms.JSONField(
-        label=_("Filters"),
+    filters = forms.Field(
         required=False,
-        widget=unfold_widgets.UnfoldAdminTextInputWidget(attrs={"type": "hidden"}),
-        help_text=_("JSON formatted filters to apply during extraction. Use tree view for easier editing."),
+        label=_("Filters"),
+        help_text=_(
+            "JSON-formatted filters used during extraction. Read-only. To make changes, go back and choose "
+            "the proper filter set."
+        ),
+        widget=UnfoldReadOnlyJSONWidget(),
     )
 
     def __init__(self, *args, **kwargs):
@@ -229,14 +241,6 @@ class ExtractCurriculumForm(forms.Form):
                     pass
 
         super().__init__(*args, **kwargs)
-
-        # If initial filters is a dict but widget is a hidden text input, stringify it for correct rendering
-        try:
-            init_filters = self.initial.get("filters")
-            if isinstance(init_filters, dict):
-                self.initial["filters"] = json.dumps(init_filters)
-        except Exception:
-            pass
 
     def clean_name(self):
         """
@@ -292,11 +296,7 @@ class ExtractCurriculumForm(forms.Form):
         return columns if columns else []
 
     class Media:
-        css = {
-            "all": (
-                "admin/cell_management/cellinfo/css/extract.css",
-            )
-        }
+        css = {"all": ("admin/cell_management/cellinfo/css/extract.css",)}
         js: tuple[str, ...] = ()
 
 
@@ -316,7 +316,7 @@ class FilterRowForm(forms.Form):
     field = forms.ChoiceField(
         label=_("Field"),
         choices=(),
-        widget=UnfoldAdminSelectWidget(
+        widget=unfold_widgets.UnfoldAdminSelectWidget(
             attrs={
                 "style": "width: 100%;",
                 "data-theme": "admin-autocomplete",
@@ -328,7 +328,7 @@ class FilterRowForm(forms.Form):
     operator = forms.ChoiceField(
         label=_("Operator"),
         choices=(),
-        widget=UnfoldAdminSelectWidget(
+        widget=unfold_widgets.UnfoldAdminSelectWidget(
             attrs={
                 "style": "width: 100%;",
                 "data-theme": "admin-autocomplete",
@@ -365,7 +365,7 @@ class FilterRowForm(forms.Form):
     value_categorical = forms.ChoiceField(
         label=_("Value (categorical)"),
         choices=(),
-        widget=UnfoldAdminSelectWidget(
+        widget=unfold_widgets.UnfoldAdminSelectWidget(
             attrs={
                 "style": "width: 100%;",
                 "data-theme": "admin-autocomplete",
@@ -382,7 +382,7 @@ class FilterRowForm(forms.Form):
             ("true", "true"),
             ("false", "false"),
         ),
-        widget=UnfoldAdminSelectWidget(
+        widget=unfold_widgets.UnfoldAdminSelectWidget(
             attrs={
                 "style": "width: 100%;",
                 "data-theme": "admin-autocomplete",
@@ -442,4 +442,3 @@ class FilterRowForm(forms.Form):
                 "admin/css/autocomplete.css",
             )
         }
-

@@ -205,9 +205,10 @@ def _get_cellinfo_filters_fields(*, dataset: str | None = None) -> list[dict]:
                 operators = ["eq", "gt", "gte", "lt", "lte"]
             case builtins.str:
                 ftype = "string"
-                operators = ["eq", "not_eq", "in", "not_in"]
                 # suggest only for categorical string columns (<= limit distinct values)
                 suggest = key in categorical_columns if dataset else False
+                # Split operators for plain string vs categorical string
+                operators = ["in", "not_in"] if suggest else ["eq", "not_eq", "in", "not_in"]
             case _:
                 # Skip unsupported/complex types
                 continue
@@ -340,19 +341,18 @@ class ExtractCurriculumAdminView(generic.FormView):
         """
         cleaned = form.cleaned_data
         try:
-            # pipeline_url = workflows_utils.submit_extract_pipeline(
-            #     feature_schema=cleaned["feature_schema"],
-            #     creator_id=self.request.user.id,
-            #     bigquery_dataset=cleaned["bigquery_dataset"],
-            #     name=cleaned["name"],
-            #     extract_bin_size=cleaned["extract_bin_size"],
-            #     categorical_column_count_limit=cleaned["categorical_column_count_limit"],
-            #     extract_bin_keys=cleaned.get("extract_bin_keys") or None,
-            #     filters=cleaned.get("filters") or None,
-            #     metadata_extra_columns=cleaned.get("metadata_extra_columns") or None,
-            # )
-            print(cleaned, "SUBMITTING")
-            pipeline_url = "https://cellarium.ai"
+            pipeline_url = workflows_utils.submit_extract_pipeline(
+                feature_schema=cleaned["feature_schema"],
+                creator_id=self.request.user.id,
+                bigquery_dataset=cleaned["bigquery_dataset"],
+                name=cleaned["name"],
+                extract_bin_size=cleaned["extract_bin_size"],
+                categorical_column_count_limit=cleaned["categorical_column_count_limit"],
+                obs_columns=cleaned["obs_columns"],
+                extract_bin_keys=cleaned.get("extract_bin_keys") or None,
+                filters=cleaned.get("filters") or None,
+                metadata_extra_columns=cleaned.get("metadata_extra_columns") or None,
+            )
         except Exception as exc:  # Surface error to admin as message and redisplay form
             messages.error(self.request, f"Failed to submit extract pipeline: {exc}")
             return self.form_invalid(form)
@@ -366,6 +366,4 @@ class ExtractCurriculumAdminView(generic.FormView):
             ),
         )
         # Redirect back to Cell Info page within Admin
-        return http_HttpResponseRedirect(
-            django_urls.reverse("admin:cell_management_cellinfo_changelist")
-        )
+        return http_HttpResponseRedirect(django_urls.reverse("admin:cell_management_cellinfo_changelist"))

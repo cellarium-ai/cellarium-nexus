@@ -33,7 +33,7 @@
   padding-top: 0 !important;
   padding-bottom: 0 !important;
   padding-left: 0.5rem !important; /* similar to px-2 */
-  padding-right: 2rem !important;  /* make space for clear + arrow */
+  padding-right: 1.5rem !important;  /* make space for clear only (we hide select2 arrow) */
   width: 100%;
 }
 #filters-block .select2-container .select2-selection--single .select2-selection__placeholder {
@@ -124,6 +124,13 @@ html.dark #filters-block .filter-remove:hover {
   white-space: nowrap; /* keep names on one line */
 }
 
+/* Ensure proper contrast for selected dataset in dark theme (override Unfold changes) */
+html.dark #dataset-selector .dataset-card[aria-selected="true"] {
+  background-color: rgb(var(--color-primary-900) / 0.2) !important;
+  border-color: rgb(var(--color-primary-600)) !important;
+  color: rgb(var(--color-primary-300)) !important;
+}
+
 /* Selected dataset description with truncation and expansion */
 #selected-dataset-description {
   display: -webkit-box;
@@ -150,4 +157,9 @@ html.dark #filters-block .filter-remove:hover {
 }
 html.dark #dataset-desc-toggle {
   color: rgb(var(--color-primary-400));
+}
+
+/* Remove duplicate chevrons: Select2 arrow + Unfold chevron. Keep Unfold's. */
+#filters-block .select2-container .select2-selection--single .select2-selection__arrow {
+  display: none !important;
 }

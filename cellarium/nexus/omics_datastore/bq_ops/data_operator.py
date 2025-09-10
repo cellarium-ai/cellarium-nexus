@@ -295,9 +295,7 @@ class BigQueryDataOperator:
         :return: Distinct values count for the column
         """
         target_dataset = dataset if dataset else self.dataset
-        template_path = (
-            Path(__file__).parent.parent / "sql_templates" / "general" / "column_distinct_count.sql.mako"
-        )
+        template_path = Path(__file__).parent.parent / "sql_templates" / "general" / "column_distinct_count.sql.mako"
         template_data = bq_sql.TemplateData(
             project=self.project, dataset=target_dataset, table_name=table_name, column_name=column_name
         )
@@ -322,9 +320,7 @@ class BigQueryDataOperator:
         :return: List of distinct values
         """
         target_dataset = dataset if dataset else self.dataset
-        template_path = (
-            Path(__file__).parent.parent / "sql_templates" / "general" / "column_distinct_values.sql.mako"
-        )
+        template_path = Path(__file__).parent.parent / "sql_templates" / "general" / "column_distinct_values.sql.mako"
         template_data = bq_sql.TemplateData(
             project=self.project,
             dataset=target_dataset,

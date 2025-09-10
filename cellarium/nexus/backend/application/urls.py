@@ -4,6 +4,7 @@ from django.views.generic import RedirectView
 
 from cellarium.nexus.backend.cell_management.admin.views import cell_info_admin as cell_info_admin_module
 
+
 # Inject our custom admin URL into the admin site's URL patterns so it lives under the
 # 'admin' namespace and can be reversed by Unfold and Django admin internals.
 def _inject_custom_admin_urls(orig_get_urls):

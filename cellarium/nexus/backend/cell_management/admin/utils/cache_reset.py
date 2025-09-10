@@ -65,9 +65,7 @@ def reset_cellinfo_filter_cache(*, repopulate: bool = True) -> dict[str, int]:
 
         cursor.execute(delete_sql, ["countcache:%", "bqcache:%"])
 
-    logger.info(
-        f"Deleted {deleted_rows} cache rows with prefixes 'countcache:' and 'bqcache:' from table '{location}'"
-    )
+    logger.info(f"Deleted {deleted_rows} cache rows with prefixes 'countcache:' and 'bqcache:' from table '{location}'")
 
     if not repopulate:
         return {"deleted": int(deleted_rows), "repopulated": int(repopulated_items)}
@@ -110,11 +108,7 @@ def reset_cellinfo_filter_cache(*, repopulate: bool = True) -> dict[str, int]:
                 )
                 repopulated_items += 1
             except Exception as exc:  # noqa: BLE001 - continue warming others
-                logger.warning(
-                    f"Failed to warm distinct values for dataset '{ds}', column '{col}': {exc}"
-                )
+                logger.warning(f"Failed to warm distinct values for dataset '{ds}', column '{col}': {exc}")
 
-    logger.info(
-        f"Repopulated {repopulated_items} cache entries across {len(dataset_names)} datasets"
-    )
+    logger.info(f"Repopulated {repopulated_items} cache entries across {len(dataset_names)} datasets")
     return {"deleted": int(deleted_rows), "repopulated": int(repopulated_items)}
