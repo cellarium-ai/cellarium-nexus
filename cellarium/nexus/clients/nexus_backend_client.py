@@ -16,7 +16,6 @@ class ApiEndpoints:
     UPDATE_INGEST_FILE_INFO: str = "api/ingest-management/ingest/{id}"
     CELL_INFO_RESERVE_INDEXES: str = "api/ingest-management/reserve-indexes/cell-info/"
     FEATURE_INFO_RESERVE_INDEXES: str = "api/ingest-management/reserve-indexes/feature-info/"
-    INGEST_FROM_AVRO: str = "api/ingest-management/ingest-from-avro/"
     REGISTER_CURRICULUM: str = "api/curriculum/curriculums/"
     UPDATE_CURRICULUM: str = "api/curriculum/curriculums/{name}/"
     CREATE_VALIDATION_REPORT_ITEM: str = "api/ingest-management/validation-report-item/create/"
@@ -142,24 +141,6 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
         return self.__reserve_indexes_for_model(
             batch_size=batch_size, reserve_model_type=ReserveIndexesModelType.FEATURE_INFO
         )
-
-    def ingest_from_avro(self, stage_dir: str, ingest_id: int) -> dict[str, int]:
-        """
-        Trigger ingestion of CellInfo and FeatureInfo from Avro files.
-
-        :param stage_dir: Base staging directory path where the Avro files are located
-        :param ingest_id: ID of the ingest process
-
-        :raise HTTPError: if the request fails
-        :raise ValueError: if the response is invalid
-
-        :return: Dictionary containing counts of ingested records
-        """
-        data = {"stage_dir": stage_dir, "ingest_id": ingest_id}
-
-        api_out = self.post_json(endpoint=ApiEndpoints.INGEST_FROM_AVRO, data=data)
-
-        return {"cell_info_count": api_out["cell_info_count"], "feature_info_count": api_out["feature_info_count"]}
 
     def register_curriculum(
         self,

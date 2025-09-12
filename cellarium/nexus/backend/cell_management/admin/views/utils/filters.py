@@ -7,9 +7,9 @@ Cell Info admin endpoints.
 
 from __future__ import annotations
 
-import typing as t
-import types as py_types
 import decimal as py_decimal
+import types as py_types
+import typing as t
 
 
 def normalize_filter_statements(*, filter_statements: dict[str, t.Any]) -> dict[str, t.Any]:

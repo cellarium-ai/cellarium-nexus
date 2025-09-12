@@ -230,13 +230,6 @@ class NexusDataOpsCoordinator:
             gcs_stage_dir=bucket_stage_dir,
         )
 
-    def _ingest_data_in_nexus_backend(self, bucket_stage_dir: str, ingest_id: int) -> None:
-        logging.info(f"Ingesting data to Nexus backend...")
-        self.backend_client.ingest_from_avro(
-            stage_dir=bucket_stage_dir,
-            ingest_id=ingest_id,
-        )
-
     @staticmethod
     def _cleanup_ingest_files(bucket_name: str, bucket_stage_dir: str) -> list[str]:
         """
@@ -284,8 +277,8 @@ class NexusDataOpsCoordinator:
 
         try:
             with self._ingest_data_to_bigquery(bucket_name=bucket_name, bucket_stage_dir=bucket_stage_dir):
-                # If nexus backend does not return a success status, data will not be ingested in BigQuery as well
-                self._ingest_data_in_nexus_backend(bucket_stage_dir=bucket_stage_dir, ingest_id=ingest_id)
+                # Nothing to do inside; commit happens on clean exit of this block.
+                pass
 
             self._cleanup_ingest_files(bucket_name=bucket_name, bucket_stage_dir=bucket_stage_dir)
         except Exception as e:

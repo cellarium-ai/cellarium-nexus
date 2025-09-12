@@ -1,7 +1,7 @@
 from typing import Type
 
 from django.db.models import Model
-from google.api_core import exceptions as google_exceptions
+
 from rest_framework import status
 from rest_framework.generics import CreateAPIView, GenericAPIView, RetrieveUpdateAPIView
 from rest_framework.request import Request
@@ -12,7 +12,7 @@ from cellarium.nexus.backend.cell_management import models as cell_models
 from cellarium.nexus.backend.core.utils.reset_cache import reset_cache_and_repopulate
 from cellarium.nexus.backend.ingest_management import models
 from cellarium.nexus.backend.ingest_management.api import serializers
-from cellarium.nexus.backend.ingest_management.services import import_from_avro, index_tracking
+from cellarium.nexus.backend.ingest_management.services import index_tracking
 
 
 class IngestCreateAPIView(CreateAPIView):
@@ -24,44 +24,6 @@ class IngestRetrieveUpdateAPIView(RetrieveUpdateAPIView):
     queryset = models.IngestInfo.objects.all()
     lookup_field = "id"
     http_method_names = ("get", "put", "patch")
-
-
-class IngestFromAvroView(APIView):
-    """View for ingesting CellInfo and FeatureInfo from Avro files."""
-
-    serializer_class = serializers.IngestFromAvroSerializer
-
-    def post(self, request):
-        """
-        Handle POST request to ingest Avro files.
-
-        :param request: HTTP request
-
-        :return: Response with ingestion results
-        """
-        serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        stage_dir = serializer.validated_data["stage_dir"]
-
-        try:
-            cell_info_count, feature_info_count = import_from_avro.ingest_files(stage_dir=stage_dir)
-
-            return Response(
-                {
-                    "message": "Ingestion completed successfully",
-                    "cell_info_count": cell_info_count,
-                    "feature_info_count": feature_info_count,
-                },
-                status=status.HTTP_201_CREATED,
-            )
-
-        except google_exceptions.NotFound:
-            return Response({"error": "One or more files not found in GCS bucket"}, status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return Response(
-                {"error": f"Error during ingestion: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
 
 
 class ReserveIndexesAPIViewAbstract(GenericAPIView):

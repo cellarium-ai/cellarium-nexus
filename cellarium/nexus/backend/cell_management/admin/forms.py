@@ -1,15 +1,15 @@
 import json
 
 from django import forms
+from django.utils.html import escape
 from django.utils.translation import gettext_lazy as _
 from django_json_widget.widgets import JSONEditorWidget as BaseJSONEditorWidget
-from django.utils.html import escape
-
 from unfold import widgets as unfold_widgets
+
+from cellarium.nexus.backend.cell_management.admin import constants
 from cellarium.nexus.backend.cell_management.admin.utils import check_curriculum_exists
 from cellarium.nexus.backend.cell_management.models import BigQueryDataset, FeatureSchema
 from cellarium.nexus.backend.curriculum.models import Curriculum
-from cellarium.nexus.backend.cell_management.admin import constants
 
 
 class CustomJSONEditorWidget(BaseJSONEditorWidget):

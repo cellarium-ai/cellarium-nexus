@@ -1,37 +1,56 @@
-from typing import List, Tuple
+from typing import Iterable
 
-from django.apps import apps
+import pydantic
+from cellarium.nexus.omics_datastore.bq_avro_schemas import cell_management
 
 
-def get_obs_column_choices() -> List[Tuple[str, str]]:
+def _choices_from_schema(
+    *, model: type[pydantic.BaseModel], exclude: Iterable[str]
+) -> list[tuple[str, str]]:
     """
-    Get available column choices for obs mapping from CellInfo model.
+    Build choices from a Pydantic schema's fields using their titles.
 
-    :return: List of (field_name, verbose_name) tuples
+    :param model: Pydantic model class to introspect
+    :param exclude: Iterable of field names to exclude
 
-    :raise LookupError: If model is not found
-    :raise AttributeError: If field metadata is missing
+    :raise ValueError: If field metadata retrieval fails
+
+    :return: List of tuples in the form ``(field_name, title)``
     """
-    CellInfo = apps.get_model("cell_management", "CellInfo")
-    return [
-        (field.name, field.verbose_name)
-        for field in CellInfo._meta.fields
-        if field.name not in ["id", "ingest", "metadata_extra", "tag"]
-    ]
+    exclude_set = set(exclude)
+    choices: list[tuple[str, str]] = []
+    # Pydantic v2 stores fields on `model_fields`
+    for name, field in model.model_fields.items():
+        if name in exclude_set:
+            continue
+        title = field.title or name
+        choices.append((name, title))
+    return choices
 
 
-def get_var_column_choices() -> List[Tuple[str, str]]:
+def get_obs_column_choices() -> list[tuple[str, str]]:
     """
-    Get available column choices for var mapping from FeatureInfo model.
+    Get available column choices for obs mapping from ``CellInfoBQAvroSchema``.
 
-    :return: List of (field_name, verbose_name) tuples
+    :raise ValueError: If field metadata retrieval fails
 
-    :raise LookupError: If model is not found
-    :raise AttributeError: If field metadata is missing
+    :return: List of tuples in the form ``(field_name, title)``
     """
-    FeatureInfo = apps.get_model("cell_management", "CellFeatureInfo")
-    return [
-        (field.name, field.verbose_name)
-        for field in FeatureInfo._meta.fields
-        if field.name not in ["id", "metadata_extra"]
-    ]
+    return _choices_from_schema(
+        model=cell_management.CellInfoBQAvroSchema,
+        exclude=["id", "ingest_id", "metadata_extra", "tag"],
+    )
+
+
+def get_var_column_choices() -> list[tuple[str, str]]:
+    """
+    Get available column choices for var mapping from ``FeatureInfoBQAvroSchema``.
+
+    :raise ValueError: If field metadata retrieval fails
+
+    :return: List of tuples in the form ``(field_name, title)``
+    """
+    return _choices_from_schema(
+        model=cell_management.FeatureInfoBQAvroSchema,
+        exclude=["id", "metadata_extra"],
+    )
