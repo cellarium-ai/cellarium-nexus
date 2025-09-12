@@ -1,12 +1,11 @@
 from typing import Iterable
 
 import pydantic
+
 from cellarium.nexus.omics_datastore.bq_avro_schemas import cell_management
 
 
-def _choices_from_schema(
-    *, model: type[pydantic.BaseModel], exclude: Iterable[str]
-) -> list[tuple[str, str]]:
+def _choices_from_schema(*, model: type[pydantic.BaseModel], exclude: Iterable[str]) -> list[tuple[str, str]]:
     """
     Build choices from a Pydantic schema's fields using their titles.
 

@@ -1,14 +1,9 @@
-from typing import Type
-
-from django.db.models import Model
-
-from rest_framework import status
+from rest_framework import exceptions, status
 from rest_framework.generics import CreateAPIView, GenericAPIView, RetrieveUpdateAPIView
 from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from cellarium.nexus.backend.cell_management import models as cell_models
 from cellarium.nexus.backend.core.utils.reset_cache import reset_cache_and_repopulate
 from cellarium.nexus.backend.ingest_management import models
 from cellarium.nexus.backend.ingest_management.api import serializers
@@ -27,24 +22,32 @@ class IngestRetrieveUpdateAPIView(RetrieveUpdateAPIView):
 
 
 class ReserveIndexesAPIViewAbstract(GenericAPIView):
-    """Abstract API View to reserve indexes for a given model."""
+    """Abstract API View to reserve indexes for a given resource key and dataset."""
 
     serializer_class = serializers.ReserveIndexesSerializer
-    model_class: Type[Model] = None
+    resource_key: str | None = None
 
     def perform_reserve(self, serializer: serializers.ReserveIndexesSerializer) -> dict[str, int]:
         """
-        Handles the index reservation logic.
+        Handle the index reservation logic.
 
         :param serializer: The validated serializer instance.
+
+        :raise exceptions.ValidationError: if resource_key is missing
 
         :return: Dictionary with start_index and end_index.
         """
         batch_size = serializer.validated_data["batch_size"]
+        bigquery_dataset = serializer.validated_data["bigquery_dataset"]
 
-        start_index, end_index = index_tracking.reserve_indexes(model_class=self.model_class, batch_size=batch_size)
+        if not self.resource_key:
+            raise exceptions.ValidationError("Resource key is not configured for this endpoint")
 
-        return {"start_index": start_index, "end_index": end_index}
+        start_index, end_index = index_tracking.reserve_indexes(
+            bigquery_dataset=bigquery_dataset, resource_key=self.resource_key, batch_size=batch_size
+        )
+
+        return {"index_start": start_index, "index_end": end_index}
 
     def post(self, request: Request, *args, **kwargs) -> Response:
         """
@@ -54,20 +57,19 @@ class ReserveIndexesAPIViewAbstract(GenericAPIView):
         serializer.is_valid(raise_exception=True)
 
         response_data = self.perform_reserve(serializer)
-
         return Response(response_data)
 
 
 class ReserveIndexesCellInfoAPIView(ReserveIndexesAPIViewAbstract):
-    """Reserves indexes for CellInfo model."""
+    """Reserve indexes for CellInfo resource."""
 
-    model_class = cell_models.CellInfo
+    resource_key = "cell_info"
 
 
 class ReserveIndexesFeatureInfoAPIView(ReserveIndexesAPIViewAbstract):
-    """Reserves indexes for FeatureInfo model."""
+    """Reserve indexes for FeatureInfo resource."""
 
-    model_class = cell_models.CellFeatureInfo
+    resource_key = "feature_info"
 
 
 class ValidationReportItemCreateAPIView(CreateAPIView):

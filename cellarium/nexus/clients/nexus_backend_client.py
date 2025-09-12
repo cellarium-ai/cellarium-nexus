@@ -88,11 +88,12 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
         return IngestInfoAPISchema(**api_out)
 
     def __reserve_indexes_for_model(
-        self, batch_size: int, reserve_model_type: ReserveIndexesModelType
+        self, *, bigquery_dataset: str, batch_size: int, reserve_model_type: ReserveIndexesModelType
     ) -> tuple[int, int]:
         """
-        Reserve a batch of indexes for a specific model type.
+        Reserve a batch of indexes for a specific model type and dataset.
 
+        :param bigquery_dataset: Name of the BigQuery dataset to scope the reservation
         :param batch_size: Number of indexes to reserve
         :param reserve_model_type: Type of model to reserve indexes for
 
@@ -109,13 +110,20 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
             case _:
                 raise ValueError("Not supported type")
 
-        api_out = self.post_json(endpoint=endpoint, data={"batch_size": batch_size})
-        return api_out["start_index"], api_out["end_index"]
+        api_out = self.post_json(
+            endpoint=endpoint,
+            data={
+                "bigquery_dataset": bigquery_dataset,
+                "batch_size": batch_size,
+            },
+        )
+        return api_out["index_start"], api_out["index_end"]
 
-    def reserve_indexes_cell_info(self, batch_size: int) -> tuple[int, int]:
+    def reserve_indexes_cell_info(self, *, bigquery_dataset: str, batch_size: int) -> tuple[int, int]:
         """
         Reserve a batch of indexes for cell info records.
 
+        :param bigquery_dataset: Name of the BigQuery dataset to scope the reservation
         :param batch_size: Number of indexes to reserve
 
         :raise HTTPError: if the request fails
@@ -124,13 +132,16 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
         :return: Tuple of (start_index, end_index)
         """
         return self.__reserve_indexes_for_model(
-            batch_size=batch_size, reserve_model_type=ReserveIndexesModelType.CELL_INFO
+            bigquery_dataset=bigquery_dataset,
+            batch_size=batch_size,
+            reserve_model_type=ReserveIndexesModelType.CELL_INFO,
         )
 
-    def reserve_indexes_feature_info(self, batch_size: int) -> tuple[int, int]:
+    def reserve_indexes_feature_info(self, *, bigquery_dataset: str, batch_size: int) -> tuple[int, int]:
         """
         Reserve a batch of indexes for feature info records.
 
+        :param bigquery_dataset: Name of the BigQuery dataset to scope the reservation
         :param batch_size: Number of indexes to reserve
 
         :raise HTTPError: if the request fails
@@ -139,7 +150,9 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
         :return: Tuple of (start_index, end_index)
         """
         return self.__reserve_indexes_for_model(
-            batch_size=batch_size, reserve_model_type=ReserveIndexesModelType.FEATURE_INFO
+            bigquery_dataset=bigquery_dataset,
+            batch_size=batch_size,
+            reserve_model_type=ReserveIndexesModelType.FEATURE_INFO,
         )
 
     def register_curriculum(

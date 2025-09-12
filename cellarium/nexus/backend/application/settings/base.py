@@ -266,24 +266,6 @@ UNFOLD = {
             },
         ],
     },
-    "TABS": [
-        {
-            "models": [
-                "cell_management.cellinfo",
-                "cell_management.cellfeatureinfo",
-            ],
-            "items": [
-                {
-                    "title": _("Cells"),
-                    "link": reverse_lazy("admin:cell_management_cellinfo_changelist"),
-                },
-                {
-                    "title": _("Cell Features"),
-                    "link": reverse_lazy("admin:cell_management_cellfeatureinfo_changelist"),
-                },
-            ],
-        },
-    ],
 }
 
 # Google Cloud Storage Settings

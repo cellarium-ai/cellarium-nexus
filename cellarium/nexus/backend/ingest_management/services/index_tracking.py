@@ -1,24 +1,27 @@
-from typing import Type
-
-from django.contrib.contenttypes.models import ContentType
 from django.db import transaction
-from django.db.models import Model
 
-from cellarium.nexus.backend.ingest_management import models
+from cellarium.nexus.backend.ingest_management import models as ingest_models
 
 
-def reserve_indexes(model_class: Type[Model], batch_size: int) -> tuple[int, int]:
+def reserve_indexes(
+    *, bigquery_dataset: "ingest_models.BigQueryDataset", resource_key: str, batch_size: int
+) -> tuple[int, int]:
     """
-    Reserves a batch of indexes atomically for the given model.
+    Reserve a batch of indexes atomically for the given dataset and resource key.
 
-    :param model_class: The Django model class to track indexes for.
-    :param batch_size: The number of indexes to reserve.
+    :param bigquery_dataset: BigQuery dataset instance to scope the index space
 
-    :return: Tuple (start_index, end_index)
+    :param resource_key: Logical resource key identifying the index namespace (e.g., "cell_info")
+
+    :param batch_size: Number of indexes to reserve in this batch
+
+    :return: Tuple with start and end indexes (start_index, end_index)
     """
     with transaction.atomic():
-        content_type = ContentType.objects.get_for_model(model=model_class)
-        tracking, created = models.IndexTracking.objects.select_for_update().get_or_create(content_type=content_type)
+        tracking, _ = ingest_models.IndexTracking.objects.select_for_update().get_or_create(
+            bigquery_dataset=bigquery_dataset,
+            resource_key=resource_key,
+        )
 
         start_index = tracking.largest_index + 1
         end_index = start_index + batch_size - 1

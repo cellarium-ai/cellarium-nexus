@@ -171,10 +171,12 @@ class NexusDataOpsCoordinator:
                 del adata
 
                 cell_info_start_index, cell_info_end_index = self.backend_client.reserve_indexes_cell_info(
-                    batch_size=total_cells
+                    bigquery_dataset=bigquery_dataset,
+                    batch_size=total_cells,
                 )
                 feature_info_start_index, feature_info_end_index = self.backend_client.reserve_indexes_feature_info(
-                    batch_size=total_features
+                    bigquery_dataset=bigquery_dataset,
+                    batch_size=total_features,
                 )
 
                 ingest_job_result = self.bq_data_operator.create_ingest_files(
