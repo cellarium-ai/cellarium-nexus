@@ -10,7 +10,7 @@ class IngestInfoBQAvroSchema(BaseModel):
 class FeatureInfoBQAvroSchema(BaseModel):
     id: int = Field(default=..., title="id", description="Primary key, unique identifier")
     ensemble_id: str = Field(default=..., title="ensemble id", description="Original identifier")
-    symbol: str = Field(default=..., title="symbol", description="Name of the feature")
+    symbol: str | None = Field(default=..., title="symbol", description="Name of the feature")
     tag: str | None = Field(default=None, title="tag")
     ingest_id: int = Field(default=..., title="ingest id", description="Foreign key referencing IngestInfo")
     metadata_extra: JSONBQField = Field(description="Extra metadata for the variable, optional")
