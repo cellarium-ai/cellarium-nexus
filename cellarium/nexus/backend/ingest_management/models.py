@@ -1,7 +1,6 @@
 import uuid
 
 from django.contrib.auth import get_user_model
-from django.contrib.contenttypes.fields import GenericForeignKey
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
@@ -104,24 +103,23 @@ class VarColumnMapping(models.Model):
 
 
 class IndexTracking(models.Model):
-    content_type = models.OneToOneField(
-        to="contenttypes.ContentType",
+    bigquery_dataset = models.ForeignKey(
+        to="cell_management.BigQueryDataset",
         on_delete=models.CASCADE,
-        unique=True,
-        verbose_name=_("tracked model"),
-        related_name="ingest_management_indextracking",
+        related_name="ingest_management_index_trackings",
+        verbose_name=_("BigQuery dataset"),
     )
-    table_object_id = models.PositiveIntegerField(default=0, verbose_name=_("table object id"))
-    tracked_model = GenericForeignKey(ct_field="content_type", fk_field="table_object_id")
+    resource_key = models.CharField(max_length=100, verbose_name=_("resource key"))
     largest_index = models.BigIntegerField(default=0, verbose_name=_("largest assigned index"))
 
     class Meta:
         verbose_name = "Index Tracking"
         verbose_name_plural = "Index Tracking Entries"
         app_label = "ingest_management"
+        unique_together = ("bigquery_dataset", "resource_key")
 
     def __str__(self):
-        return f"{self.content_type.name} -- {self.largest_index}"
+        return f"{self.bigquery_dataset} | {self.resource_key} -- {self.largest_index}"
 
 
 class ValidationReport(models.Model):

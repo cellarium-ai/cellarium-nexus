@@ -171,10 +171,12 @@ class NexusDataOpsCoordinator:
                 del adata
 
                 cell_info_start_index, cell_info_end_index = self.backend_client.reserve_indexes_cell_info(
-                    batch_size=total_cells
+                    bigquery_dataset=bigquery_dataset,
+                    batch_size=total_cells,
                 )
                 feature_info_start_index, feature_info_end_index = self.backend_client.reserve_indexes_feature_info(
-                    batch_size=total_features
+                    bigquery_dataset=bigquery_dataset,
+                    batch_size=total_features,
                 )
 
                 ingest_job_result = self.bq_data_operator.create_ingest_files(
@@ -230,13 +232,6 @@ class NexusDataOpsCoordinator:
             gcs_stage_dir=bucket_stage_dir,
         )
 
-    def _ingest_data_in_nexus_backend(self, bucket_stage_dir: str, ingest_id: int) -> None:
-        logging.info(f"Ingesting data to Nexus backend...")
-        self.backend_client.ingest_from_avro(
-            stage_dir=bucket_stage_dir,
-            ingest_id=ingest_id,
-        )
-
     @staticmethod
     def _cleanup_ingest_files(bucket_name: str, bucket_stage_dir: str) -> list[str]:
         """
@@ -284,8 +279,8 @@ class NexusDataOpsCoordinator:
 
         try:
             with self._ingest_data_to_bigquery(bucket_name=bucket_name, bucket_stage_dir=bucket_stage_dir):
-                # If nexus backend does not return a success status, data will not be ingested in BigQuery as well
-                self._ingest_data_in_nexus_backend(bucket_stage_dir=bucket_stage_dir, ingest_id=ingest_id)
+                # Nothing to do inside; commit happens on clean exit of this block.
+                pass
 
             self._cleanup_ingest_files(bucket_name=bucket_name, bucket_stage_dir=bucket_stage_dir)
         except Exception as e:

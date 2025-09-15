@@ -16,7 +16,6 @@ class ApiEndpoints:
     UPDATE_INGEST_FILE_INFO: str = "api/ingest-management/ingest/{id}"
     CELL_INFO_RESERVE_INDEXES: str = "api/ingest-management/reserve-indexes/cell-info/"
     FEATURE_INFO_RESERVE_INDEXES: str = "api/ingest-management/reserve-indexes/feature-info/"
-    INGEST_FROM_AVRO: str = "api/ingest-management/ingest-from-avro/"
     REGISTER_CURRICULUM: str = "api/curriculum/curriculums/"
     UPDATE_CURRICULUM: str = "api/curriculum/curriculums/{name}/"
     CREATE_VALIDATION_REPORT_ITEM: str = "api/ingest-management/validation-report-item/create/"
@@ -89,11 +88,12 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
         return IngestInfoAPISchema(**api_out)
 
     def __reserve_indexes_for_model(
-        self, batch_size: int, reserve_model_type: ReserveIndexesModelType
+        self, *, bigquery_dataset: str, batch_size: int, reserve_model_type: ReserveIndexesModelType
     ) -> tuple[int, int]:
         """
-        Reserve a batch of indexes for a specific model type.
+        Reserve a batch of indexes for a specific model type and dataset.
 
+        :param bigquery_dataset: Name of the BigQuery dataset to scope the reservation
         :param batch_size: Number of indexes to reserve
         :param reserve_model_type: Type of model to reserve indexes for
 
@@ -110,13 +110,20 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
             case _:
                 raise ValueError("Not supported type")
 
-        api_out = self.post_json(endpoint=endpoint, data={"batch_size": batch_size})
-        return api_out["start_index"], api_out["end_index"]
+        api_out = self.post_json(
+            endpoint=endpoint,
+            data={
+                "bigquery_dataset": bigquery_dataset,
+                "batch_size": batch_size,
+            },
+        )
+        return api_out["index_start"], api_out["index_end"]
 
-    def reserve_indexes_cell_info(self, batch_size: int) -> tuple[int, int]:
+    def reserve_indexes_cell_info(self, *, bigquery_dataset: str, batch_size: int) -> tuple[int, int]:
         """
         Reserve a batch of indexes for cell info records.
 
+        :param bigquery_dataset: Name of the BigQuery dataset to scope the reservation
         :param batch_size: Number of indexes to reserve
 
         :raise HTTPError: if the request fails
@@ -125,13 +132,16 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
         :return: Tuple of (start_index, end_index)
         """
         return self.__reserve_indexes_for_model(
-            batch_size=batch_size, reserve_model_type=ReserveIndexesModelType.CELL_INFO
+            bigquery_dataset=bigquery_dataset,
+            batch_size=batch_size,
+            reserve_model_type=ReserveIndexesModelType.CELL_INFO,
         )
 
-    def reserve_indexes_feature_info(self, batch_size: int) -> tuple[int, int]:
+    def reserve_indexes_feature_info(self, *, bigquery_dataset: str, batch_size: int) -> tuple[int, int]:
         """
         Reserve a batch of indexes for feature info records.
 
+        :param bigquery_dataset: Name of the BigQuery dataset to scope the reservation
         :param batch_size: Number of indexes to reserve
 
         :raise HTTPError: if the request fails
@@ -140,26 +150,10 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
         :return: Tuple of (start_index, end_index)
         """
         return self.__reserve_indexes_for_model(
-            batch_size=batch_size, reserve_model_type=ReserveIndexesModelType.FEATURE_INFO
+            bigquery_dataset=bigquery_dataset,
+            batch_size=batch_size,
+            reserve_model_type=ReserveIndexesModelType.FEATURE_INFO,
         )
-
-    def ingest_from_avro(self, stage_dir: str, ingest_id: int) -> dict[str, int]:
-        """
-        Trigger ingestion of CellInfo and FeatureInfo from Avro files.
-
-        :param stage_dir: Base staging directory path where the Avro files are located
-        :param ingest_id: ID of the ingest process
-
-        :raise HTTPError: if the request fails
-        :raise ValueError: if the response is invalid
-
-        :return: Dictionary containing counts of ingested records
-        """
-        data = {"stage_dir": stage_dir, "ingest_id": ingest_id}
-
-        api_out = self.post_json(endpoint=ApiEndpoints.INGEST_FROM_AVRO, data=data)
-
-        return {"cell_info_count": api_out["cell_info_count"], "feature_info_count": api_out["feature_info_count"]}
 
     def register_curriculum(
         self,

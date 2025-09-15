@@ -1,5 +1,4 @@
 import pandas as pd
-from django.conf import settings
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse
@@ -9,7 +8,6 @@ from django.utils.translation import gettext_lazy as _
 from unfold.admin import ModelAdmin, TabularInline
 from unfold.decorators import action
 
-from cellarium.nexus.backend.core.admin.helpers import CountRelatedObjectsDeleteMixin
 from cellarium.nexus.backend.ingest_management import models
 from cellarium.nexus.backend.ingest_management.admin import constants, forms
 from cellarium.nexus.backend.ingest_management.admin import utils as admin_utils
@@ -44,7 +42,7 @@ class ColumnMappingAdmin(ModelAdmin):
 
 
 @admin.register(models.IngestInfo)
-class IngestInfoAdmin(CountRelatedObjectsDeleteMixin, ModelAdmin):
+class IngestInfoAdmin(ModelAdmin):
     """
     Admin interface for managing ingest file information.
 
@@ -52,9 +50,6 @@ class IngestInfoAdmin(CountRelatedObjectsDeleteMixin, ModelAdmin):
     Prevents direct creation and editing of ingests - they can only be created through the
     'Ingest New Data' action.
     """
-
-    # Override the actions to use our custom delete_selected action
-    actions = ["delete_selected"]
 
     # Prevent adding new instances through the admin interface
     def has_add_permission(self, request: HttpRequest) -> bool:

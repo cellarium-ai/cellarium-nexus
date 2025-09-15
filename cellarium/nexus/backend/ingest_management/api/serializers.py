@@ -53,8 +53,14 @@ class IngestFromAvroSerializer(serializers.Serializer):
 
 
 class ReserveIndexesSerializer(serializers.Serializer):
-    """Serializer for reserving indexes."""
+    """Serialize input and output for reserving indexes."""
 
+    bigquery_dataset = serializers.SlugRelatedField(
+        slug_field="name",
+        queryset=cell_models.BigQueryDataset.objects.all(),
+        write_only=True,
+        help_text="Name of the BigQuery dataset to scope the reservation",
+    )
     batch_size = serializers.IntegerField(min_value=1, write_only=True)
     index_start = serializers.IntegerField(read_only=True)
     index_end = serializers.IntegerField(read_only=True)

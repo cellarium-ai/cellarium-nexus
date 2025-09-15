@@ -1,0 +1,48 @@
+{# Filters partial for Cell Info admin page (server-rendered formset) #}
+{% load i18n unfold %}
+<div id="filters-block" class="my-8 py-4 border-t border-base-200 dark:border-base-800">
+  <h2 class="mb-3 text-lg font-semibold">Filters</h2>
+
+  <div id="filters-toolbar" class="flex items-center gap-3 mb-3">
+    {% component "admin/custom_components/button.html" with variant="primary" id="filters-add" %}
+      {% trans "Add filter" %}
+    {% endcomponent %}
+    {% component "admin/custom_components/button.html" with variant="default" id="filters-apply" %}
+      {% trans "Apply" %}
+    {% endcomponent %}
+  </div>
+
+  {# Include any JS/CSS required by the forms/widgets (Select2, etc.) #}
+  {{ filters_formset.media }}
+
+  <form id="filters-formset" method="post" novalidate>
+    {% csrf_token %}
+    {{ filters_formset.management_form }}
+
+    <div id="filters-rows" class="mt-2 space-y-2">
+      {% for form in filters_formset.forms %}
+        <div class="filter-row flex flex-wrap items-center gap-2 py-0.5" data-index="{{ forloop.counter0 }}">
+          <div class="w-48">{{ form.field }}</div>
+          <div class="w-40">{{ form.operator }}</div>
+          <div class="w-80 relative value-cell">{{ form.value }}</div>
+          {% if form.DELETE %}{{ form.DELETE.as_hidden }}{% endif %}
+          <button type="button" class="filter-remove inline-flex items-center justify-center h-9 text-sm px-3 bg-transparent border border-base-300 dark:border-base-700 text-red-600 dark:text-red-400 rounded-md hover:bg-base-100 dark:hover:bg-base-800 focus:outline-none focus:ring-1 focus:ring-primary-600 shadow-none">Remove</button>
+        </div>
+      {% endfor %}
+    </div>
+
+    {# Hidden empty form template for JS cloning (uses __prefix__ placeholder) #}
+    <template id="filters-empty-form-template">
+      <div class="filter-row flex flex-wrap items-center gap-2 py-0.5" data-index="__prefix__">
+        <div class="w-48">{{ filters_formset.empty_form.field }}</div>
+        <div class="w-40">{{ filters_formset.empty_form.operator }}</div>
+        <div class="w-80 relative value-cell">{{ filters_formset.empty_form.value }}</div>
+        {% if filters_formset.can_delete %}{{ filters_formset.empty_form.DELETE.as_hidden }}{% endif %}
+        <button type="button" class="filter-remove inline-flex items-center justify-center h-9 text-sm px-3 bg-transparent border border-base-300 dark:border-base-700 text-red-600 dark:text-red-400 rounded-md hover:bg-base-100 dark:hover:bg-base-800 focus:outline-none focus:ring-1 focus:ring-primary-600 shadow-none">Remove</button>
+      </div>
+    </template>
+  </form>
+
+  {# Expose fields metadata to JS #}
+  {{ filters_fields_meta|json_script:"filters-fields-meta" }}
+</div>
