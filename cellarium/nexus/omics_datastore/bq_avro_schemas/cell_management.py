@@ -3,22 +3,22 @@ from pydantic import BaseModel, Field
 
 
 class IngestInfoBQAvroSchema(BaseModel):
-    id: int = Field(..., title="Ingest ID")
+    id: int = Field(title="Ingest ID")
     metadata_extra: JSONBQField | None = Field(default="{}", description="Unstructured metadata, optional")
 
 
 class FeatureInfoBQAvroSchema(BaseModel):
-    id: int = Field(default=..., title="id", description="Primary key, unique identifier")
-    ensemble_id: str = Field(default=..., title="ensemble id", description="Original identifier")
-    symbol: str | None = Field(default=..., title="symbol", description="Name of the feature")
+    id: int = Field(title="id", description="Primary key, unique identifier")
+    ensemble_id: str = Field(title="ensemble id", description="Original identifier")
+    symbol: str | None = Field(title="symbol", description="Name of the feature")
     tag: str | None = Field(default=None, title="tag")
-    ingest_id: int = Field(default=..., title="ingest id", description="Foreign key referencing IngestInfo")
+    ingest_id: int = Field(title="ingest id", description="Foreign key referencing IngestInfo")
     metadata_extra: JSONBQField = Field(description="Extra metadata for the variable, optional")
     biotype: str | None = Field(default=None, title="biotype", description="Biotype of the feature, optional")
     is_filtered: bool | None = Field(
         default=None, title="is filtered", description="Indicates if the feature is filtered, optional"
     )
-    reference: str = Field(default=..., title="reference", description="Reference information for the feature")
+    reference: str = Field(title="reference", description="Reference information for the feature")
 
     class Config:
         title = "FeatureInfo"
@@ -27,14 +27,14 @@ class FeatureInfoBQAvroSchema(BaseModel):
 
 
 class CellInfoBQAvroSchema(BaseModel):
-    id: int = Field(default=..., title="ID")
-    original_id: str = Field(default=..., title="Original ID")
-    ingest_id: int = Field(default=..., title="Ingest ID")
+    id: int = Field(title="ID")
+    original_id: str = Field(title="Original ID")
+    ingest_id: int = Field(title="Ingest ID")
     metadata_extra: JSONBQField = Field(title="Obs Metadata Extra")
     tag: str | None = Field(default=None, title="tag")
     # Cell Features
     donor_id: str | None = Field(default=None, title="Donor ID")
-    cell_type: str | None = Field(default=..., title="Cell Type")
+    cell_type: str | None = Field(default=None, title="Cell Type")
     assay: str | None = Field(default=None, title="Assay")
     development_stage: str | None = Field(default=None, title="Development Stage")
     tissue: str | None = Field(default=None, title="Tissue")
@@ -59,6 +59,6 @@ class CellInfoBQAvroSchema(BaseModel):
 
 
 class RawCountMatrixCOOBQAvroSchema(BaseModel):
-    cell_id: int = Field(default=..., title="Cell ID")
-    feature_id: int = Field(default=..., title="Feature ID")
-    raw_count: int = Field(default=..., title="Raw Count Value")
+    cell_id: int = Field(title="Cell ID")
+    feature_id: int = Field(title="Feature ID")
+    raw_count: int = Field(title="Raw Count Value")

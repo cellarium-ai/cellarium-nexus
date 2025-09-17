@@ -239,6 +239,63 @@ def _apply_column_mapping(df: pd.DataFrame, mapping: dict[str, str]) -> pd.DataF
     return df
 
 
+def _required_non_optional_string_fields(model: t.Type[pydantic.BaseModel]) -> set[str]:
+    """
+    Determine required, non-optional string fields for a Pydantic model.
+
+    A field is considered required and non-optional if its annotation is :class:`str` (not Optional)
+    and it has no default value.
+
+    :param model: Pydantic model class to inspect
+
+    :return: Set of field names that must exist and contain strings
+    """
+    required: set[str] = set()
+    for name, field in model.model_fields.items():
+        annotation = field.annotation
+        if annotation is str and field.is_required():
+            required.add(name)
+    return required
+
+
+def _validate_required_string_columns(df: pd.DataFrame, required_cols: set[str], context: str) -> None:
+    """
+    Validate that required string columns exist and contain non-null string values.
+
+    :param df: Dataframe to validate
+    :param required_cols: Set of required string column names
+    :param context: Human-readable context for error messages, e.g. "obs" or "var"
+
+    :raise: DataIngestError
+    :return: None
+    """
+    missing = sorted([c for c in required_cols if c not in df.columns])
+    if missing:
+        raise exceptions.DataValidationError(f"Missing required {context} string columns: {', '.join(missing)}")
+
+    # Check non-null and type
+    bad_nulls: list[str] = []
+    bad_types: list[str] = []
+    for col in required_cols:
+        series = df[col]
+        if series.isna().any():
+            bad_nulls.append(col)
+        # Ensure all non-null are strings
+        if not series.dropna().map(lambda v: isinstance(v, str)).all():
+            bad_types.append(col)
+
+    messages: list[str] = []
+    if bad_nulls:
+        messages.append(f"columns with null values: {', '.join(sorted(bad_nulls))}")
+    if bad_types:
+        messages.append(f"columns with non-string values: {', '.join(sorted(bad_types))}")
+
+    if messages:
+        raise exceptions.DataValidationError(
+            f"Invalid values for required {context} string columns; " + "; ".join(messages)
+        )
+
+
 def _ensure_schema_fields(df: pd.DataFrame, schema_field_names: list[str]) -> pd.DataFrame:
     """
     Ensure all schema fields exist in the dataframe, filling missing columns with None values.
@@ -393,6 +450,13 @@ def prepare_input_anndata(
         end_index=feature_index_end,
         column_mapping=var_mapping,
     )
+
+    # Validate required string columns prior to writing AnnData
+    obs_required_str = _required_non_optional_string_fields(model=CellInfoBQAvroSchema)
+    var_required_str = _required_non_optional_string_fields(model=FeatureInfoBQAvroSchema)
+
+    _validate_required_string_columns(df=df_obs_schema_data, required_cols=obs_required_str, context="obs")
+    _validate_required_string_columns(df=df_var_schema_data, required_cols=var_required_str, context="var")
 
     # Update the AnnData object with processed data
     adata.obs = df_obs_schema_data

@@ -2,6 +2,10 @@ class OmicsDatastoreException(Exception):
     pass
 
 
+class DataValidationError(OmicsDatastoreException):
+    pass
+
+
 class DataProcessingError(OmicsDatastoreException):
     pass
 
