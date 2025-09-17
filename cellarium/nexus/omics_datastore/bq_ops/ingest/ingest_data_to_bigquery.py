@@ -1,7 +1,7 @@
+import datetime
 import logging
 import uuid
 from contextlib import contextmanager
-from datetime import datetime
 from typing import Any, Generator, List, Tuple
 
 from google.api_core.exceptions import NotFound
@@ -36,7 +36,7 @@ def generate_staging_suffix() -> str:
 
     :return: A unique staging suffix in format 'staging_YYYYMMDDHHMMSS_uuid'
     """
-    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    timestamp = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d%H%M%S")
     unique_id = uuid.uuid4().hex[:6]
     return f"staging_{timestamp}_{unique_id}"
 
