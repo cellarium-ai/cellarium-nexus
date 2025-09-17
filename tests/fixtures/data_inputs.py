@@ -1,6 +1,5 @@
-import concurrent.futures as cf
 import pathlib
-from typing import Iterator, Tuple
+from typing import Tuple
 
 import anndata
 import numpy as np
@@ -9,15 +8,6 @@ import pytest
 import scipy.sparse as sp
 
 from cellarium.nexus.omics_datastore.bq_ops import constants as ingest_constants
-from cellarium.nexus.omics_datastore.bq_ops.ingest import create_ingest_files
-
-
-@pytest.fixture(autouse=True)
-def rng_seed() -> None:
-    """
-    Set deterministic random seed for tests in this package.
-    """
-    np.random.seed(0)
 
 
 @pytest.fixture()
@@ -83,6 +73,8 @@ def small_anndata(tmp_path: pathlib.Path, small_csr_matrix: sp.csr_matrix) -> Tu
 def obs_var_mappings() -> dict:
     """
     Provide example column mappings for obs and var, including index mapping.
+
+    :return: Mapping dictionary for obs and var
     """
     return {
         "obs_mapping": {
@@ -94,16 +86,3 @@ def obs_var_mappings() -> dict:
             "gene": "gene_name",
         },
     }
-
-
-@pytest.fixture()
-def patched_process_pool_executor(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """
-    Patch ProcessPoolExecutor in the target module to use ThreadPoolExecutor to avoid multiprocessing in tests.
-
-    :param monkeypatch: Pytest monkeypatch fixture
-    """
-    # Use ThreadPoolExecutor to produce real Future objects compatible with concurrent.futures.wait
-    monkeypatch.setattr(create_ingest_files.concurrency, "ProcessPoolExecutor", cf.ThreadPoolExecutor)
-    yield
-    # automatic unpatch on fixture teardown

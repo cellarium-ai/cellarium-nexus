@@ -1,3 +1,5 @@
 pytest_plugins = [
-    "tests.omics_datastore.bq_ops.fixtures",
+    "tests.fixtures.data_inputs",
+    "tests.fixtures.helpers",
+    "tests.fixtures.mocks",
 ]
