@@ -1,5 +1,5 @@
 <%!
-    from nexus.omics_datastore.bq_ops import constants
+    from cellarium.nexus.omics_datastore.bq_ops import constants
 %>
 -- Count distinct values of a column in a base table
 select count(distinct(${column_name})) as distinct_count

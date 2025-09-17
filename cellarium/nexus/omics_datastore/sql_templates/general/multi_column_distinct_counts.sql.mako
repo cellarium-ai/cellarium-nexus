@@ -1,5 +1,5 @@
 <%!
-    from nexus.omics_datastore.bq_ops import constants
+    from cellarium.nexus.omics_datastore.bq_ops import constants
 %>
 -- Count distinct values for multiple columns in a base table
 -- Expects: project, dataset, table_name, column_names (list[str])

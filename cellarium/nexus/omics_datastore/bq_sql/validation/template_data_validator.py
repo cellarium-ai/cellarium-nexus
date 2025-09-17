@@ -1,5 +1,5 @@
-from nexus.omics_datastore.bq_sql.constants import ComparisonOperators
-from nexus.omics_datastore.bq_sql.validation import exceptions
+from cellarium.nexus.omics_datastore.bq_sql.constants import ComparisonOperators
+from cellarium.nexus.omics_datastore.bq_sql.validation import exceptions
 
 
 def validate_not_empty(value: str | list | dict) -> None:

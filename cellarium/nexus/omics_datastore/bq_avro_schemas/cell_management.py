@@ -1,5 +1,6 @@
-from nexus.omics_datastore.bq_avro_schemas.custom_types import JSONBQField
 from pydantic import BaseModel, Field
+
+from cellarium.nexus.omics_datastore.bq_avro_schemas.custom_types import JSONBQField
 
 
 class IngestInfoBQAvroSchema(BaseModel):
