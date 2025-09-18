@@ -4,6 +4,7 @@ from typing import Iterator
 import numpy as np
 import pytest
 
+from cellarium.nexus.omics_datastore.bq_ops.extract import extract as extract_module
 from cellarium.nexus.omics_datastore.bq_ops.ingest import create_ingest_files
 
 
@@ -20,11 +21,13 @@ def rng_seed() -> None:
 @pytest.fixture()
 def patched_process_pool_executor(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """
-    Patch ProcessPoolExecutor in the target module to use ThreadPoolExecutor to avoid multiprocessing in tests.
+    Patch ProcessPoolExecutor globally to use ThreadPoolExecutor to avoid multiprocessing in tests.
 
     :param monkeypatch: Pytest monkeypatch fixture
 
     :return: None
     """
-    monkeypatch.setattr(create_ingest_files.concurrency, "ProcessPoolExecutor", cf.ThreadPoolExecutor)
+    # Patch on the concurrent.futures module so any module aliasing it (e.g., "import concurrent.futures as concurrency")
+    # sees the patched ProcessPoolExecutor.
+    monkeypatch.setattr(cf, "ProcessPoolExecutor", cf.ThreadPoolExecutor)
     yield
