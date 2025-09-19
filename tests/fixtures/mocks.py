@@ -1,6 +1,8 @@
 import datetime as dt
 import typing
 
+import google.auth as google_auth
+import google.auth.credentials as google_auth_credentials
 import pytest
 from google.cloud import bigquery
 
@@ -166,6 +168,28 @@ class BQClientMock:
         :raise: None
         """
         self.delete_table_recorder.append(table_id)
+
+
+@pytest.fixture(autouse=True)
+def disable_google_adc(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Disable Google Application Default Credentials lookup in tests.
+
+    Patch ``google.auth.default`` to return anonymous credentials and a dummy
+    project to prevent network calls and credential discovery in CI.
+
+    :param monkeypatch: Pytest monkeypatch fixture
+
+    :raise: None
+
+    :return: None
+    """
+    creds = google_auth_credentials.AnonymousCredentials()
+
+    def _default(*args: typing.Any, **kwargs: typing.Any) -> tuple[google_auth_credentials.AnonymousCredentials, str]:
+        return creds, "test-project"
+
+    monkeypatch.setattr(target=google_auth, name="default", value=_default)
 
 
 @pytest.fixture()
