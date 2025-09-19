@@ -171,6 +171,20 @@ Lint and format
    # Auto-format (Ruff fixes + Black)
    poetry run poe format
 
+Pre-commit hooks
+~~~~~~~~~~~~~~~~
+
+This repository includes a ``.pre-commit-config.yaml`` that runs a local hook to lint via ``poetry run poe lint``.
+
+.. code-block:: bash
+
+   # Install Git hooks
+   poetry run pre-commit install
+
+   # Run all hooks on the entire codebase
+   poetry run pre-commit run --all-files
+
+
 Export pinned requirements for Docker
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
