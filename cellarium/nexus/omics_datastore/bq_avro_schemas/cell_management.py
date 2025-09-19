@@ -45,6 +45,7 @@ class CellInfoBQAvroSchema(BaseModel):
     sex: str | None = Field(default=None, title="Sex")
     suspension_type: str | None = Field(default=None, title="Suspension Type")
     total_mrna_umis: int | None = Field(default=None, title="Total mRNA UMIs")
+    is_primary_data: bool | None = Field(default=None, title="Primary Data")
 
     # Cell Features Ontology Term IDs
     cell_type_ontology_term_id: str | None = Field(default=None, title="Cell Type Ontology Term ID")
