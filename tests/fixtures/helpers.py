@@ -1,4 +1,5 @@
 import concurrent.futures as cf
+import datetime as dt
 from typing import Iterator
 
 import numpy as np
@@ -13,6 +14,24 @@ def rng_seed() -> None:
     :return: None
     """
     np.random.seed(0)
+
+
+@pytest.fixture(autouse=True)
+def compat_datetime_utc(monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Provide ``datetime.UTC`` on Python 3.10 by aliasing to ``datetime.timezone.utc``.
+
+    This ensures test and app code using ``datetime.UTC`` works uniformly across
+    Python 3.10, 3.11, and 3.12.
+
+    :param monkeypatch: Pytest monkeypatch fixture
+
+    :raise: None
+
+    :return: None
+    """
+    if not hasattr(dt, "UTC"):
+        monkeypatch.setattr(dt, "UTC", dt.timezone.utc, raising=False)
 
 
 @pytest.fixture()

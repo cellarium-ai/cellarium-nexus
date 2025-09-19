@@ -36,6 +36,10 @@ def freeze_time(monkeypatch: pytest.MonkeyPatch) -> typing.Callable[[dt.datetime
 
     monkeypatch.setattr(dt, "datetime", _FrozenDateTime)
 
+    # Python 3.11+ introduces datetime.UTC; provide a compatibility shim for 3.10
+    if not hasattr(dt, "UTC"):
+        monkeypatch.setattr(dt, "UTC", dt.timezone.utc, raising=False)
+
     def _set(new_value: dt.datetime) -> None:
         frozen["value"] = new_value
 
