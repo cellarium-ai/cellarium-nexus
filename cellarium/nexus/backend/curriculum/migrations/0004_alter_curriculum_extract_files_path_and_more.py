@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("curriculum", "0003_remove_curriculum_extract_files_dir_and_more"),
     ]

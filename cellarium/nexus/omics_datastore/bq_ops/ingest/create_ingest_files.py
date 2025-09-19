@@ -605,7 +605,7 @@ def dump_core_matrix_in_parallel(
     output_dir: pathlib.Path,
     count_matrix_multiprocessing_batch_size: int = COUNT_MATRIX_MULTIPROCESSING_BATCH_SIZE_DEFAULT,
 ):
-    logger.info(f"Dumping core matrix into COO format to batched CSV files...")
+    logger.info("Dumping core matrix into COO format to batched CSV files...")
     num_batches = math.ceil(total_cells / count_matrix_multiprocessing_batch_size)
 
     # ranges are start-inclusive and end-exclusive

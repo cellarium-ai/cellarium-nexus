@@ -26,7 +26,6 @@ def fill_bigquery_dataset(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("cell_management", "0003_alter_cellinfo_assay_ontology_term_id_and_more"),
     ]

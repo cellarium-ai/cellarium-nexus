@@ -5,7 +5,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("cell_management", "0006_remove_cellinfo_bigquery_dataset_and_more"),
         ("ingest_management", "0002_validationreport_validationreportitem"),

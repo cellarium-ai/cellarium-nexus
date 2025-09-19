@@ -9,7 +9,6 @@ This module targets cache keys produced by BigQuery-backed filter utilities:
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 import django.conf as dj_conf
 import django.db as dj_db

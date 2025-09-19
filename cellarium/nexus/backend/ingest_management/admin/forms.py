@@ -1,6 +1,6 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
-from unfold.widgets import UnfoldAdminFileFieldWidget, UnfoldAdminNullBooleanSelectWidget, UnfoldAdminSelectWidget
+from unfold.widgets import UnfoldAdminFileFieldWidget, UnfoldAdminSelectWidget
 
 from cellarium.nexus.backend.cell_management.models import BigQueryDataset
 from cellarium.nexus.backend.ingest_management.models import ColumnMapping

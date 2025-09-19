@@ -8,7 +8,6 @@ import cellarium.nexus.backend.curriculum.models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [

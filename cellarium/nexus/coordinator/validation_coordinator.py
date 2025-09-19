@@ -7,7 +7,6 @@ from cellarium.nexus.shared.utils import gcp
 
 
 class NexusDataValidationCoordinator:
-
     def __init__(self, *, nexus_backend_api_url: str, validation_report_id: int, max_bytes_valid_per_file: int) -> None:
         """
         Initialize the Nexus data controller.
