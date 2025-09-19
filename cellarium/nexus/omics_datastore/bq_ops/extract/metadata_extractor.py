@@ -2,7 +2,6 @@
 Extract metadata from BigQuery tables for CAS data extracts.
 """
 
-import json
 import logging
 import os
 import ssl
@@ -10,10 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import certifi
-import numpy as np
-import pandas as pd
 from google.cloud import bigquery
-from smart_open import open
 
 from cellarium.nexus.omics_datastore import bq_sql
 from cellarium.nexus.shared.schemas.omics_datastore import ExtractMetadata

@@ -11,7 +11,6 @@ def import_from_string(dotted_path: str):
 
 
 class BigQueryDataValidator:
-
     @staticmethod
     def validate_remote_file_size(adata_gcs_path: str, max_size_bytes: int, raise_exception=True) -> bool:
         is_valid = validate_remote_file_size(adata_gcs_path=adata_gcs_path, max_size_bytes=max_size_bytes)

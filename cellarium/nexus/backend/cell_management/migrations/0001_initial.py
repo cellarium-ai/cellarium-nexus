@@ -6,7 +6,6 @@ import cellarium.nexus.backend.cell_management.models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = []

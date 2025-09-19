@@ -410,7 +410,7 @@ class NexusDataOpsCoordinator:
                 temp_file.flush()
 
                 # Upload to GCS
-                logger.info(f"Uploading metadata to GCS")
+                logger.info("Uploading metadata to GCS")
                 utils.gcp.upload_file_to_bucket(
                     local_file_path=temp_file.name, bucket_name=bucket_name, blob_name=metadata_path
                 )

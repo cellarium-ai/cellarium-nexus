@@ -17,8 +17,8 @@ COPY . /app
 RUN chmod +x deploy/backend/docker-entrypoint.sh
 
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
- && pip install --no-cache-dir -r requirements/backend.txt \
- && pip install --no-cache-dir -e /app \
+ && pip install --no-cache-dir -r deploy/requirements/backend.lock.txt \
+ && pip install --no-cache-dir . \
  && pip install --no-cache-dir gunicorn
 
 EXPOSE 8080

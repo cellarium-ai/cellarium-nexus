@@ -41,10 +41,6 @@ class ValidationReportItemInline(TabularInline):
         if not obj.input_file_gcs_path:
             return "-"
 
-        # Extract the filename from the path (everything after the last slash)
-        path_parts = obj.input_file_gcs_path.split("/")
-        filename = path_parts[-1] if path_parts else ""
-
         # Create a truncated version with ellipsis in the middle
         max_length = 50
         if len(obj.input_file_gcs_path) > max_length:

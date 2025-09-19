@@ -4,7 +4,6 @@ from django.db import migrations
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("cell_management", "0005_ensemble_id_symbol_unique_together"),
     ]

@@ -1,5 +1,5 @@
 <%
-    from nexus.omics_datastore.bq_ops import constants
+    from cellarium.nexus.omics_datastore.bq_ops import constants
 %>
 select 
     id,

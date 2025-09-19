@@ -9,7 +9,6 @@ import cellarium.nexus.backend.ingest_management.utils.column_mapping
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [

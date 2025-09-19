@@ -7,7 +7,6 @@ def default_empty_dict():
 
 
 class BigQueryDatasetQuerySet(models.QuerySet):
-
     def get_default_dataset(self) -> models.Model | None:
         """
         Get the default BigQuery dataset if only one exists.

@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y gcc python3-dev libpq-dev git \
 COPY . /app
 
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
- && pip install --no-cache-dir -r requirements/pipelines.txt \
- && pip install --no-cache-dir -e /app
+ && pip install --no-cache-dir -r deploy/requirements/workflows.lock.txt \
+ && pip install --no-cache-dir .
 
 ENV PYTHONPATH=/app:/app/cellarium:/app/cellarium/nexus

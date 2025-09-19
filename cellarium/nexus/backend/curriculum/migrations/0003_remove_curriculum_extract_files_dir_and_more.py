@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("curriculum", "0002_curriculum_extract_bin_count_and_more"),
     ]

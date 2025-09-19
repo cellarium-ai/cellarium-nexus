@@ -1,5 +1,5 @@
 <%!
-    from nexus.omics_datastore.bq_ops import constants
+    from cellarium.nexus.omics_datastore.bq_ops import constants
 %>
 create or replace table `${project}.${dataset}.${extract_table_prefix}${constants.BQ_EXTRACT_MATRIX_COO_TABLE_NAME}`
 partition by range_bucket(extract_bin, generate_array(0, ${partition_bin_count}, ${partition_size}))

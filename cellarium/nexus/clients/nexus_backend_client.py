@@ -2,13 +2,13 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Literal
 
-from nexus.clients.api_schemas import (
+from cellarium.nexus.clients.api_schemas import (
     BackendResetAPISchema,
     CurriculumAPISchema,
     IngestInfoAPISchema,
     ValidationReportItemAPISchema,
 )
-from nexus.clients.base import BaseAPIHTTPClient
+from cellarium.nexus.clients.base import BaseAPIHTTPClient
 
 
 class ApiEndpoints:

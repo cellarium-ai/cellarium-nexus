@@ -1,0 +1,21 @@
+# --- GitHub Linguist configuration ---
+
+# Ignore Poetry lockfile (huge TOML file)
+poetry.lock linguist-vendored
+
+# Ignore Jupyter notebooks (JSON masquerading as code)
+*.ipynb linguist-vendored
+
+# Ignore common dependency/metadata files
+*.yml linguist-vendored
+*.yaml linguist-vendored
+*.toml linguist-vendored
+*.json linguist-vendored
+*.ini linguist-vendored
+
+# Ignore documentation files
+*.md linguist-documentation
+*.rst linguist-documentation
+
+# Ignore migrations (Django/SQLAlchemy, etc.)
+migrations/** linguist-vendored
