@@ -4,9 +4,6 @@ from typing import Iterator
 import numpy as np
 import pytest
 
-from cellarium.nexus.omics_datastore.bq_ops.extract import extract as extract_module
-from cellarium.nexus.omics_datastore.bq_ops.ingest import create_ingest_files
-
 
 @pytest.fixture(autouse=True)
 def rng_seed() -> None:

@@ -119,7 +119,7 @@ def test_create_ingest_files_tag_empty_string(
         },
     }
 
-    result = create_ingest_files.create_ingest_files(
+    _ = create_ingest_files.create_ingest_files(
         adata_file_path=ad_path,
         tag="",
         cell_info_start_index=1,

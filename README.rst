@@ -118,6 +118,69 @@ The system uses Kubeflow pipelines to orchestrate data workflows:
 
    - Configurations are passed as YAML files via GCS
 
+Environment and Tooling (Poetry)
+--------------------------------
+
+This repository uses Poetry for dependency management, virtual environments, tasks, and packaging.
+
+Install tooling
+~~~~~~~~~~~~~~~
+
+Using pip (in a virtual environment)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: bash
+
+   python3 -m venv .venv-poetry
+   source .venv-poetry/bin/activate
+   pip install poetry
+   poetry self add "poetry-dynamic-versioning[plugin]"
+   poetry self add poetry-plugin-export
+   poetry --version
+
+Create the environment and install dependencies
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: bash
+
+   poetry install --with dev,test,backend
+
+   # Optional: keep the venv inside the repo
+   poetry config virtualenvs.in-project true
+
+Run tests
+~~~~~~~~~
+
+.. code-block:: bash
+
+   # All tests
+   poetry run poe test
+
+   # Subsets (pytest markers defined under tests/)
+   poetry run poe unit
+   poetry run poe integration
+
+Lint and format
+~~~~~~~~~~~~~~~
+
+.. code-block:: bash
+
+   # Lint check (Ruff + Black --check)
+   poetry run poe lint
+
+   # Auto-format (Ruff fixes + Black)
+   poetry run poe format
+
+Export pinned requirements for Docker
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: bash
+
+   poetry run poe export-backend-reqs
+   poetry run poe export-workflows-reqs
+
+Dockerfiles consume the exported files under ``deploy/requirements/`` and install the package with ``pip install .`` for reproducible builds.
+
 Contributing
 ------------
 
