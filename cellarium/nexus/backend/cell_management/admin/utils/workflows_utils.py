@@ -8,6 +8,7 @@ from cellarium.nexus.backend.cell_management.admin import constants
 from cellarium.nexus.backend.cell_management.admin.utils import exceptions
 from cellarium.nexus.omics_datastore.bq_ops import BigQueryDataOperator
 from cellarium.nexus.shared import schemas
+from cellarium.nexus.shared.schemas import component_configs
 from cellarium.nexus.shared.utils import workflows_configs
 
 
@@ -41,7 +42,7 @@ def compose_extract_curriculum_configs(
     extract_bin_keys: list[str] | None = None,
     filters: dict | None = None,
     metadata_extra_columns: list[str] | None = None,
-) -> tuple[schemas.component_configs.BQOpsPrepareExtract, list[schemas.component_configs.BQOpsExtract]]:
+) -> tuple[component_configs.BQOpsPrepareExtract, list[component_configs.BQOpsExtract]]:
     """
     Compose extract curriculum configs for the Kubeflow pipeline.
 
@@ -79,7 +80,7 @@ def compose_extract_curriculum_configs(
 
     extract_bucket_path = f"{settings.BACKEND_PIPELINE_DIR}/{settings.PIPELINE_DATA_EXTRACTS_DIR}/{name}"
 
-    prepare_extract_config = schemas.component_configs.BQOpsPrepareExtract(
+    prepare_extract_config = component_configs.BQOpsPrepareExtract(
         extract_name=name,
         project_id=settings.GCP_PROJECT_ID,
         nexus_backend_api_url=settings.SITE_URL,
@@ -106,7 +107,7 @@ def compose_extract_curriculum_configs(
 
         extract_obs_columns = obs_columns + metadata_extra_columns if metadata_extra_columns else obs_columns
         extract_configs.append(
-            schemas.component_configs.BQOpsExtract(
+            component_configs.BQOpsExtract(
                 extract_name=name,
                 project_id=settings.GCP_PROJECT_ID,
                 nexus_backend_api_url=settings.SITE_URL,
