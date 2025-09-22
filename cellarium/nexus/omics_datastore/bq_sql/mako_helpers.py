@@ -49,7 +49,7 @@ def _list_value_processor(v: list) -> str:
     """
     if isinstance(v[0], str):
         return f"({', '.join([_string_value_processor(x) for x in v])})"
-    elif isinstance(v[0], int):
+    elif isinstance(v[0], (int, float)):
         return f"({', '.join([_numeric_value_processor(x) for x in v])})"
 
 
