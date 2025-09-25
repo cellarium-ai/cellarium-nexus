@@ -7,7 +7,7 @@ BigQuery-backed filter caching and perform a targeted reset.
 
 import logging
 
-from cellarium.nexus.backend.cell_management.admin.utils import cache_reset as cm_cache_reset
+from cellarium.nexus.backend.cell_management.utils import cache_reset as cm_cache_reset
 
 logger = logging.getLogger(__name__)
 

@@ -1,0 +1,18 @@
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def backend_cache_cleaner(settings):
+    """
+    Clear the configured cache (DatabaseCache via SQLite) around each test for isolation.
+
+    :raise: None
+
+    :return: None
+    """
+    # Clear cache between tests for isolation
+    from django.core.cache import cache
+
+    cache.clear()
+    yield
+    cache.clear()

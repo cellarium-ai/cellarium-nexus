@@ -21,9 +21,8 @@ from django.http import JsonResponse as http_JsonResponse
 from cellarium.nexus.backend.cell_management import models as cell_models
 from cellarium.nexus.backend.cell_management.admin import forms as admin_forms
 from cellarium.nexus.backend.cell_management.admin import schemas as admin_schemas
-from cellarium.nexus.backend.cell_management.admin.utils import bigquery_utils
-from cellarium.nexus.backend.cell_management.admin.utils import workflows_utils as workflows_utils
-from cellarium.nexus.backend.cell_management.admin.views.utils import filters as filters_utils
+from cellarium.nexus.backend.cell_management.utils import bigquery_utils, workflows_utils
+from cellarium.nexus.backend.cell_management.utils import filters as filters_utils
 from cellarium.nexus.omics_datastore.bq_avro_schemas import cell_management as bq_schemas
 from cellarium.nexus.omics_datastore.bq_ops import constants as bq_constants
 

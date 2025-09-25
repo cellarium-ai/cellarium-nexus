@@ -5,7 +5,7 @@ from google.cloud import bigquery
 
 from cellarium.nexus.backend.cell_management import models
 from cellarium.nexus.backend.cell_management.admin import constants
-from cellarium.nexus.backend.cell_management.admin.utils import exceptions
+from cellarium.nexus.backend.cell_management.utils import exceptions
 from cellarium.nexus.omics_datastore.bq_ops import BigQueryDataOperator
 from cellarium.nexus.shared import schemas
 from cellarium.nexus.shared.schemas import component_configs
@@ -154,7 +154,7 @@ def compose_and_dump_configs(
             extract files.
     :param metadata_extra_columns: Optional list of additional metadata columns to include
 
-    :raise ValueError: If extract_bin_size <= 0
+    :raise: ValueError: If extract_bin_size <= 0
     :raise exceptions.ZeroCellsReturnedError: If no cells match the filters
     :raise IOError: If there's an error writing configs to GCS
     :raise google.api_core.exceptions.GoogleAPIError: If BigQuery operations fail
@@ -216,7 +216,7 @@ def submit_extract_pipeline(
     :param filters: Optional dictionary of filter statements to apply
     :param metadata_extra_columns: Optional list of additional metadata columns to include
 
-    :raise ValueError: If extract_bin_size <= 0
+    :raise: ValueError: If extract_bin_size <= 0
     :raise exceptions.ZeroCellsReturnedError: If no cells match the filters
     :raise IOError: If there's an error writing configs to GCS
     :raise google.api_core.exceptions.GoogleAPIError: If pipeline submission fails

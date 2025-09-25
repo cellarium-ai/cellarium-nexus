@@ -14,7 +14,7 @@ import django.conf as dj_conf
 import django.db as dj_db
 
 from cellarium.nexus.backend.cell_management import models as cell_models
-from cellarium.nexus.backend.cell_management.admin.utils import bigquery_utils
+from cellarium.nexus.backend.cell_management.utils import bigquery_utils
 from cellarium.nexus.omics_datastore.bq_ops import constants as bq_constants
 
 logger = logging.getLogger(__name__)

@@ -9,14 +9,14 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RemoveField(
-            model_name="cellinfo",
-            name="bigquery_dataset",
-        ),
-        migrations.RemoveField(
-            model_name="cellinfo",
-            name="ingest",
-        ),
+        # migrations.RemoveField(
+        #     model_name="cellinfo",
+        #     name="bigquery_dataset",
+        # ),
+        # migrations.RemoveField(
+        #     model_name="cellinfo",
+        #     name="ingest",
+        # ),
         migrations.DeleteModel(
             name="CellFeatureInfo",
         ),
