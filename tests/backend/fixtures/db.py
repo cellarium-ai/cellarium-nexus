@@ -1,8 +1,20 @@
 import pytest
 
 
-@pytest.fixture(scope="session", autouse=True)
-def backend_test_db_setup():
+@pytest.fixture(autouse=True)
+def _enable_db_access(db):
+    """
+    Enable database access for cell_management unit tests.
+
+    Database-backed cache (DatabaseCache) operations require an active
+    database connection even in unit tests. Requesting the ``db`` fixture
+    ensures Django test DB is set up.
+    """
+    pass
+
+
+@pytest.fixture(autouse=True)
+def backend_test_db_setup(request: pytest.FixtureRequest):
     """
     Configure a file-backed SQLite database for backend tests.
 
@@ -11,13 +23,14 @@ def backend_test_db_setup():
     DatabaseCache pointing at the "core_nexuscache" table; ensure that table
     exists for tests.
     """
+    # Only run for tests under tests/backend/
+    fspath = str(getattr(request.node, "fspath", ""))
+    if "/tests/backend/" not in fspath:
+        return
+
     from django.core.management import call_command
     from django.db import connections
 
-    # Ensure the cache table exists (createcachetable is idempotent)
-    # We need a real DB connection available to run this management command.
-    # For SQLite, the connection will create the file on demand.
-    # Close any existing connection to ensure a clean state before creating the table.
     try:
         connections["default"].close()
     except Exception:
