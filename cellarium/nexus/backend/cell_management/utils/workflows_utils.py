@@ -80,6 +80,9 @@ def compose_extract_curriculum_configs(
 
     extract_bucket_path = f"{settings.BACKEND_PIPELINE_DIR}/{settings.PIPELINE_DATA_EXTRACTS_DIR}/{name}"
 
+    # Normalize optional filters to an empty mapping for schema validation
+    normalized_filters = filters or {}
+
     prepare_extract_config = component_configs.BQOpsPrepareExtract(
         extract_name=name,
         project_id=settings.GCP_PROJECT_ID,
@@ -87,7 +90,7 @@ def compose_extract_curriculum_configs(
         bigquery_dataset=bigquery_dataset.name,
         features=features,
         categorical_column_count_limit=categorical_column_count_limit,
-        filters=filters,
+        filters=normalized_filters,
         obs_columns=obs_columns,
         extract_bin_size=extract_bin_size,
         bucket_name=settings.BUCKET_NAME_PRIVATE,

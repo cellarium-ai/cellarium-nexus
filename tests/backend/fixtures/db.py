@@ -3,6 +3,23 @@ from typing import Any
 import pytest
 
 
+@pytest.fixture()
+def admin_user(django_user_model: Any) -> Any:
+    """
+    Create superuser for admin integration tests.
+
+    :param django_user_model: Django user model fixture
+
+    :return: Created superuser instance
+    """
+    user = django_user_model.objects.create_superuser(
+        username="admin",
+        email="admin@example.com",
+        password="insecure-password",
+    )
+    return user
+
+
 @pytest.fixture(autouse=True)
 def _enable_db_access(db: Any) -> None:
     """

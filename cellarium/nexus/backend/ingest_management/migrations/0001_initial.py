@@ -5,7 +5,7 @@ import uuid
 import django.db.models.deletion
 from django.db import migrations, models
 
-import cellarium.nexus.backend.ingest_management.utils.column_mapping
+from cellarium.nexus.backend.ingest_management.utils import column_mapping_utils
 
 
 class Migration(migrations.Migration):
@@ -108,7 +108,7 @@ class Migration(migrations.Migration):
                 (
                     "schema_column",
                     models.CharField(
-                        choices=cellarium.nexus.backend.ingest_management.utils.column_mapping.get_obs_column_choices,
+                        choices=column_mapping_utils.get_obs_column_choices,
                         max_length=255,
                         verbose_name="schema column",
                     ),
@@ -136,7 +136,7 @@ class Migration(migrations.Migration):
                 (
                     "schema_column",
                     models.CharField(
-                        choices=cellarium.nexus.backend.ingest_management.utils.column_mapping.get_var_column_choices,
+                        choices=column_mapping_utils.get_var_column_choices,
                         max_length=255,
                         verbose_name="schema column",
                     ),
