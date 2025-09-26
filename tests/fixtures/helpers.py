@@ -1,6 +1,6 @@
 import concurrent.futures as cf
 import datetime as dt
-from typing import Iterator
+from collections.abc import Iterator
 
 import numpy as np
 import pytest

@@ -1,5 +1,4 @@
 import pathlib
-from typing import Tuple
 
 import anndata
 import numpy as np
@@ -25,7 +24,7 @@ def small_csr_matrix() -> sp.csr_matrix:
 
 
 @pytest.fixture()
-def small_anndata(tmp_path: pathlib.Path, small_csr_matrix: sp.csr_matrix) -> Tuple[anndata.AnnData, pathlib.Path]:
+def small_anndata(tmp_path: pathlib.Path, small_csr_matrix: sp.csr_matrix) -> tuple[anndata.AnnData, pathlib.Path]:
     """
     Create a small AnnData with obs/var/uns and write it to an .h5ad file.
 
@@ -70,7 +69,7 @@ def small_anndata(tmp_path: pathlib.Path, small_csr_matrix: sp.csr_matrix) -> Tu
 
 
 @pytest.fixture()
-def obs_var_mappings() -> dict:
+def obs_var_mappings() -> dict[str, dict[str, str]]:
     """
     Provide example column mappings for obs and var, including index mapping.
 

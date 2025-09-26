@@ -16,6 +16,7 @@ def ingest(default_dataset: cell_management_models.BigQueryDataset) -> ingest_mo
     Create ingest info bound to the provided default dataset.
 
     :param default_dataset: Default BigQuery dataset fixture
+
     :return: Newly created ingest info instance
     """
     return ingest_models.IngestInfo.objects.create(bigquery_dataset=default_dataset)
@@ -33,7 +34,7 @@ def test_ingest_from_avro_validate_happy_path(ingest: ingest_models.IngestInfo) 
 
 def test_ingest_from_avro_validate_status_check(ingest: ingest_models.IngestInfo) -> None:
     """
-    Raise when ingest is already in a terminal succeeded state.
+    Raise error if ingest is already in a terminal succeeded state.
 
     :raise: ValidationError
     """
@@ -48,7 +49,7 @@ def test_ingest_from_avro_validate_status_check(ingest: ingest_models.IngestInfo
 
 def test_ingest_from_avro_nonexistent_id() -> None:
     """
-    Raise when ingest id does not correspond to any existing record.
+    Raise error if ingest ID does not correspond to any existing record.
 
     :raise: ValidationError
     """

@@ -18,9 +18,6 @@ def test_process_cell_info_obs_with_and_without_mapping(small_csr_matrix) -> Non
     Validate that _process_cell_info_obs adds id/ingest_id/tag and computes total_mrna_umis.
 
     Also validate mapping behavior and schema/metadata partitioning.
-
-    :raise: None
-    :return: None
     """
     n_obs, _ = small_csr_matrix.shape
     obs = pd.DataFrame(
@@ -68,9 +65,6 @@ def test_process_cell_info_obs_with_and_without_mapping(small_csr_matrix) -> Non
 def test_process_feature_info_var_with_and_without_mapping() -> None:
     """
     Validate that _process_feature_info_var adds id/ingest_id/tag and partitions columns.
-
-    :raise: None
-    :return: None
     """
     df_var = pd.DataFrame(
         data={

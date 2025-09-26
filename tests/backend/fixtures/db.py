@@ -1,8 +1,10 @@
+from typing import Any
+
 import pytest
 
 
 @pytest.fixture(autouse=True)
-def _enable_db_access(db):
+def _enable_db_access(db: Any) -> None:
     """
     Enable database access for cell_management unit tests.
 
@@ -14,7 +16,7 @@ def _enable_db_access(db):
 
 
 @pytest.fixture(autouse=True)
-def backend_test_db_setup(request: pytest.FixtureRequest):
+def backend_test_db_setup(request: pytest.FixtureRequest) -> None:
     """
     Configure a file-backed SQLite database for backend tests.
 
