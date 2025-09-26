@@ -87,7 +87,7 @@ class ResetCacheAPIView(APIView):
     API view for resetting and repopulating the cache.
 
     This endpoint triggers a complete cache reset and repopulation of all
-    cached filters. It requires admin privileges to execute.
+    cached filters.
     """
 
     def post(self, request: Request) -> Response:

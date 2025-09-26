@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 def _choices_from_schema(*, model: type[pydantic.BaseModel], exclude: Iterable[str]) -> list[tuple[str, str]]:
     """
-    Build choices from a Pydantic schema's fields using their titles.
+    Build choices from a Pydantic sclearchema's fields using their titles.
 
     :param model: Pydantic model class to introspect
     :param exclude: Iterable of field names to exclude
