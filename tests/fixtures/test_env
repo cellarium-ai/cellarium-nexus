@@ -19,6 +19,7 @@ DB_INSTANCE_CONNECTION_NAME=test-project:us-central1:dummy
 GCP_PROJECT_ID=test-project
 BUCKET_NAME_PRIVATE=dummy-private
 BUCKET_NAME_PUBLIC=dummy-public
+GCP_APPLICATION_BILLING_LABEL=dummy_label
 
 # Pipelines (dummy)
 PIPELINE_BASE_IMAGE=gcr.io/dummy/base:latest
