@@ -10,7 +10,7 @@ from unfold.decorators import action
 
 from cellarium.nexus.backend.ingest_management import models
 from cellarium.nexus.backend.ingest_management.admin import constants, forms
-from cellarium.nexus.backend.ingest_management.admin import utils as admin_utils
+from cellarium.nexus.backend.ingest_management.utils import column_mapping_utils, workflows_utils
 
 
 class ObsColumnMappingInline(TabularInline):
@@ -140,8 +140,8 @@ class IngestInfoAdmin(ModelAdmin):
             if not all(col in df.columns for col in constants.REQUIRED_CSV_FILE_COLUMNS):
                 raise ValidationError(f"CSV must contain columns: {', '.join(constants.REQUIRED_CSV_FILE_COLUMNS)}")
 
-            column_mapping = admin_utils.create_column_mapping(column_mapping_obj=column_mapping_obj)
-            pipeline_url = admin_utils.submit_ingest_pipeline(
+            column_mapping = column_mapping_utils.create_column_mapping(column_mapping_obj=column_mapping_obj)
+            pipeline_url = workflows_utils.submit_ingest_pipeline(
                 df_ingest_file_info=df,
                 column_mapping=column_mapping,
                 bigquery_dataset=bigquery_dataset,

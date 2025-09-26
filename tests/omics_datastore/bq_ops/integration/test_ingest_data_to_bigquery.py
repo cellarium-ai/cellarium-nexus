@@ -8,6 +8,13 @@ from cellarium.nexus.omics_datastore.bq_ops import constants as ingest_constants
 from cellarium.nexus.omics_datastore.bq_ops import exceptions as ingest_exceptions
 from cellarium.nexus.omics_datastore.bq_ops.ingest import ingest_data_to_bigquery
 
+BASE_TABLE_EXPECTATIONS: tuple[tuple[str, list[str] | None], ...] = (
+    (ingest_constants.BQ_INGEST_TABLE_NAME, None),
+    (ingest_constants.BQ_CELL_INFO_TABLE_NAME, None),
+    (ingest_constants.BQ_FEATURE_INFO_TABLE_NAME, None),
+    (ingest_constants.BQ_RAW_COUNT_MATRIX_COO_TABLE_NAME, ["cell_id"]),
+)
+
 
 def _record_create_staging_table() -> tuple[list[dict[str, typing.Any]], typing.Callable[..., None]]:
     calls: list[dict[str, typing.Any]] = []
@@ -55,36 +62,32 @@ def patched_bq_client(monkeypatch: pytest.MonkeyPatch, bq_client: typing.Any) ->
     return bq_client
 
 
-def test_context_happy_path_commits_and_cleans_up(
+@pytest.fixture()
+def happy_path_artifacts(
     monkeypatch: pytest.MonkeyPatch,
     patched_bq_client: typing.Any,
     freeze_time: typing.Callable[[typing.Any], None],
     freeze_uuid: typing.Callable[[str], None],
-) -> None:
+) -> dict[str, typing.Any]:
     """
-    Exercise the happy path: staging creation → data loads → context exit → commit → cleanup.
+    Execute happy-path ingest context and gather inspection artifacts.
 
     :param monkeypatch: Pytest monkeypatch fixture
     :param patched_bq_client: Mock BigQuery client
     :param freeze_time: Frozen time setter fixture
     :param freeze_uuid: Frozen uuid setter fixture
 
-    :raise: AssertionError
-
-    :return: None
+    :return: Dictionary of recorded artifacts from the ingest context
     """
-    # Make suffix deterministic
     import datetime as dt
 
     freeze_time(dt.datetime(2025, 1, 1, 0, 0, 0, tzinfo=dt.UTC))
     freeze_uuid("deadbeefcafebabe0123456789abcd0")
     expected_suffix = "staging_20250101000000_deadbe"
 
-    # Record staging table creation calls
     calls, recorder = _record_create_staging_table()
     monkeypatch.setattr(ingest_data_to_bigquery, "create_staging_table", recorder)
 
-    # Increase output rows for a more realistic job state
     patched_bq_client.load_job_rows = 123
 
     with ingest_data_to_bigquery.bigquery_ingest_context(
@@ -93,51 +96,89 @@ def test_context_happy_path_commits_and_cleans_up(
         gcs_bucket_name="bucket",
         gcs_stage_dir="stage",
     ):
-        # No-op work inside context
         pass
 
-    # Verify staging table creation
-    assert len(calls) == 4
-    base_names = {
-        ingest_constants.BQ_INGEST_TABLE_NAME,
-        ingest_constants.BQ_CELL_INFO_TABLE_NAME,
-        ingest_constants.BQ_FEATURE_INFO_TABLE_NAME,
-        ingest_constants.BQ_RAW_COUNT_MATRIX_COO_TABLE_NAME,
-    }
-    seen_bases = {c["base_table_name"] for c in calls}
-    assert seen_bases == base_names
-    # Clustering only for raw counts
-    for c in calls:
-        if c["base_table_name"] == ingest_constants.BQ_RAW_COUNT_MATRIX_COO_TABLE_NAME:
-            assert c["clustering_fields"] == ["cell_id"]
-        else:
-            assert c["clustering_fields"] is None
-        assert c["staging_suffix"] == expected_suffix
-
-    # Verify loads issued to BQ
-    # Expect four load calls; we only have the last one recorded by fixture,
-    # so assert that at least the last call matches expected format.
-    assert patched_bq_client.last_load_uri is not None
-    assert patched_bq_client.last_load_table_id is not None
-    assert patched_bq_client.last_load_job_config is not None
-    assert patched_bq_client.last_load_uri.startswith("gs://bucket/stage/")
-    assert patched_bq_client.last_load_table_id.startswith("proj.ds.")
-
-    # Verify commit issued (multi-statement SQL)
     assert len(patched_bq_client.query_sql_recorder) == 1
-    sql = patched_bq_client.query_sql_recorder[0]
+
+    return {
+        "calls": calls,
+        "expected_suffix": expected_suffix,
+        "sql": patched_bq_client.query_sql_recorder[0],
+        "delete_tables": list(patched_bq_client.delete_table_recorder),
+        "last_load_uri": patched_bq_client.last_load_uri,
+        "last_load_table_id": patched_bq_client.last_load_table_id,
+        "last_load_job_config": patched_bq_client.last_load_job_config,
+    }
+
+
+def test_context_happy_path_commits_and_cleans_up(happy_path_artifacts: dict[str, typing.Any]) -> None:
+    """
+    Exercise the happy path end-to-end and ensure overall side effects occur.
+    """
+    assert len(happy_path_artifacts["calls"]) == len(BASE_TABLE_EXPECTATIONS)
+
+    assert happy_path_artifacts["last_load_uri"] is not None
+    assert happy_path_artifacts["last_load_table_id"] is not None
+    assert happy_path_artifacts["last_load_job_config"] is not None
+    assert happy_path_artifacts["last_load_uri"].startswith("gs://bucket/stage/")
+    assert happy_path_artifacts["last_load_table_id"].startswith("proj.ds.")
+
+    sql = happy_path_artifacts["sql"]
     assert "BEGIN TRANSACTION;" in sql
     assert "COMMIT TRANSACTION;" in sql
-    # Ensure inserts for each table are present with deterministic staging names
-    for base in base_names:
-        assert f"INSERT INTO `ds.{base}`" in sql
-        assert f"FROM `ds.{base}_{expected_suffix}`" in sql
 
-    # Verify cleanup (all staging tables deleted)
-    # 4 tables expected
-    assert len(patched_bq_client.delete_table_recorder) == 4
-    for base in base_names:
-        assert f"proj.ds.{base}_{expected_suffix}" in patched_bq_client.delete_table_recorder
+    assert len(happy_path_artifacts["delete_tables"]) == len(BASE_TABLE_EXPECTATIONS)
+
+
+@pytest.mark.parametrize("table_name, expected_clustering", BASE_TABLE_EXPECTATIONS)
+def test_context_happy_path_staging_tables(
+    happy_path_artifacts: dict[str, typing.Any],
+    table_name: str,
+    expected_clustering: list[str] | None,
+) -> None:
+    """
+    Assert staging table creation properties per ingest table.
+    """
+    calls = happy_path_artifacts["calls"]
+    expected_suffix = happy_path_artifacts["expected_suffix"]
+
+    call = next(c for c in calls if c["base_table_name"] == table_name)
+    assert call["staging_suffix"] == expected_suffix
+    if expected_clustering is None:
+        assert call["clustering_fields"] is None
+    else:
+        assert call["clustering_fields"] == expected_clustering
+
+
+@pytest.mark.parametrize("table_name, _expected_clustering", BASE_TABLE_EXPECTATIONS)
+def test_context_happy_path_commit_sql_tables(
+    happy_path_artifacts: dict[str, typing.Any],
+    table_name: str,
+    _expected_clustering: list[str] | None,
+) -> None:
+    """
+    Ensure commit SQL references staging and destination tables for each ingest table.
+    """
+    sql = happy_path_artifacts["sql"]
+    expected_suffix = happy_path_artifacts["expected_suffix"]
+
+    assert f"INSERT INTO `ds.{table_name}`" in sql
+    assert f"FROM `ds.{table_name}_{expected_suffix}`" in sql
+
+
+@pytest.mark.parametrize("table_name, _expected_clustering", BASE_TABLE_EXPECTATIONS)
+def test_context_happy_path_cleanup_tables(
+    happy_path_artifacts: dict[str, typing.Any],
+    table_name: str,
+    _expected_clustering: list[str] | None,
+) -> None:
+    """
+    Verify cleanup removes staging tables for each ingest table.
+    """
+    delete_tables = happy_path_artifacts["delete_tables"]
+    expected_suffix = happy_path_artifacts["expected_suffix"]
+
+    assert f"proj.ds.{table_name}_{expected_suffix}" in delete_tables
 
 
 def test_context_load_failure_raises_and_skips_commit(

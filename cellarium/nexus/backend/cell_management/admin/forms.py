@@ -7,8 +7,8 @@ from django_json_widget.widgets import JSONEditorWidget as BaseJSONEditorWidget
 from unfold import widgets as unfold_widgets
 
 from cellarium.nexus.backend.cell_management.admin import constants
-from cellarium.nexus.backend.cell_management.admin.utils import check_curriculum_exists
 from cellarium.nexus.backend.cell_management.models import BigQueryDataset, FeatureSchema
+from cellarium.nexus.backend.cell_management.utils.check_curriculum import check_curriculum_exists
 from cellarium.nexus.backend.curriculum.models import Curriculum
 
 

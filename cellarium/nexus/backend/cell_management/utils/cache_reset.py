@@ -14,7 +14,7 @@ import django.conf as dj_conf
 import django.db as dj_db
 
 from cellarium.nexus.backend.cell_management import models as cell_models
-from cellarium.nexus.backend.cell_management.admin.utils import bigquery_utils
+from cellarium.nexus.backend.cell_management.utils import bigquery_utils
 from cellarium.nexus.omics_datastore.bq_ops import constants as bq_constants
 
 logger = logging.getLogger(__name__)
@@ -57,12 +57,12 @@ def reset_cellinfo_filter_cache(*, repopulate: bool = True) -> dict[str, int]:
         # Pull keys for logging/count (best effort) and delete them
         select_sql = f"SELECT cache_key FROM {location} WHERE cache_key LIKE %s OR cache_key LIKE %s"
         delete_sql = f"DELETE FROM {location} WHERE cache_key LIKE %s OR cache_key LIKE %s"
-
-        cursor.execute(select_sql, ["countcache:%", "bqcache:%"])
+        # Use wildcard patterns to match DatabaseCache versioned keys (e.g., ":1:countcache:...")
+        cursor.execute(select_sql, ["%countcache:%", "%bqcache:%"])
         keys = [row[0] for row in cursor.fetchall()] or []
         deleted_rows = len(keys)
 
-        cursor.execute(delete_sql, ["countcache:%", "bqcache:%"])
+        cursor.execute(delete_sql, ["%countcache:%", "%bqcache:%"])
 
     logger.info(f"Deleted {deleted_rows} cache rows with prefixes 'countcache:' and 'bqcache:' from table '{location}'")
 

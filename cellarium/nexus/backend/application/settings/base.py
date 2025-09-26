@@ -13,7 +13,7 @@ DEBUG = True
 ALLOWED_HOSTS = [env("MAIN_HOST_ALLOWED")]
 SITE_URL = env("SITE_URL")
 CSRF_TRUSTED_ORIGINS = [SITE_URL]
-ROOT_URLCONF = "backend.application.urls"
+ROOT_URLCONF = "cellarium.nexus.backend.application.urls"
 WSGI_APPLICATION = "cellarium.nexus.backend.application.wsgi.application"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 ENVIRONMENT = env("ENVIRONMENT", default="local")

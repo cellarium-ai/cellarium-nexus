@@ -42,7 +42,7 @@ class Migration(migrations.Migration):
                 verbose_name="BigQuery dataset",
             ),
         ),
-        migrations.RunPython(fill_bigquery_dataset),
+        migrations.RunPython(fill_bigquery_dataset, migrations.RunPython.noop),
         migrations.AlterField(
             model_name="cellinfo",
             name="bigquery_dataset",

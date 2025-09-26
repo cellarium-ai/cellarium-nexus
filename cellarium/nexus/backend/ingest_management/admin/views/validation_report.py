@@ -10,8 +10,8 @@ from unfold.decorators import action
 
 from cellarium.nexus.backend.ingest_management import models
 from cellarium.nexus.backend.ingest_management.admin import constants, forms
-from cellarium.nexus.backend.ingest_management.admin.utils.export_csv import export_model_queryset_to_csv
-from cellarium.nexus.backend.ingest_management.admin.utils.workflows_utils import submit_validation_pipeline
+from cellarium.nexus.backend.ingest_management.utils.export_csv import export_model_queryset_to_csv
+from cellarium.nexus.backend.ingest_management.utils.workflows_utils import submit_validation_pipeline
 
 
 class ValidationReportItemInline(TabularInline):
