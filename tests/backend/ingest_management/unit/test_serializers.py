@@ -2,6 +2,8 @@
 Unit tests for ingest management API serializers.
 """
 
+from typing import Any, Callable
+
 import pytest
 from rest_framework.exceptions import ValidationError
 
@@ -32,30 +34,54 @@ def test_ingest_from_avro_validate_happy_path(ingest: ingest_models.IngestInfo) 
     assert data["ingest"].id == ingest.id
 
 
-def test_ingest_from_avro_validate_status_check(ingest: ingest_models.IngestInfo) -> None:
+def _set_status(ingest: ingest_models.IngestInfo, *, status: str) -> None:
     """
-    Raise error if ingest is already in a terminal succeeded state.
+    Persist ingest status update for parametrized tests.
 
-    :raise: ValidationError
+    :param ingest: Ingest info instance to update
+    :param status: Status value to apply
     """
-    # Mark as succeeded to trigger error
-    ingest.status = ingest_models.IngestInfo.STATUS_SUCCEEDED
+    ingest.status = status
     ingest.save(update_fields=["status"])
 
-    s = serializers.IngestFromAvroSerializer(data={"stage_dir": "/tmp/x", "ingest_id": ingest.id})
-    with pytest.raises(ValidationError):
-        s.is_valid(raise_exception=True)
 
-
-def test_ingest_from_avro_nonexistent_id() -> None:
+@pytest.mark.parametrize(
+    "payload_factory, setup_case",
+    [
+        pytest.param(
+            lambda ingest: {"stage_dir": "/tmp/x", "ingest_id": ingest.id},
+            lambda ingest: _set_status(ingest, status=ingest_models.IngestInfo.STATUS_SUCCEEDED),
+            id="status-succeeded",
+        ),
+        pytest.param(
+            lambda ingest: {"stage_dir": "/tmp/x", "ingest_id": 999999},
+            lambda ingest: None,
+            id="missing-ingest",
+        ),
+    ],
+)
+def test_ingest_from_avro_validation_errors(
+    ingest: ingest_models.IngestInfo,
+    payload_factory: Callable[[ingest_models.IngestInfo], dict[str, Any]],
+    setup_case: Callable[[ingest_models.IngestInfo], None] | None,
+) -> None:
     """
-    Raise error if ingest ID does not correspond to any existing record.
+    Validate serializer error scenarios for ingest lookup failures.
+
+    :param ingest: Default ingest info instance provided by fixture
+    :param payload_factory: Callable that builds serializer payload for the scenario
+    :param setup_case: Callable that mutates ingest state prior to serializer validation
 
     :raise: ValidationError
     """
-    s = serializers.IngestFromAvroSerializer(data={"stage_dir": "/tmp/x", "ingest_id": 999999})
+    if setup_case is not None:
+        setup_case(ingest)
+
+    payload = payload_factory(ingest)
+    serializer = serializers.IngestFromAvroSerializer(data=payload)
+
     with pytest.raises(ValidationError):
-        s.is_valid(raise_exception=True)
+        serializer.is_valid(raise_exception=True)
 
 
 def test_reserve_indexes_serializer_slug_field(default_dataset: cell_management_models.BigQueryDataset) -> None:
