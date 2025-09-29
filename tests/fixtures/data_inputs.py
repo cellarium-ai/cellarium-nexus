@@ -1,4 +1,5 @@
 import pathlib
+import shutil
 
 import anndata
 import numpy as np
@@ -66,6 +67,43 @@ def small_anndata(tmp_path: pathlib.Path, small_csr_matrix: sp.csr_matrix) -> tu
     ad.write_h5ad(filename=h5_path)
 
     return ad, h5_path
+
+
+@pytest.fixture(
+    params=[
+        "small",
+        "adata_ingest_test_sample-0001.h5ad",
+        "adata_ingest_test_sample-0002.h5ad",
+        "adata_ingest_test_sample-0003.h5ad",
+    ]
+)
+def ingest_anndata(
+    tmp_path: pathlib.Path, request: pytest.FixtureRequest, small_anndata: tuple[anndata.AnnData, pathlib.Path]
+) -> tuple[anndata.AnnData, pathlib.Path]:
+    """
+    Provide an AnnData and file path for ingestion tests.
+
+    This fixture is parametrized to yield:
+    - the synthetic small AnnData built in tests ("small")
+    - each real .h5ad file under `tests/fixtures/data/`
+
+    Real files are copied into `tmp_path` to keep repository data immutable.
+
+    :param tmp_path: Temporary directory provided by pytest
+    :param request: Pytest request object carrying the current parameter
+    :param small_anndata: Synthetic AnnData/path pair for the "small" case
+
+    :return: Tuple of (AnnData, Path)
+    """
+    param = request.param
+    if param == "small":
+        return small_anndata
+
+    src = pathlib.Path(__file__).parent / "data" / param
+    dst = tmp_path / param
+    shutil.copyfile(src, dst)
+    ad = anndata.read_h5ad(dst)
+    return ad, dst
 
 
 @pytest.fixture()

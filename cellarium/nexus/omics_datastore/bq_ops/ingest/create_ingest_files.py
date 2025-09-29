@@ -276,12 +276,28 @@ def _validate_required_string_columns(df: pd.DataFrame, required_cols: set[str],
     # Check non-null and type
     bad_nulls: list[str] = []
     bad_types: list[str] = []
+
+    # Debug: log dtypes to help diagnose environment differences
+    try:
+        logger.debug(
+            f"Validating required string columns for context='{context}'; dtypes="
+            f"{ {c: str(df[c].dtype) for c in sorted(required_cols) if c in df.columns} }"
+        )
+    except Exception as e:
+        # Best-effort logging; include stack only when DEBUG enabled
+        logger.debug(f"Failed to collect dtype debug info for context='{context}': {e}", exc_info=True)
+
     for col in required_cols:
         series = df[col]
         if series.isna().any():
             bad_nulls.append(col)
-        # Ensure all non-null are strings
-        if not series.dropna().map(lambda v: isinstance(v, str)).all():
+        # Ensure all non-null are strings; avoid pandas Categorical reductions
+        non_null = series[~series.isna()]
+        try:
+            values = non_null.astype(object).tolist()
+        except Exception:
+            values = list(non_null.tolist())
+        if not all(isinstance(v, str) for v in values):
             bad_types.append(col)
 
     messages: list[str] = []
