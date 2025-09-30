@@ -1,0 +1,27 @@
+# Test environment variables for Django backend tests
+# Safe/dummy values; checked into repo to keep CI and local runs identical.
+
+# Core
+SECRET_KEY=not-secret
+ENVIRONMENT=test
+MAIN_HOST_ALLOWED=localhost
+SITE_URL=http://localhost:8000
+
+# Database (SQLite used in settings/test.py; these are harmless fallbacks)
+DB_NAME=test-db
+DB_USER=test
+DB_PASSWORD=test
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_INSTANCE_CONNECTION_NAME=test-project:us-central1:dummy
+
+# GCP / Storage
+GCP_PROJECT_ID=test-project
+BUCKET_NAME_PRIVATE=dummy-private
+BUCKET_NAME_PUBLIC=dummy-public
+GCP_APPLICATION_BILLING_LABEL=dummy_label
+
+# Pipelines (dummy)
+PIPELINE_BASE_IMAGE=gcr.io/dummy/base:latest
+PIPELINE_SERVICE_ACCOUNT=dummy@dummy.iam.gserviceaccount.com
+PIPELINE_ROOT_PATH=gs://dummy-root

@@ -139,3 +139,49 @@ def test_validate_required_string_columns_non_string_values_raise() -> None:
     with pytest.raises(ingest_exceptions.DataValidationError) as exc:
         create_ingest_files._validate_required_string_columns(df=df, required_cols=required, context="var")
     assert "columns with non-string values" in str(exc.value)
+
+
+def test_validate_required_string_columns_categorical_strings_pass() -> None:
+    """
+    Validate that validator works when columns are pandas Categorical of strings.
+    """
+    df = pd.DataFrame(
+        data={
+            "ensemble_id": pd.Categorical(["g1", "g2"]),
+            "reference": pd.Categorical(["ref1", "ref2"]),
+        }
+    )
+    required = {"ensemble_id", "reference"}
+    # Should not raise
+    create_ingest_files._validate_required_string_columns(df=df, required_cols=required, context="var")
+
+
+def test_validate_required_string_columns_categorical_non_string_values_raise() -> None:
+    """
+    Validate that validator raises when Categorical contains non-strings.
+    """
+    df = pd.DataFrame(
+        data={
+            "ensemble_id": pd.Categorical(["g1", 2]),
+            "reference": pd.Categorical(["ref1", "ref2"]),
+        }
+    )
+    required = {"ensemble_id", "reference"}
+    with pytest.raises(ingest_exceptions.DataValidationError) as exc:
+        create_ingest_files._validate_required_string_columns(df=df, required_cols=required, context="var")
+    assert "columns with non-string values" in str(exc.value)
+
+
+def test_validate_required_string_columns_pandas_stringdtype_pass() -> None:
+    """
+    Validate that validator works when columns use pandas StringDtype.
+    """
+    df = pd.DataFrame(
+        data={
+            "ensemble_id": pd.Series(["g1", "g2"], dtype=pd.StringDtype()),
+            "reference": pd.Series(["ref1", "ref2"], dtype=pd.StringDtype()),
+        }
+    )
+    required = {"ensemble_id", "reference"}
+    # Should not raise
+    create_ingest_files._validate_required_string_columns(df=df, required_cols=required, context="var")

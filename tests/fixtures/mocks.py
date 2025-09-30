@@ -1,5 +1,6 @@
 import datetime as dt
 import typing
+from collections.abc import Callable
 
 import google.auth as google_auth
 import google.auth.credentials as google_auth_credentials
@@ -8,15 +9,13 @@ from google.cloud import bigquery
 
 
 @pytest.fixture()
-def freeze_time(monkeypatch: pytest.MonkeyPatch) -> typing.Callable[[dt.datetime], None]:
+def freeze_time(monkeypatch: pytest.MonkeyPatch) -> Callable[[dt.datetime], None]:
     """
     Freeze datetime.utcnow() and datetime.now(datetime.UTC) to a fixed value.
 
     Provide a setter to change frozen time during a test.
 
     :param monkeypatch: Pytest monkeypatch fixture
-
-    :raise: None
 
     :return: Setter function that accepts a datetime value
     """
@@ -47,13 +46,11 @@ def freeze_time(monkeypatch: pytest.MonkeyPatch) -> typing.Callable[[dt.datetime
 
 
 @pytest.fixture()
-def freeze_uuid(monkeypatch: pytest.MonkeyPatch) -> typing.Callable[[str], None]:
+def freeze_uuid(monkeypatch: pytest.MonkeyPatch) -> Callable[[str], None]:
     """
     Freeze uuid.uuid4().hex to a chosen 32-char hex string.
 
     :param monkeypatch: Pytest monkeypatch fixture
-
-    :raise: None
 
     :return: Setter function that accepts a 32-hex string (lowercase)
     """
@@ -138,8 +135,6 @@ class BQClientMock:
         :param table_id: Target BigQuery table ID
         :param job_config: BigQuery LoadJobConfig
 
-        :raise: None
-
         :return: Provided load job mock instance
         """
         self.last_load_uri = uri
@@ -156,8 +151,6 @@ class BQClientMock:
 
         :param sql: SQL text to record
 
-        :raise: None
-
         :return: Provided query job mock instance
         """
         self.query_sql_recorder.append(sql)
@@ -168,8 +161,6 @@ class BQClientMock:
         Record deleted table ID for assertions.
 
         :param table_id: Table to delete
-
-        :raise: None
         """
         self.delete_table_recorder.append(table_id)
 
@@ -183,10 +174,6 @@ def disable_google_adc(monkeypatch: pytest.MonkeyPatch) -> None:
     project to prevent network calls and credential discovery in CI.
 
     :param monkeypatch: Pytest monkeypatch fixture
-
-    :raise: None
-
-    :return: None
     """
     creds = google_auth_credentials.AnonymousCredentials()
 
@@ -201,8 +188,6 @@ def bq_load_job() -> BQLoadJobMock:
     """
     Provide a dummy BigQuery Load Job instance with result() and output_rows.
 
-    :raise: None
-
     :return: Load job instance
     """
     return BQLoadJobMock()
@@ -212,8 +197,6 @@ def bq_load_job() -> BQLoadJobMock:
 def bq_query_job() -> BQQueryJobMock:
     """
     Provide a dummy BigQuery Query Job instance with result().
-
-    :raise: None
 
     :return: Query job instance
     """
@@ -232,8 +215,6 @@ def bq_client(bq_load_job: BQLoadJobMock, bq_query_job: BQQueryJobMock) -> BQCli
     - last_load_uri: str | None
     - last_load_table_id: str | None
     - last_load_job_config: bigquery.LoadJobConfig | None
-
-    :raise: None
 
     :return: Mock client instance
     """

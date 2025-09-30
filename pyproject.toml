@@ -69,6 +69,8 @@ optional = true
 [tool.poetry.group.test.dependencies]
 pytest = "==8.4.2"
 pytest-cov = "^5.0.0"
+pytest-django = "^4.11.1"
+pytest-env = "^1.1.5"
 
 [tool.poetry.group.dev]
 optional = true
@@ -89,13 +91,13 @@ unit = "pytest -m unit"
 integration = "pytest -m integration"
 
 lint.sequence = [
-  { cmd = "ruff check ." },
-  { cmd = "black --check ." },
+    { cmd = "ruff check ." },
+    { cmd = "black --check ." },
 ]
 
 format.sequence = [
-  { cmd = "ruff check . --fix" },
-  { cmd = "black ." },
+    { cmd = "ruff check . --fix" },
+    { cmd = "black ." },
 ]
 
 export-backend-reqs = "poetry export --only main,backend --without-hashes -f requirements.txt -o deploy/requirements/backend.lock.txt"
@@ -109,3 +111,23 @@ line-length = 120
 
 [tool.ruff.lint]
 extend-select = ["I"]
+
+[tool.pytest.ini_options]
+
+DJANGO_SETTINGS_MODULE = "cellarium.nexus.backend.application.settings"
+env = [
+    "ENVIRONMENT=test"
+]
+
+
+filterwarnings = [
+    "ignore::DeprecationWarning:google\\._upb\\._message",
+    "ignore::pydantic._internal._config.PydanticDeprecatedSince20",
+    "ignore::anndata._core.aligned_df.ImplicitModificationWarning",
+    'ignore:Type google\._upb\._message\.(MessageMapContainer|ScalarMapContainer) uses PyType_Spec with a metaclass that has custom tp_new:DeprecationWarning',
+]
+markers = [
+    "unit: unit tests for omics_datastore bq_ops",
+    "integration: integration tests for omics_datastore bq_ops",
+    "django_db: tests requiring Django DB access",
+]

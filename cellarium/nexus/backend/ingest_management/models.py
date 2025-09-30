@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
-from cellarium.nexus.backend.ingest_management.utils.column_mapping import (
+from cellarium.nexus.backend.ingest_management.utils.column_mapping_utils import (
     get_obs_column_choices,
     get_var_column_choices,
 )
