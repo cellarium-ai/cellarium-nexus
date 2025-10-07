@@ -81,7 +81,7 @@ class CreateSchemaFromCSVForm(forms.Form):
     )
 
 
-class UnfoldReadOnlyJSONWidget(unfold_widgets.UnfoldAdminTextareaWidget):
+class SimpleJSONWidget(unfold_widgets.UnfoldAdminTextareaWidget):
     """
     Theme-aware (Unfold) read-only JSON:
       • rows = number of JSON lines (clamped)
@@ -113,7 +113,6 @@ class UnfoldReadOnlyJSONWidget(unfold_widgets.UnfoldAdminTextareaWidget):
         line_count = pretty.count("\n") + 1
         rows = max(self.min_rows, min(self.max_rows, line_count))
         attrs["rows"] = rows
-        attrs["readonly"] = True
 
         style = attrs.get("style", "")
         style += ";resize:none;overflow:auto;max-height:28rem"
@@ -218,10 +217,10 @@ class ExtractCurriculumForm(forms.Form):
         required=False,
         label=_("Filters"),
         help_text=_(
-            "JSON-formatted filters used during extraction. Read-only. To make changes, go back and choose "
-            "the proper filter set."
+            "JSON-formatted filters used during extraction. You can edit these filters directly or go back to "
+            "choose a different filter set."
         ),
-        widget=UnfoldReadOnlyJSONWidget(),
+        widget=SimpleJSONWidget,
     )
 
     def __init__(self, *args, **kwargs):
