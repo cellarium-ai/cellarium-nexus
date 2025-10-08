@@ -39,37 +39,47 @@ class BigQueryDataset(models.Model):
         return self.name
 
 
-class FeatureInfo(models.Model):
-    """
-    Model for storing feature information like ensemble IDs and symbols.
-    """
-
-    ensemble_id = models.CharField(max_length=255, verbose_name=_("ensemble id"))
-    symbol = models.CharField(max_length=255, verbose_name=_("symbol"))
-
-    class Meta:
-        verbose_name = _("feature info")
-        verbose_name_plural = _("feature info objects")
-        app_label = "cell_management"
-        unique_together = ("ensemble_id", "symbol")
-
-    def __str__(self):
-        return f"{self.symbol} ({self.ensemble_id})"
-
-
 class FeatureSchema(models.Model):
     """
     Model for storing feature schemas and their associated features.
     """
 
     name = models.CharField(max_length=255, verbose_name=_("name"), unique=True)
-    features = models.ManyToManyField(
-        to="cell_management.FeatureInfo", related_name="schemas", verbose_name=_("features")
-    )
 
     class Meta:
         verbose_name = _("feature schema")
         verbose_name_plural = _("feature schemas")
+        app_label = "cell_management"
 
     def __str__(self):
         return self.name
+
+
+class FeatureInfo(models.Model):
+    """
+    Model for storing feature information like ensemble IDs and symbols.
+
+    Each feature belongs to exactly one schema and will be deleted when the schema is deleted.
+    Each ensemble_id must be unique within a schema.
+    """
+
+    ensemble_id = models.CharField(max_length=255, verbose_name=_("ensemble id"))
+    symbol = models.CharField(max_length=255, verbose_name=_("symbol"), blank=True, null=True)
+    feature_schema = models.ForeignKey(
+        to="FeatureSchema",
+        on_delete=models.CASCADE,
+        related_name="features",
+        verbose_name=_("feature schema"),
+    )
+
+    class Meta:
+        verbose_name = _("feature info")
+        verbose_name_plural = _("feature info objects")
+        app_label = "cell_management"
+        unique_together = [("feature_schema", "ensemble_id")]
+        indexes = [
+            models.Index(fields=["feature_schema", "ensemble_id"]),
+        ]
+
+    def __str__(self):
+        return f"{self.symbol} ({self.ensemble_id})"

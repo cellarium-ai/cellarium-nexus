@@ -16,12 +16,15 @@ def _make_feature_schema(*, symbols: list[tuple[str, str]] = None) -> models.Fea
 
     :param symbols: List of (ensemble_id, symbol) pairs
 
-    :return: Persisted FeatureSchema instance with features M2M populated
+    :return: Persisted FeatureSchema instance with features populated
     """
     fs = models.FeatureSchema.objects.create(name="schema-test")
     for ens, sym in symbols or [("ENSG000001", "TP53"), ("ENSG000002", "EGFR")]:
-        fi = models.FeatureInfo.objects.create(ensemble_id=ens, symbol=sym)
-        fs.features.add(fi)
+        models.FeatureInfo.objects.create(
+            ensemble_id=ens,
+            symbol=sym,
+            feature_schema=fs,
+        )
     return fs
 
 

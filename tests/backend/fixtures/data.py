@@ -10,6 +10,36 @@ from cellarium.nexus.backend.curriculum import models as curriculum_models
 
 
 @pytest.fixture()
+def feature_schema_factory() -> Callable:
+    """
+    Provide factory to create FeatureSchema instances with features.
+
+    :return: Callable that creates FeatureSchema with associated FeatureInfo records
+    """
+
+    def _create(name: str, features: list[tuple[str, str]] | None = None) -> models.FeatureSchema:
+        """
+        Create a FeatureSchema with optional features.
+
+        :param name: Name for the schema
+        :param features: Optional list of (ensemble_id, symbol) tuples
+
+        :return: Created FeatureSchema instance
+        """
+        schema = models.FeatureSchema.objects.create(name=name)
+        if features:
+            for ensemble_id, symbol in features:
+                models.FeatureInfo.objects.create(
+                    ensemble_id=ensemble_id,
+                    symbol=symbol,
+                    feature_schema=schema,
+                )
+        return schema
+
+    return _create
+
+
+@pytest.fixture()
 def default_dataset() -> models.BigQueryDataset:
     """
     Create default BigQuery dataset row for backend tests.
@@ -47,6 +77,36 @@ def curriculum_factory(admin_user: curriculum_models.UserModel) -> Callable[[str
         return curriculum
 
     return _create
+
+
+@pytest.fixture()
+def sample_csv_file(tmp_path: Path) -> Path:
+    """
+    Create a valid CSV file with feature data for testing.
+
+    :param tmp_path: Temporary directory path
+
+    :return: Path to CSV file
+    """
+    csv_path = tmp_path / "features.csv"
+    csv_path.write_text(
+        "ensemble_id,symbol\n" "ENSG00000141510,TP53\n" "ENSG00000157764,BRAF\n" "ENSG00000146648,EGFR\n"
+    )
+    return csv_path
+
+
+@pytest.fixture()
+def invalid_csv_file(tmp_path: Path) -> Path:
+    """
+    Create an invalid CSV file (missing required columns).
+
+    :param tmp_path: Temporary directory path
+
+    :return: Path to invalid CSV file
+    """
+    csv_path = tmp_path / "invalid.csv"
+    csv_path.write_text("wrong_column,another_column\n" "value1,value2\n")
+    return csv_path
 
 
 @pytest.fixture()
