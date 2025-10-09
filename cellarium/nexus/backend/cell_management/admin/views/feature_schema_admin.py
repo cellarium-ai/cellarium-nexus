@@ -5,7 +5,6 @@ Admin module for feature schema management.
 import csv
 import logging
 
-import pandas as pd
 from django.contrib import admin, messages
 from django.db.models import QuerySet
 from django.http import Http404, HttpRequest, HttpResponse
@@ -17,7 +16,8 @@ from unfold.admin import ModelAdmin
 from unfold.decorators import action
 
 from cellarium.nexus.backend.cell_management.admin import constants, forms
-from cellarium.nexus.backend.cell_management.models import FeatureInfo, FeatureSchema
+from cellarium.nexus.backend.cell_management.models import FeatureSchema
+from cellarium.nexus.backend.cell_management.utils import feature_schema_utils
 
 logger = logging.getLogger(__name__)
 
@@ -176,39 +176,34 @@ class FeatureSchemaAdmin(ModelAdmin):
             schema_name = form.cleaned_data["schema_name"]
             csv_file = form.cleaned_data["csv_file"]
 
-            df = pd.read_csv(csv_file)
-            schema = FeatureSchema.objects.create(name=schema_name)
+            try:
+                # Parse and validate CSV
+                features_df = feature_schema_utils.parse_feature_csv(csv_file=csv_file)
 
-            # Get all existing features that match our CSV data
-            existing_features = set(
-                FeatureInfo.objects.filter(
-                    ensemble_id__in=df["ensemble_id"].tolist(), symbol__in=df["symbol"].tolist()
-                ).values_list("ensemble_id", "symbol")
-            )
+                # Create schema and features
+                schema, stats = feature_schema_utils.create_feature_schema_from_dataframe(
+                    schema_name=schema_name,
+                    features_df=features_df,
+                )
 
-            # Create only features that don't exist yet
-            new_features = []
-            for index, row in df.iterrows():
-                if (row["ensemble_id"], row["symbol"]) not in existing_features:
-                    new_features.append(FeatureInfo(ensemble_id=row["ensemble_id"], symbol=row["symbol"]))
+                messages.success(
+                    request,
+                    _("Schema '{}' created successfully with {} features").format(schema_name, stats["total_count"]),
+                )
+                logger.info(
+                    f"Successfully created schema '{schema_name}' with {stats['total_count']} features via CSV upload"
+                )
+                return redirect("admin:cell_management_featureschema_changelist")
 
-            # Bulk create new features if any
-            if new_features:
-                FeatureInfo.objects.bulk_create(new_features)
-
-            # Get all features (both existing and newly created) for the schema
-            all_features = FeatureInfo.objects.filter(
-                ensemble_id__in=df["ensemble_id"].tolist(), symbol__in=df["symbol"].tolist()
-            )
-            schema.features.add(*all_features)
-
-            messages.success(
-                request,
-                _("Schema created successfully. Added {} features ({} new, {} existing)").format(
-                    len(df), len(new_features), len(existing_features)
-                ),
-            )
-            return redirect("admin:cell_management_featureschema_changelist")
+            except feature_schema_utils.InvalidFeatureCSVError as e:
+                messages.error(request, _("Invalid CSV file: {}").format(str(e)))
+                logger.warning(f"Invalid CSV upload attempt: {e}")
+            except feature_schema_utils.DuplicateSchemaNameError as e:
+                messages.error(request, _("Schema name already exists: {}").format(str(e)))
+                logger.warning(f"Duplicate schema name attempt: {e}")
+            except Exception as e:
+                messages.error(request, _("Error creating schema: {}").format(str(e)))
+                logger.error(f"Unexpected error during schema creation: {e}", exc_info=True)
 
         return render(
             request=request,

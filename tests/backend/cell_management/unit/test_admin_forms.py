@@ -10,8 +10,11 @@ from cellarium.nexus.backend.cell_management.admin import forms as admin_forms
 
 def _make_feature_schema() -> cm_models.FeatureSchema:
     fs = cm_models.FeatureSchema.objects.create(name="fs-test")
-    f = cm_models.FeatureInfo.objects.create(ensemble_id="E1", symbol="S1")
-    fs.features.add(f)
+    cm_models.FeatureInfo.objects.create(
+        ensemble_id="E1",
+        symbol="S1",
+        feature_schema=fs,
+    )
     return fs
 
 
