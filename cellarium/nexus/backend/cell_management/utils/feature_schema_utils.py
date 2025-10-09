@@ -42,6 +42,10 @@ def parse_feature_csv(csv_file: BinaryIO | str) -> pd.DataFrame:
     Parse and validate CSV file containing feature data.
 
     Validate that the CSV contains required columns: ensemble_id and symbol.
+    The function intentionally does not verify that ensemble_id values are
+    present in a particular dataset. Feature schemas can be reused across
+    multiple dataset extracts, so we defer dataset-specific validation to the
+    extract workflow (see discussion #43).
 
     :param csv_file: File-like object or path to CSV file
 
