@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cellarium.nexus.omics_datastore.bq_sql import query as query_module
-from cellarium.nexus.omics_datastore.bq_sql.validation.query_validators import base_query_validator as base_val
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql import query as query_module
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql.validation.query_validators import base_query_validator as base_val
 
 
 def write_tmp_template(tmp_path: Path, content: str) -> str:

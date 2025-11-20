@@ -1,7 +1,7 @@
 import pytest
 
-from cellarium.nexus.omics_datastore.bq_sql.validation import exceptions as val_exceptions
-from cellarium.nexus.omics_datastore.bq_sql.validation import template_data_validator as v
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql.validation import exceptions as val_exceptions
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql.validation import template_data_validator as v
 
 
 def test_validate_not_empty_raises() -> None:

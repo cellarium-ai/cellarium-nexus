@@ -2,8 +2,10 @@ from google.cloud import bigquery
 from google.cloud import exceptions as gc_exceptions
 from google.cloud.bigquery import QueryJob
 
-from cellarium.nexus.omics_datastore.bq_sql.validation import exceptions
-from cellarium.nexus.omics_datastore.bq_sql.validation.query_validators.base_query_validator import SQLSyntaxValidator
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql.validation import exceptions
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql.validation.query_validators.base_query_validator import (
+    SQLSyntaxValidator,
+)
 
 
 class BigQuerySQLSyntaxValidator(SQLSyntaxValidator):

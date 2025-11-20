@@ -1,8 +1,8 @@
 import pytest
 
-from cellarium.nexus.omics_datastore.bq_sql import constants as constants_module
-from cellarium.nexus.omics_datastore.bq_sql import template_data as td_module
-from cellarium.nexus.omics_datastore.bq_sql.validation import exceptions as val_exceptions
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql import constants as constants_module
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql import template_data as td_module
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql.validation import exceptions as val_exceptions
 
 
 def test_template_data_minimal() -> None:

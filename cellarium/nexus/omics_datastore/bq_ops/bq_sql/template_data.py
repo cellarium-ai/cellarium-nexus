@@ -1,7 +1,7 @@
 from typing import Any
 
-from cellarium.nexus.omics_datastore.bq_sql.constants import TemplateDataDictNames
-from cellarium.nexus.omics_datastore.bq_sql.validation import template_data_validator
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql.constants import TemplateDataDictNames
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql.validation import template_data_validator
 
 
 class TemplateData:

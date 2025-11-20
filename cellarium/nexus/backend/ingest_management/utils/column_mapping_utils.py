@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Iterable
 
 import pydantic
 
-from cellarium.nexus.omics_datastore.bq_avro_schemas import cell_management
+from cellarium.nexus.omics_datastore.bq_ops.bq_avro_schemas import cell_management
 
 if TYPE_CHECKING:
     from cellarium.nexus.backend.ingest_management import models

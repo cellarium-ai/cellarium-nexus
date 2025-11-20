@@ -2,7 +2,9 @@ import types
 
 import pytest
 
-from cellarium.nexus.omics_datastore.bq_sql.validation.query_validators import bigquery_validator as bq_val_module
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql.validation.query_validators import (
+    bigquery_validator as bq_val_module,
+)
 
 cloud = pytest.importorskip("google.cloud")
 

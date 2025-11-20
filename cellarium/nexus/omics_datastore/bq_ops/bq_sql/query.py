@@ -3,9 +3,11 @@ import logging
 import sqlparse
 from mako.template import Template
 
-from cellarium.nexus.omics_datastore.bq_sql.template_data import TemplateData
-from cellarium.nexus.omics_datastore.bq_sql.validation.query_validators import BigQuerySQLSyntaxValidator
-from cellarium.nexus.omics_datastore.bq_sql.validation.query_validators.base_query_validator import SQLSyntaxValidator
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql.template_data import TemplateData
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql.validation.query_validators import BigQuerySQLSyntaxValidator
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql.validation.query_validators.base_query_validator import (
+    SQLSyntaxValidator,
+)
 
 logger = logging.getLogger(__name__)
 

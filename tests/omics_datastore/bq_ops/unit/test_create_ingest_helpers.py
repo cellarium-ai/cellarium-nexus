@@ -4,11 +4,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from cellarium.nexus.omics_datastore.bq_avro_schemas.cell_management import (
+from cellarium.nexus.omics_datastore.bq_ops import exceptions as ingest_exceptions
+from cellarium.nexus.omics_datastore.bq_ops.bq_avro_schemas.cell_management import (
     CellInfoBQAvroSchema,
     FeatureInfoBQAvroSchema,
 )
-from cellarium.nexus.omics_datastore.bq_ops import exceptions as ingest_exceptions
 from cellarium.nexus.omics_datastore.bq_ops.ingest import create_ingest_files
 
 

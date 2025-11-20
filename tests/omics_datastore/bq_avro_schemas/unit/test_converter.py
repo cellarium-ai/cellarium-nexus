@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 
-from cellarium.nexus.omics_datastore.bq_avro_schemas import converter as conv_module
-from cellarium.nexus.omics_datastore.bq_avro_schemas import custom_types as ct_module
+from cellarium.nexus.omics_datastore.bq_ops.bq_avro_schemas import converter as conv_module
+from cellarium.nexus.omics_datastore.bq_ops.bq_avro_schemas import custom_types as ct_module
 
 
 class AvroModel(BaseModel):

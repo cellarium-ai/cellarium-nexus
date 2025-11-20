@@ -4,7 +4,7 @@ import py_avro_schema as pas
 from google.cloud import bigquery
 from pydantic import BaseModel, create_model
 
-from cellarium.nexus.omics_datastore.bq_avro_schemas.custom_types import JSONBQField
+from cellarium.nexus.omics_datastore.bq_ops.bq_avro_schemas.custom_types import JSONBQField
 
 
 def pydantic_to_avro(pydantic_model: Type[BaseModel]) -> dict[str, Any]:

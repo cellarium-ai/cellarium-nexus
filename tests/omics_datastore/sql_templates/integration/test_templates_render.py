@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from cellarium.nexus.omics_datastore.bq_sql import query as query_module
-from cellarium.nexus.omics_datastore.bq_sql import template_data as td_module
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql import query as query_module
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql import template_data as td_module
 
-TEMPLATES_ROOT = Path(__file__).resolve().parents[3] / "cellarium" / "nexus" / "omics_datastore" / "sql_templates"
+TEMPLATES_ROOT = (
+    Path(__file__).resolve().parents[3] / "cellarium" / "nexus" / "omics_datastore" / "bq_ops" / "sql_templates"
+)
 
 
 def minimal_kwargs_for_templates() -> dict[str, dict[str, object]]:

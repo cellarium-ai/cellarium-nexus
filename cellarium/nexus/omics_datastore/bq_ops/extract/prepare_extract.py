@@ -11,15 +11,14 @@ from typing import Any, Sequence
 
 from google.cloud import bigquery
 
-from cellarium.nexus.omics_datastore import bq_sql
-from cellarium.nexus.omics_datastore.bq_ops import constants
+from cellarium.nexus.omics_datastore.bq_ops import bq_sql, constants
 from cellarium.nexus.omics_datastore.bq_ops.extract.metadata_extractor import MetadataExtractor
 from cellarium.nexus.shared import schemas
 
 logger = logging.getLogger(__name__)
 
 # Template paths
-TEMPLATE_DIR = Path(__file__).parent.parent.parent / "sql_templates" / "prepare_extract"
+TEMPLATE_DIR = Path(__file__).parent.parent / "sql_templates" / "prepare_extract"
 CELL_INFO_RAND_TEMPLATE = TEMPLATE_DIR / "prepare_cell_info_randomized.sql.mako"
 CELL_INFO_TEMPLATE = TEMPLATE_DIR / "prepare_cell_info.sql.mako"
 DROP_CELL_INFO_RAND_TEMPLATE = TEMPLATE_DIR / "drop_prepare_cell_info_randomized.sql.mako"

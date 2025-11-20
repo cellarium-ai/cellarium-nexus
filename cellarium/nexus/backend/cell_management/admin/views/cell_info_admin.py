@@ -23,8 +23,8 @@ from cellarium.nexus.backend.cell_management.admin import forms as admin_forms
 from cellarium.nexus.backend.cell_management.admin import schemas as admin_schemas
 from cellarium.nexus.backend.cell_management.utils import bigquery_utils, workflows_utils
 from cellarium.nexus.backend.cell_management.utils import filters as filters_utils
-from cellarium.nexus.omics_datastore.bq_avro_schemas import cell_management as bq_schemas
 from cellarium.nexus.omics_datastore.bq_ops import constants as bq_constants
+from cellarium.nexus.omics_datastore.bq_ops.bq_avro_schemas import cell_management as bq_schemas
 
 
 class CellInfoAdminView(generic.TemplateView):

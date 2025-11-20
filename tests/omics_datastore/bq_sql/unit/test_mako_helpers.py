@@ -1,7 +1,7 @@
 import pytest
 
-from cellarium.nexus.omics_datastore.bq_sql import exceptions as bq_exceptions
-from cellarium.nexus.omics_datastore.bq_sql import mako_helpers
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql import exceptions as bq_exceptions
+from cellarium.nexus.omics_datastore.bq_ops.bq_sql import mako_helpers
 
 
 def test_build_concat_expression_basic() -> None:
