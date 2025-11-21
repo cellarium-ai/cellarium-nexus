@@ -55,3 +55,35 @@ class ExtractMetadata(BaseModel):
 
         bin_size = self.extract_bin_size or 0
         return bin_size * (self.total_bins - 1) + self.last_bin_size if self.total_bins > 0 else 0
+
+
+class SomaJoinIdRange(BaseModel):
+    """
+    Store a contiguous joinid range.
+
+    :param start: Inclusive start soma_joinid
+    :param end: Inclusive end soma_joinid
+    """
+
+    start: int
+    end: int
+
+
+class SomaExtractPlan(BaseModel):
+    """
+    Store SOMA extract plan information.
+
+    :param experiment_uri: URI of the SOMA experiment
+    :param value_filter: SOMA obs filter expression used for this plan
+    :param joinid_ranges: List of contiguous soma_joinid ranges
+    :param total_cells: Total number of cells matching the filter
+    :param range_size: Target number of cells per range
+    :param filters: Structured filter specification, using Nexus format
+    """
+
+    experiment_uri: str
+    value_filter: str
+    joinid_ranges: list[SomaJoinIdRange]
+    total_cells: int
+    range_size: int
+    filters: dict[str, Any] | None = None
