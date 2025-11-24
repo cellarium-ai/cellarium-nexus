@@ -171,7 +171,8 @@ class TileDBSOMADataOperator:
         obs_columns: list[str] | None = None,
         var_columns: list[str] | None = None,
         x_layer: str = "X",
-        max_workers: int | None = None,
+        max_workers_extract: int | None = None,
+        max_workers_shuffle: int | None = None,
         cleanup_temp: bool = True,
     ) -> None:
         """
@@ -191,7 +192,8 @@ class TileDBSOMADataOperator:
         :param obs_columns: Optional list of obs columns to include
         :param var_columns: Optional list of var columns to include
         :param x_layer: Name of the SOMA X layer to read counts from
-        :param max_workers: Maximum number of parallel workers
+        :param max_workers_extract: Maximum parallel workers for extraction (network I/O intensive)
+        :param max_workers_shuffle: Maximum parallel workers for shuffling (CPU/memory intensive)
         :param cleanup_temp: Whether to delete temp directory after shuffling
 
         :raise SomaExtractError: If SOMA reads fail
@@ -222,7 +224,7 @@ class TileDBSOMADataOperator:
                 var_columns=var_columns,
                 x_layer=x_layer,
                 output_format="zarr",  # Use Zarr for temp files (fast random access)
-                max_workers=max_workers,
+                max_workers=max_workers_extract,
             )
 
             # Stage 2: Shuffle cells across chunks
@@ -233,7 +235,7 @@ class TileDBSOMADataOperator:
                 chunk_size=final_chunk_size,
                 input_format="zarr",  # Read from Zarr temp files
                 output_format=output_format,  # Write in requested format
-                max_workers=max_workers,
+                max_workers=max_workers_shuffle,
             )
 
             logger.info("Extract and shuffle operation completed successfully")

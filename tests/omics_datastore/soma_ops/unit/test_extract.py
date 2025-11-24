@@ -36,8 +36,12 @@ def test_extract_range_to_anndata_happy_path(monkeypatch: pytest.MonkeyPatch, tm
         }
     )
 
-    # Create sparse matrix
-    x_coo = sp.coo_matrix(np.array([[1, 0, 2], [0, 3, 0], [1, 1, 1]]))
+    # Create sparse matrix with soma_joinids as row indices
+    # Row indices should match soma_joinids: [10, 15, 20]
+    x_coo = sp.coo_matrix(
+        ([1, 2, 3, 1, 1, 1], ([10, 10, 15, 20, 20, 20], [0, 2, 1, 0, 1, 2])),
+        shape=(21, 3),  # Max joinid is 20, so shape is 21 x 3
+    )
 
     def fake_open(uri: str, mode: str) -> FakeSomaExperiment:
         assert uri == experiment_uri
@@ -65,12 +69,15 @@ def test_extract_range_to_anndata_happy_path(monkeypatch: pytest.MonkeyPatch, tm
         obs_columns=["cell_type"],
         var_columns=["symbol"],
         x_layer="X",
+        output_format="h5ad",
     )
 
     # Verify AnnData was created
     assert len(adata_instances) == 1
     adata = adata_instances[0]
-    assert adata.X is x_coo
+    # Verify X matrix shape is correct (remapped to 0-based indices)
+    assert adata.X.shape == (3, 3)
+    assert adata.X.nnz == 6
     # Verify obs index is soma_joinid
     assert list(adata.obs.index) == [10, 15, 20]
     # Verify var index is soma_joinid
@@ -112,6 +119,7 @@ def test_extract_range_to_anndata_empty_obs(monkeypatch: pytest.MonkeyPatch, tmp
         value_filter=value_filter,
         joinid_range=joinid_range,
         output_path=output_path,
+        output_format="h5ad",
     )
 
     # Verify empty AnnData was created
@@ -139,6 +147,7 @@ def test_extract_range_to_anndata_error_handling(monkeypatch: pytest.MonkeyPatch
             value_filter=value_filter,
             joinid_range=joinid_range,
             output_path=output_path,
+            output_format="h5ad",
         )
 
 
@@ -171,6 +180,7 @@ def test_extract_range_worker(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
         obs_columns=obs_columns,
         var_columns=var_columns,
         x_layer=x_layer,
+        output_format="h5ad",
     )
 
     # Verify call
@@ -216,17 +226,21 @@ def test_extract_ranges_happy_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         obs_columns: list[str] | None,
         var_columns: list[str] | None,
         x_layer: str,
+        output_format: str,
     ) -> tuple[int, str]:
-        # Create the output file
+        # Create the output file/directory
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.touch()
+        if output_format == "zarr":
+            output_path.mkdir(exist_ok=True)
+        else:
+            output_path.touch()
         return idx, str(output_path)
 
     monkeypatch.setattr(extract_module, "_extract_range_worker", fake_worker)
 
     # Mock ProcessPoolExecutor to run synchronously
     executor = FakeExecutor(max_workers=2, worker_fn=fake_worker)
-    monkeypatch.setattr(extract_module, "ProcessPoolExecutor", lambda max_workers: executor)
+    monkeypatch.setattr(extract_module, "ProcessPoolExecutor", lambda **kwargs: executor)
 
     # Mock as_completed to return futures
     def fake_as_completed(futures: dict[object, int]) -> list[object]:
@@ -250,9 +264,9 @@ def test_extract_ranges_happy_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     # Verify worker was called for each range
     assert len(executor.calls) == 2
 
-    # Verify output files were created
-    assert (output_dir / "range_000000.h5ad").exists()
-    assert (output_dir / "range_000001.h5ad").exists()
+    # Verify output files were created (default format is zarr)
+    assert (output_dir / "range_000000.zarr").exists()
+    assert (output_dir / "range_000001.zarr").exists()
 
 
 def test_extract_ranges_failure_handling(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -286,7 +300,7 @@ def test_extract_ranges_failure_handling(monkeypatch: pytest.MonkeyPatch, tmp_pa
             return future
 
     executor = FailingExecutor(max_workers=2)
-    monkeypatch.setattr(extract_module, "ProcessPoolExecutor", lambda max_workers: executor)
+    monkeypatch.setattr(extract_module, "ProcessPoolExecutor", lambda **kwargs: executor)
 
     # Mock as_completed to return futures
     def fake_as_completed(futures: dict[object, int]) -> list[object]:
@@ -356,21 +370,13 @@ def test_shuffle_extracted_chunks_happy_path(monkeypatch: pytest.MonkeyPatch, tm
     (input_dir / "range_000001.h5ad").touch()
 
     # Mock anndata.read_h5ad
-    def fake_read_h5ad(path: Path, backed: str) -> FakeAnnData:
-        assert backed == "r"
+    def fake_read_h5ad(path: Path, backed: str | None = None) -> FakeAnnData:
+        if backed:
+            assert backed == "r"
         # Return fake with 3 cells per file
         return FakeAnnData(n_obs=3)
 
     monkeypatch.setattr("anndata.read_h5ad", fake_read_h5ad)
-
-    # Mock anndata.concat
-    def fake_concat(adatas: list[FakeAnnData], axis: int, merge: str) -> FakeAnnData:
-        assert axis == 0
-        assert merge == "same"
-        total = sum(a.n_obs for a in adatas)
-        return FakeAnnData(n_obs=total)
-
-    monkeypatch.setattr("anndata.concat", fake_concat)
 
     # Mock np.random.permutation
     def fake_permutation(n: int) -> np.ndarray:
@@ -379,11 +385,41 @@ def test_shuffle_extracted_chunks_happy_path(monkeypatch: pytest.MonkeyPatch, tm
 
     monkeypatch.setattr(np.random, "permutation", fake_permutation)
 
+    # Mock _write_shuffled_chunk worker
+    def fake_write_chunk(
+        chunk_idx: int,
+        chunk_indices: object,
+        input_files: object,
+        input_format: str,
+        output_dir: Path,
+        output_format: str,
+    ) -> tuple[int, str]:
+        # Create output file
+        output_dir.mkdir(parents=True, exist_ok=True)
+        if output_format == "zarr":
+            output_path = output_dir / f"chunk_{chunk_idx:06d}.zarr"
+            output_path.mkdir(exist_ok=True)
+        else:
+            output_path = output_dir / f"chunk_{chunk_idx:06d}.h5ad"
+            output_path.touch()
+        return chunk_idx, str(output_path)
+
+    # Mock ProcessPoolExecutor
+    executor = FakeExecutor(max_workers=1, worker_fn=fake_write_chunk)
+    monkeypatch.setattr(extract_module, "ProcessPoolExecutor", lambda **kwargs: executor)
+
+    # Mock as_completed
+    def fake_as_completed(futures: dict[object, int]) -> list[object]:
+        return list(futures.keys())
+
+    monkeypatch.setattr(extract_module, "as_completed", fake_as_completed)
+
     # Execute
     extract_module.shuffle_extracted_chunks(
         input_dir=input_dir,
         output_dir=output_dir,
         chunk_size=4,
+        input_format="h5ad",
         output_format="h5ad",
         max_workers=1,
     )

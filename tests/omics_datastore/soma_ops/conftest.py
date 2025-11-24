@@ -55,11 +55,19 @@ class FakeFuture:
 class FakeExecutor:
     """Mock ProcessPoolExecutor for testing."""
 
-    def __init__(self, max_workers: int, worker_fn: Callable | None = None) -> None:
+    def __init__(
+        self,
+        max_workers: int,
+        worker_fn: Callable | None = None,
+        mp_context: object = None,
+        initializer: object = None,
+        initargs: object = None,
+    ) -> None:
         self.max_workers = max_workers
         self.worker_fn = worker_fn
         self.futures: list[FakeFuture] = []
         self.calls: list[tuple[object, tuple, dict]] = []
+        # Ignore mp_context, initializer, initargs for testing
 
     def __enter__(self) -> "FakeExecutor":
         return self
@@ -138,6 +146,10 @@ class FakeSomaXQuery:
 
     def __init__(self, matrix: sp.coo_matrix) -> None:
         self.matrix = matrix
+
+    def coos(self) -> "FakeSomaXQuery":
+        """Return self to support coos() chaining."""
+        return self
 
     def concat(self) -> FakeSomaXTable:
         return FakeSomaXTable(self.matrix)

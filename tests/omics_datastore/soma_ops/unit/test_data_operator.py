@@ -160,6 +160,7 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
         experiment_uri: str,
         filters: object,
         range_size: int,
+        output_chunk_size: int | None,
         shuffle_ranges: bool,
     ) -> SomaExtractPlan:
         plan_calls.append(
@@ -167,6 +168,7 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
                 "experiment_uri": experiment_uri,
                 "filters": filters,
                 "range_size": range_size,
+                "output_chunk_size": output_chunk_size,
                 "shuffle_ranges": shuffle_ranges,
             }
         )
@@ -176,6 +178,7 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
             joinid_ranges=[SomaJoinIdRange(start=0, end=10)],
             total_cells=10,
             range_size=range_size,
+            output_chunk_size=output_chunk_size,
             filters=filters,
         )
 
@@ -218,6 +221,7 @@ def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.Monk
         obs_columns: list[str] | None,
         var_columns: list[str] | None,
         x_layer: str,
+        output_format: str,
         max_workers: int | None,
     ) -> None:
         extract_calls.append(
@@ -227,6 +231,7 @@ def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.Monk
                 "obs_columns": obs_columns,
                 "var_columns": var_columns,
                 "x_layer": x_layer,
+                "output_format": output_format,
                 "max_workers": max_workers,
             }
         )
@@ -318,7 +323,8 @@ def test_extract_ranges_shuffled_with_temp_dir(monkeypatch: pytest.MonkeyPatch, 
         obs_columns=["cell_type"],
         var_columns=["symbol"],
         x_layer="raw",
-        max_workers=2,
+        max_workers_extract=2,
+        max_workers_shuffle=4,
         cleanup_temp=True,
     )
 
@@ -337,7 +343,7 @@ def test_extract_ranges_shuffled_with_temp_dir(monkeypatch: pytest.MonkeyPatch, 
     assert shuffle_calls[0]["output_dir"] == output_dir
     assert shuffle_calls[0]["chunk_size"] == 10
     assert shuffle_calls[0]["output_format"] == "zarr"
-    assert shuffle_calls[0]["max_workers"] == 2
+    assert shuffle_calls[0]["max_workers"] == 4
 
     # Verify cleanup was called
     assert rmtree_calls == [temp_dir]
