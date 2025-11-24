@@ -77,7 +77,8 @@ class SomaExtractPlan(BaseModel):
     :param value_filter: SOMA obs filter expression used for this plan
     :param joinid_ranges: List of contiguous soma_joinid ranges
     :param total_cells: Total number of cells matching the filter
-    :param range_size: Target number of cells per range
+    :param range_size: Target number of cells per range (for extraction)
+    :param output_chunk_size: Target number of cells per output chunk (for shuffling)
     :param filters: Structured filter specification, using Nexus format
     """
 
@@ -86,4 +87,5 @@ class SomaExtractPlan(BaseModel):
     joinid_ranges: list[SomaJoinIdRange]
     total_cells: int
     range_size: int
+    output_chunk_size: int | None = None
     filters: dict[str, Any] | None = None

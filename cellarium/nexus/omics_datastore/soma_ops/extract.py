@@ -8,6 +8,7 @@ import logging
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
+from typing import Literal
 
 import anndata
 import numpy as np
@@ -43,12 +44,13 @@ def extract_range_to_anndata(
     obs_columns: list[str] | None = None,
     var_columns: list[str] | None = None,
     x_layer: str = "X",
+    output_format: Literal["zarr", "h5ad"] = "zarr",
 ) -> None:
     """
     Extract a single soma_joinid range to an AnnData file.
 
     Read obs, var, and X data from a SOMA experiment for a specific joinid range
-    and write to an AnnData file.
+    and write to an AnnData file in the specified format.
 
     :param experiment_uri: URI of the SOMA experiment
     :param value_filter: SOMA obs value_filter expression
@@ -57,9 +59,11 @@ def extract_range_to_anndata(
     :param obs_columns: Optional obs columns to include
     :param var_columns: Optional var columns to include
     :param x_layer: Name of the SOMA X layer to read counts from
+    :param output_format: Output format - "zarr" or "h5ad"
 
     :raise SomaExtractError: If SOMA reads fail
     :raise IOError: If file operations fail
+    :raise ValueError: If output_format is invalid
     """
     try:
         logger.info(f"Extracting joinid range [{joinid_range.start}, {joinid_range.end}] to {output_path}")
@@ -170,7 +174,12 @@ def extract_range_to_anndata(
             # Write to file
             logger.info(f"Writing to {output_path}")
 
-            adata.write_h5ad(output_path, compression="gzip")
+            if output_format == "zarr":
+                adata.write_zarr(output_path)
+            elif output_format == "h5ad":
+                adata.write_h5ad(output_path, compression="gzip")
+            else:
+                raise ValueError(f"output_format must be 'zarr' or 'h5ad', got {output_format}")
 
             logger.info(f"Successfully extracted {len(obs_df)} cells to {output_path}")
 
@@ -188,6 +197,7 @@ def _extract_range_worker(
     obs_columns: list[str] | None,
     var_columns: list[str] | None,
     x_layer: str,
+    output_format: Literal["zarr", "h5ad"],
 ) -> tuple[int, str]:
     """
     Worker function for parallel extraction.
@@ -200,6 +210,7 @@ def _extract_range_worker(
     :param obs_columns: Optional obs columns to include
     :param var_columns: Optional var columns to include
     :param x_layer: Name of the SOMA X layer to read counts from
+    :param output_format: Output format - "zarr" or "h5ad"
 
     :raise SomaExtractError: If extraction fails
 
@@ -213,6 +224,7 @@ def _extract_range_worker(
         obs_columns=obs_columns,
         var_columns=var_columns,
         x_layer=x_layer,
+        output_format=output_format,
     )
 
     return idx, str(output_path)
@@ -225,23 +237,26 @@ def extract_ranges(
     obs_columns: list[str] | None = None,
     var_columns: list[str] | None = None,
     x_layer: str = "X",
+    output_format: Literal["zarr", "h5ad"] = "zarr",
     max_workers: int | None = None,
 ) -> None:
     """
     Extract multiple soma_joinid ranges in parallel.
 
     Process all joinid ranges from the extract plan and write separate AnnData files
-    for each range.
+    for each range in the specified format.
 
     :param plan: SOMA extract plan with joinid ranges and value_filter
     :param output_dir: Local directory to save AnnData files
     :param obs_columns: Optional obs columns to include
     :param var_columns: Optional var columns to include
     :param x_layer: Name of the SOMA X layer to read counts from
+    :param output_format: Output format - "zarr" or "h5ad" (default: "zarr")
     :param max_workers: Maximum number of parallel workers
 
     :raise SomaExtractError: If SOMA reads fail
     :raise IOError: If file operations fail
+    :raise ValueError: If output_format is invalid
     """
     if max_workers is None:
         max_workers = multiprocessing.cpu_count()
@@ -258,6 +273,9 @@ def extract_ranges(
     # Use spawn method to avoid fork-related issues with network connections (TileDB/SOMA)
     mp_context = multiprocessing.get_context("spawn")
 
+    # Determine file extension based on output format
+    file_ext = ".zarr" if output_format == "zarr" else ".h5ad"
+
     with ProcessPoolExecutor(
         max_workers=max_workers,
         mp_context=mp_context,
@@ -267,7 +285,7 @@ def extract_ranges(
         # Submit all extraction jobs
         futures = {}
         for idx, joinid_range in enumerate(plan.joinid_ranges):
-            output_path = output_dir / f"range_{idx:06d}.h5ad"
+            output_path = output_dir / f"range_{idx:06d}{file_ext}"
             future = executor.submit(
                 _extract_range_worker,
                 idx,
@@ -278,6 +296,7 @@ def extract_ranges(
                 obs_columns,
                 var_columns,
                 x_layer,
+                output_format,
             )
             futures[future] = idx
 
@@ -305,7 +324,8 @@ def shuffle_extracted_chunks(
     input_dir: Path,
     output_dir: Path,
     chunk_size: int,
-    output_format: str = "zarr",
+    input_format: Literal["zarr", "h5ad"] = "zarr",
+    output_format: Literal["zarr", "h5ad"] = "h5ad",
     max_workers: int | None = None,
 ) -> None:
     """
@@ -318,14 +338,18 @@ def shuffle_extracted_chunks(
     :param input_dir: Directory with contiguous range files
     :param output_dir: Directory to write shuffled chunks
     :param chunk_size: Number of cells per output chunk
-    :param output_format: Output format - "zarr" or "h5ad"
+    :param input_format: Input format - "zarr" or "h5ad" (default: "zarr")
+    :param output_format: Output format - "zarr" or "h5ad" (default: "h5ad")
     :param max_workers: Maximum parallel workers for writing
 
     :raise IOError: If file operations fail
-    :raise ValueError: If chunk_size is not positive or output_format is invalid
+    :raise ValueError: If chunk_size is not positive or formats are invalid
     """
     if chunk_size <= 0:
         raise ValueError(f"chunk_size must be positive, got {chunk_size}")
+
+    if input_format not in ("zarr", "h5ad"):
+        raise ValueError(f"input_format must be 'zarr' or 'h5ad', got {input_format}")
 
     if output_format not in ("zarr", "h5ad"):
         raise ValueError(f"output_format must be 'zarr' or 'h5ad', got {output_format}")
@@ -333,12 +357,13 @@ def shuffle_extracted_chunks(
     if max_workers is None:
         max_workers = multiprocessing.cpu_count()
 
-    logger.info(f"Shuffling cells from {input_dir} to {output_dir} (format: {output_format})")
+    logger.info(f"Shuffling cells from {input_dir} ({input_format}) to {output_dir} ({output_format})")
 
-    # Find all input files
-    input_files = sorted(input_dir.glob("range_*.h5ad"))
+    # Find all input files based on input format
+    input_pattern = f"range_*.{input_format}" if input_format == "h5ad" else "range_*.zarr"
+    input_files = sorted(input_dir.glob(input_pattern))
     if not input_files:
-        raise ValueError(f"No range files found in {input_dir}")
+        raise ValueError(f"No range files found in {input_dir} with pattern {input_pattern}")
 
     logger.info(f"Found {len(input_files)} input files")
 
@@ -346,7 +371,10 @@ def shuffle_extracted_chunks(
     logger.info("Creating AnnCollection from input files...")
 
     # Open files in backed mode for AnnCollection
-    adatas = [anndata.read_h5ad(str(f), backed="r") for f in input_files]
+    if input_format == "zarr":
+        adatas = [anndata.read_zarr(str(f)) for f in input_files]
+    else:  # h5ad
+        adatas = [anndata.read_h5ad(str(f), backed="r") for f in input_files]
     ann_collection = AnnCollection(
         adatas,
         join_obs="inner",  # Keep only common obs columns

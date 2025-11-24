@@ -93,6 +93,7 @@ def plan_soma_extract(
     experiment_uri: str,
     filters: dict[str, object] | None,
     range_size: int,
+    output_chunk_size: int | None = None,
     shuffle_ranges: bool = True,
 ) -> SomaExtractPlan:
     """
@@ -104,7 +105,8 @@ def plan_soma_extract(
 
     :param experiment_uri: URI of the SOMA experiment
     :param filters: Dict of filter conditions using the Nexus format
-    :param range_size: Target number of cells per range
+    :param range_size: Target number of cells per range (for extraction)
+    :param output_chunk_size: Target number of cells per output chunk (for shuffling, default: range_size)
     :param shuffle_ranges: Whether to shuffle joinid ranges
 
     :raise SomaReadError: If SOMA reads fail
@@ -140,6 +142,7 @@ def plan_soma_extract(
             joinid_ranges=[],
             total_cells=0,
             range_size=range_size,
+            output_chunk_size=output_chunk_size,
             filters=filters,
         )
 
@@ -162,6 +165,7 @@ def plan_soma_extract(
         joinid_ranges=joinid_ranges,
         total_cells=total_cells,
         range_size=range_size,
+        output_chunk_size=output_chunk_size,
         filters=filters,
     )
 
