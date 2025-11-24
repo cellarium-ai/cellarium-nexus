@@ -319,6 +319,57 @@ def extract_ranges(
     logger.info(f"Successfully extracted all {len(plan.joinid_ranges)} ranges to {output_dir}")
 
 
+def _write_shuffled_chunk(
+    chunk_idx: int,
+    chunk_indices: np.ndarray,
+    input_files: list[Path],
+    input_format: Literal["zarr", "h5ad"],
+    output_dir: Path,
+    output_format: Literal["zarr", "h5ad"],
+) -> tuple[int, str]:
+    """
+    Worker function to write a single shuffled chunk.
+
+    Each worker creates its own AnnCollection from all input files to enable
+    complete shuffling across all ranges while avoiding pickling issues.
+
+    :param chunk_idx: Index of the chunk being written
+    :param chunk_indices: Array of cell indices for this chunk
+    :param input_files: List of all input file paths
+    :param input_format: Input format
+    :param output_dir: Output directory
+    :param output_format: Output format
+
+    :return: Tuple of (chunk_idx, output_path_str)
+    """
+    logger.info(f"Processing chunk {chunk_idx} ({len(chunk_indices)} cells)...")
+
+    # Each worker creates its own AnnCollection with ALL files (backed mode)
+    if input_format == "zarr":
+        adatas = [anndata.read_zarr(str(f)) for f in input_files]
+    else:  # h5ad
+        adatas = [anndata.read_h5ad(str(f), backed="r") for f in input_files]
+
+    ann_collection = AnnCollection(
+        adatas,
+        join_obs="inner",
+        join_vars="inner",
+    )
+
+    # Extract shuffled cells (may come from any/all ranges)
+    chunk_adata = ann_collection[chunk_indices].to_adata()
+
+    # Write output
+    if output_format == "zarr":
+        output_path = output_dir / f"chunk_{chunk_idx:06d}.zarr"
+        chunk_adata.write_zarr(output_path)
+    else:  # h5ad
+        output_path = output_dir / f"chunk_{chunk_idx:06d}.h5ad"
+        chunk_adata.write_h5ad(output_path, compression="gzip")
+
+    return chunk_idx, str(output_path)
+
+
 def shuffle_extracted_chunks(
     *,
     input_dir: Path,
@@ -367,21 +418,13 @@ def shuffle_extracted_chunks(
 
     logger.info(f"Found {len(input_files)} input files")
 
-    # Create AnnCollection for memory-efficient access
-    logger.info("Creating AnnCollection from input files...")
-
-    # Open files in backed mode for AnnCollection
+    # Count total cells by reading metadata from files
+    logger.info("Computing total cell count...")
     if input_format == "zarr":
-        adatas = [anndata.read_zarr(str(f)) for f in input_files]
+        total_cells = sum(anndata.read_zarr(str(f)).n_obs for f in input_files)
     else:  # h5ad
-        adatas = [anndata.read_h5ad(str(f), backed="r") for f in input_files]
-    ann_collection = AnnCollection(
-        adatas,
-        join_obs="inner",  # Keep only common obs columns
-        join_vars="inner",  # Keep only common var columns
-    )
+        total_cells = sum(anndata.read_h5ad(str(f), backed="r").n_obs for f in input_files)
 
-    total_cells = ann_collection.n_obs
     logger.info(f"Total cells to shuffle: {total_cells}")
 
     # Create random permutation of all cell indices
@@ -395,26 +438,47 @@ def shuffle_extracted_chunks(
     # Ensure output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Process each output chunk
-    logger.info("Writing shuffled chunks...")
-    for chunk_idx in range(num_chunks):
-        start_idx = chunk_idx * chunk_size
-        end_idx = min(start_idx + chunk_size, total_cells)
-        chunk_indices = cell_permutation[start_idx:end_idx]
+    # Process each output chunk in parallel
+    logger.info(f"Writing shuffled chunks using {max_workers} workers (spawn mode)...")
 
-        # Use AnnCollection to efficiently extract shuffled cells
-        # This only loads the cells we need, not entire files
-        logger.info(f"Processing chunk {chunk_idx + 1}/{num_chunks} ({len(chunk_indices)} cells)...")
-        chunk_adata = ann_collection[chunk_indices].to_adata()
+    # Use spawn method for multiprocessing
+    mp_context = multiprocessing.get_context("spawn")
 
-        # Write output
-        if output_format == "zarr":
-            output_path = output_dir / f"chunk_{chunk_idx:06d}.zarr"
-            chunk_adata.write_zarr(output_path)
-        else:  # h5ad
-            output_path = output_dir / f"chunk_{chunk_idx:06d}.h5ad"
-            chunk_adata.write_h5ad(output_path, compression="gzip")
+    with ProcessPoolExecutor(
+        max_workers=max_workers,
+        mp_context=mp_context,
+        initializer=child_init,
+        initargs=(logging.getLevelName(logger.level),),
+    ) as executor:
+        futures = {}
+        for chunk_idx in range(num_chunks):
+            start_idx = chunk_idx * chunk_size
+            end_idx = min(start_idx + chunk_size, total_cells)
+            chunk_indices = cell_permutation[start_idx:end_idx]
 
-        logger.info(f"Wrote chunk {chunk_idx + 1}/{num_chunks}: {output_path}")
+            # Submit chunk processing job
+            # Each worker will create its own AnnCollection with all files
+            future = executor.submit(
+                _write_shuffled_chunk,
+                chunk_idx,
+                chunk_indices,
+                input_files,
+                input_format,
+                output_dir,
+                output_format,
+            )
+            futures[future] = chunk_idx
+
+        # Wait for completion and track progress
+        completed = 0
+        for future in as_completed(futures):
+            try:
+                chunk_idx, output_path = future.result()
+                completed += 1
+                logger.info(f"Progress: {completed}/{num_chunks} chunks written")
+            except Exception as e:
+                chunk_idx = futures[future]
+                logger.error(f"Failed to write chunk {chunk_idx}: {e}")
+                raise
 
     logger.info(f"Successfully shuffled {total_cells} cells into {num_chunks} chunks")
