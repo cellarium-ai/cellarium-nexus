@@ -6,6 +6,7 @@ This module provides functions to extract data from SOMA experiments into AnnDat
 
 import logging
 import multiprocessing
+import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Literal
@@ -13,8 +14,10 @@ from typing import Literal
 import anndata
 import numpy as np
 import tiledbsoma
+from anndata._core.aligned_df import ImplicitModificationWarning
 from anndata.experimental import AnnCollection
 from scipy.sparse import coo_matrix
+from tqdm import tqdm
 
 from cellarium.nexus.omics_datastore.soma_ops.exceptions import SomaExtractError
 from cellarium.nexus.shared.schemas.omics_datastore import SomaExtractPlan, SomaJoinIdRange
@@ -22,14 +25,21 @@ from cellarium.nexus.shared.schemas.omics_datastore import SomaExtractPlan, Soma
 logger = logging.getLogger(__name__)
 
 
-def child_init(log_level: str) -> None:
+def child_init(log_level: str, verbose: bool = True) -> None:
     """
     Configure logging for child processes.
 
     :param log_level: Logging level to set
+    :param verbose: If False, suppress INFO level logging in child processes
     """
+    # Suppress ImplicitModificationWarning from anndata
+    warnings.filterwarnings(action="ignore", category=ImplicitModificationWarning)
+
+    # If verbose is False, set level to WARNING to suppress INFO logs
+    effective_level = log_level if verbose else "WARNING"
+
     logging.basicConfig(
-        level=log_level,
+        level=effective_level,
         format="[%(asctime)s] [%(processName)s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
@@ -239,6 +249,7 @@ def extract_ranges(
     x_layer: str = "X",
     output_format: Literal["zarr", "h5ad"] = "zarr",
     max_workers: int | None = None,
+    verbose: bool = True,
 ) -> None:
     """
     Extract multiple soma_joinid ranges in parallel.
@@ -253,11 +264,15 @@ def extract_ranges(
     :param x_layer: Name of the SOMA X layer to read counts from
     :param output_format: Output format - "zarr" or "h5ad" (default: "zarr")
     :param max_workers: Maximum number of parallel workers
+    :param verbose: If False, suppress INFO level logging in parallel workers
 
     :raise SomaExtractError: If SOMA reads fail
     :raise IOError: If file operations fail
     :raise ValueError: If output_format is invalid
     """
+    # Suppress ImplicitModificationWarning from anndata
+    warnings.filterwarnings(action="ignore", category=ImplicitModificationWarning)
+
     if max_workers is None:
         max_workers = multiprocessing.cpu_count()
 
@@ -280,7 +295,7 @@ def extract_ranges(
         max_workers=max_workers,
         mp_context=mp_context,
         initializer=child_init,
-        initargs=(logging.getLevelName(logger.level),),
+        initargs=(logging.getLevelName(logger.level), verbose),
     ) as executor:
         # Submit all extraction jobs
         futures = {}
@@ -301,11 +316,10 @@ def extract_ranges(
             futures[future] = idx
 
         # Wait for completion
-        for future in as_completed(futures):
+        for future in tqdm(as_completed(futures), total=len(plan.joinid_ranges), desc="Extracting ranges"):
             try:
                 idx, output_path = future.result()
                 completed += 1
-                logger.info(f"Progress: {completed}/{len(plan.joinid_ranges)} ranges completed")
             except Exception as e:
                 idx = futures[future]
                 failed.append((idx, str(e)))
@@ -380,6 +394,7 @@ def shuffle_extracted_chunks(
     input_format: Literal["zarr", "h5ad"] = "zarr",
     output_format: Literal["zarr", "h5ad"] = "h5ad",
     max_workers: int | None = None,
+    verbose: bool = True,
 ) -> None:
     """
     Shuffle cells across extracted AnnData chunks.
@@ -394,10 +409,14 @@ def shuffle_extracted_chunks(
     :param input_format: Input format - "zarr" or "h5ad" (default: "zarr")
     :param output_format: Output format - "zarr" or "h5ad" (default: "h5ad")
     :param max_workers: Maximum parallel workers for writing
+    :param verbose: If False, suppress INFO level logging in parallel workers
 
     :raise IOError: If file operations fail
     :raise ValueError: If chunk_size is not positive or formats are invalid
     """
+    # Suppress ImplicitModificationWarning from anndata
+    warnings.filterwarnings(action="ignore", category=ImplicitModificationWarning)
+
     if chunk_size <= 0:
         raise ValueError(f"chunk_size must be positive, got {chunk_size}")
 
@@ -450,7 +469,7 @@ def shuffle_extracted_chunks(
         max_workers=max_workers,
         mp_context=mp_context,
         initializer=child_init,
-        initargs=(logging.getLevelName(logger.level),),
+        initargs=(logging.getLevelName(logger.level), verbose),
     ) as executor:
         futures = {}
         for chunk_idx in range(num_chunks):
@@ -473,11 +492,10 @@ def shuffle_extracted_chunks(
 
         # Wait for completion and track progress
         completed = 0
-        for future in as_completed(futures):
+        for future in tqdm(as_completed(futures), total=num_chunks, desc="Shuffling chunks"):
             try:
                 chunk_idx, output_path = future.result()
                 completed += 1
-                logger.info(f"Progress: {completed}/{num_chunks} chunks written")
             except Exception as e:
                 chunk_idx = futures[future]
                 logger.error(f"Failed to write chunk {chunk_idx}: {e}")

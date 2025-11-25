@@ -129,6 +129,7 @@ class TileDBSOMADataOperator:
         x_layer: str = "X",
         output_format: Literal["zarr", "h5ad"] = "h5ad",
         max_workers: int | None = None,
+        verbose: bool = False,
     ) -> None:
         """
         Extract SOMA data for the given joinid ranges into AnnData files.
@@ -142,6 +143,7 @@ class TileDBSOMADataOperator:
         :param x_layer: Name of the SOMA X layer to read counts from
         :param output_format: Output format - "zarr" or "h5ad" (default: "h5ad")
         :param max_workers: Maximum number of parallel workers
+        :param verbose: If False, suppress INFO level logging in parallel workers
 
         :raise SomaExtractError: If SOMA reads fail
         :raise IOError: If file operations fail
@@ -156,6 +158,7 @@ class TileDBSOMADataOperator:
             x_layer=x_layer,
             output_format=output_format,
             max_workers=max_workers,
+            verbose=verbose,
         )
 
         logger.info("Extract operation completed successfully")
@@ -174,6 +177,7 @@ class TileDBSOMADataOperator:
         max_workers_extract: int | None = None,
         max_workers_shuffle: int | None = None,
         cleanup_temp: bool = True,
+        verbose: bool = False,
     ) -> None:
         """
         Extract and shuffle cells across chunks.
@@ -195,6 +199,7 @@ class TileDBSOMADataOperator:
         :param max_workers_extract: Maximum parallel workers for extraction (network I/O intensive)
         :param max_workers_shuffle: Maximum parallel workers for shuffling (CPU/memory intensive)
         :param cleanup_temp: Whether to delete temp directory after shuffling
+        :param verbose: If False, suppress INFO level logging in parallel workers
 
         :raise SomaExtractError: If SOMA reads fail
         :raise IOError: If file operations fail
@@ -225,6 +230,7 @@ class TileDBSOMADataOperator:
                 x_layer=x_layer,
                 output_format="h5ad",  # Use H5AD for temp files (better backed mode support)
                 max_workers=max_workers_extract,
+                verbose=verbose,
             )
 
             # Stage 2: Shuffle cells across chunks
@@ -236,6 +242,7 @@ class TileDBSOMADataOperator:
                 input_format="h5ad",  # Read from H5AD temp files
                 output_format=output_format,  # Write in requested format
                 max_workers=max_workers_shuffle,
+                verbose=verbose,
             )
 
             logger.info("Extract and shuffle operation completed successfully")
