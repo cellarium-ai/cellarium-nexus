@@ -16,12 +16,12 @@ def test_build_soma_value_filter_empty_filters() -> None:
     "filters,expected",
     [
         ({"organism__eq": "Homo sapiens"}, '(organism == "Homo sapiens")'),
-        ({"organism__ne": "Mus musculus"}, '(organism != "Mus musculus")'),
+        ({"organism__not_eq": "Mus musculus"}, '(organism != "Mus musculus")'),
     ],
 )
 def test_build_soma_value_filter_eq_ne_operators(filters: dict[str, object], expected: str) -> None:
     """
-    Verify __eq and __ne operators translate correctly.
+    Verify __eq and __not_eq operators translate correctly.
     """
     result = filters_module.build_soma_value_filter(filters=filters)
     assert result == expected

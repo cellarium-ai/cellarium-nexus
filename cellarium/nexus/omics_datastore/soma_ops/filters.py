@@ -88,7 +88,7 @@ def _build_condition(column: str, operator: str, value: object) -> str:
     """
     if operator == "eq":
         return f"({column} == {_format_literal(value)})"
-    elif operator == "ne":
+    elif operator == "not_eq":
         return f"({column} != {_format_literal(value)})"
     elif operator == "in":
         if not isinstance(value, list):
@@ -115,7 +115,7 @@ def build_soma_value_filter(filters: dict[str, object] | None) -> str:
     Build a SOMA value_filter expression from a filter dict.
 
     Convert Nexus filter dict format to SOMA value_filter expression string.
-    Supported operators: eq, ne, in, not_in, gt, gte, lt, lte.
+    Supported operators: eq, not_eq, in, not_in, gt, gte, lt, lte.
 
     :param filters: Dict of filter conditions using the Nexus format
 
