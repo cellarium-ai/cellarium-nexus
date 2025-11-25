@@ -223,6 +223,7 @@ def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.Monk
         x_layer: str,
         output_format: str,
         max_workers: int | None,
+        verbose: bool,
     ) -> None:
         extract_calls.append(
             {
@@ -233,6 +234,7 @@ def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.Monk
                 "x_layer": x_layer,
                 "output_format": output_format,
                 "max_workers": max_workers,
+                "verbose": verbose,
             }
         )
 
@@ -270,6 +272,7 @@ def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.Monk
     assert call["var_columns"] == var_columns
     assert call["x_layer"] == "raw"
     assert call["max_workers"] == 4
+    assert call["verbose"] is False
 
 
 def test_extract_ranges_shuffled_with_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
