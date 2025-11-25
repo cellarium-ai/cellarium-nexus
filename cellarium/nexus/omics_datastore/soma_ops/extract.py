@@ -367,6 +367,8 @@ def _write_shuffled_chunk(
         output_path = output_dir / f"chunk_{chunk_idx:06d}.h5ad"
         chunk_adata.write_h5ad(output_path, compression="gzip")
 
+    logger.info(f"Successfully wrote chunk {chunk_idx} with {len(chunk_indices)} cells to {output_path}")
+
     return chunk_idx, str(output_path)
 
 

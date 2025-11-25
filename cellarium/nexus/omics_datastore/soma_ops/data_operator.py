@@ -216,14 +216,14 @@ class TileDBSOMADataOperator:
             temp_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            logger.info("Stage 1: Extracting contiguous ranges to Zarr format...")
+            logger.info("Stage 1: Extracting contiguous ranges to H5AD format...")
             extract_ranges(
                 plan=plan,
                 output_dir=temp_dir,
                 obs_columns=obs_columns,
                 var_columns=var_columns,
                 x_layer=x_layer,
-                output_format="zarr",  # Use Zarr for temp files (fast random access)
+                output_format="h5ad",  # Use H5AD for temp files (better backed mode support)
                 max_workers=max_workers_extract,
             )
 
@@ -233,7 +233,7 @@ class TileDBSOMADataOperator:
                 input_dir=temp_dir,
                 output_dir=output_dir,
                 chunk_size=final_chunk_size,
-                input_format="zarr",  # Read from Zarr temp files
+                input_format="h5ad",  # Read from H5AD temp files
                 output_format=output_format,  # Write in requested format
                 max_workers=max_workers_shuffle,
             )
