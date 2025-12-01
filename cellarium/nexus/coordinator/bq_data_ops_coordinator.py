@@ -1,5 +1,5 @@
 """
-Control and manage Nexus data operations.
+Control and manage BigQuery data operations for Nexus.
 """
 
 import concurrent.futures
@@ -26,17 +26,17 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-class NexusDataOpsCoordinator:
+class BQDataOpsCoordinator:
     """
-    Control and manage Nexus data operations.
+    Control and manage BigQuery data operations for Nexus.
 
-    This controller provides a high-level interface for data operations,
-    delegating BigQuery-specific operations to BQDatastoreController.
+    Provide a high-level interface for BigQuery ingest and extract operations,
+    delegating low-level operations to BigQueryDataOperator.
     """
 
     def __init__(self, *, project_id: str, nexus_backend_api_url: str, bigquery_dataset: str) -> None:
         """
-        Initialize the Nexus data controller.
+        Initialize the BigQuery data operations coordinator.
 
         :param project_id: GCP project ID
         :param nexus_backend_api_url: URL for Nexus backend API

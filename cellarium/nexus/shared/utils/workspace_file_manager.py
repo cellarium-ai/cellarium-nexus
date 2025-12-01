@@ -16,10 +16,9 @@ logger = logging.getLogger(__name__)
 
 class WorkspaceFileManager:
     """
-    Manage temporary workspaces and file operations for data pipelines.
+    Manage temporary workspaces and file operations.
 
-    Handle temporary directory creation, cloud storage operations,
-    and JSON file persistence.
+    Handle temporary directory creation, cloud storage operations
     """
 
     def __init__(self, *, bucket_name: str) -> None:

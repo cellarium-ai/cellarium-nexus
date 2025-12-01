@@ -16,14 +16,14 @@ def create_ingest_files_job(gcs_config_path: str):
     """
     Create ingest files from input data sources.
 
-    Reads a CreateIngestFilesConfig from GCS and uses NexusDataOpsCoordinator to create
+    Read a CreateIngestFilesConfig from GCS and use BQDataOpsCoordinator to create
     ingest files for the specified data source.
 
     :param gcs_config_path: GCS path to the configuration file
 
-    :raise: Exception: If file creation fails
+    :raise Exception: If file creation fails
     """
-    from cellarium.nexus.coordinator import NexusDataOpsCoordinator
+    from cellarium.nexus.coordinator import BQDataOpsCoordinator
     from cellarium.nexus.shared import utils
     from cellarium.nexus.shared.schemas.component_configs import CreateIngestFilesConfig
 
@@ -31,7 +31,7 @@ def create_ingest_files_job(gcs_config_path: str):
         gcs_path=gcs_config_path, schema_class=CreateIngestFilesConfig
     )
 
-    coordinator = NexusDataOpsCoordinator(
+    coordinator = BQDataOpsCoordinator(
         project_id=params.project_id,
         nexus_backend_api_url=params.nexus_backend_api_url,
         bigquery_dataset=params.bigquery_dataset,
@@ -60,20 +60,20 @@ def ingest_data_to_bigquery_job(gcs_config_path: str):
     """
     Ingest prepared data into BigQuery tables.
 
-    Reads an IngestFilesConfig from GCS and uses NexusDataOpsCoordinator to ingest
+    Read an IngestFilesConfig from GCS and use BQDataOpsCoordinator to ingest
     data from the specified bucket paths into BigQuery tables.
 
     :param gcs_config_path: GCS path to the configuration file
 
-    :raise: Exception: If ingestion fails
+    :raise Exception: If ingestion fails
     """
-    from cellarium.nexus.coordinator import NexusDataOpsCoordinator
+    from cellarium.nexus.coordinator import BQDataOpsCoordinator
     from cellarium.nexus.shared import utils
     from cellarium.nexus.shared.schemas.component_configs import IngestFilesConfig
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=IngestFilesConfig)
 
-    coordinator = NexusDataOpsCoordinator(
+    coordinator = BQDataOpsCoordinator(
         project_id=params.project_id,
         nexus_backend_api_url=params.nexus_backend_api_url,
         bigquery_dataset=params.bigquery_dataset,
@@ -96,20 +96,20 @@ def prepare_extract_job(gcs_config_path: str):
     """
     Prepare BigQuery tables for data extraction.
 
-    Reads a BQOpsPrepareExtract configuration from GCS and uses NexusDataOpsCoordinator
+    Read a BQOpsPrepareExtract configuration from GCS and use BQDataOpsCoordinator
     to prepare extract tables based on the specified features and filters.
 
     :param gcs_config_path: GCS path to the configuration file
 
-    :raise: Exception: If preparation fails
+    :raise Exception: If preparation fails
     """
-    from cellarium.nexus.coordinator import NexusDataOpsCoordinator
+    from cellarium.nexus.coordinator import BQDataOpsCoordinator
     from cellarium.nexus.shared import utils
     from cellarium.nexus.shared.schemas.component_configs import BQOpsPrepareExtract
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=BQOpsPrepareExtract)
 
-    coordinator = NexusDataOpsCoordinator(
+    coordinator = BQDataOpsCoordinator(
         project_id=params.project_id,
         nexus_backend_api_url=params.nexus_backend_api_url,
         bigquery_dataset=params.bigquery_dataset,
@@ -140,20 +140,20 @@ def extract_job(gcs_config_path: str):
     """
     Extract data from prepared tables into AnnData files.
 
-    Reads a BQOpsExtract configuration from GCS and uses NexusDataOpsCoordinator
+    Read a BQOpsExtract configuration from GCS and use BQDataOpsCoordinator
     to extract data from BigQuery tables into AnnData files for the specified bins.
 
     :param gcs_config_path: GCS path to the configuration file
 
-    :raise: Exception: If extraction fails
+    :raise Exception: If extraction fails
     """
-    from cellarium.nexus.coordinator import NexusDataOpsCoordinator
+    from cellarium.nexus.coordinator import BQDataOpsCoordinator
     from cellarium.nexus.shared import utils
     from cellarium.nexus.shared.schemas.component_configs import BQOpsExtract
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=BQOpsExtract)
 
-    coordinator = NexusDataOpsCoordinator(
+    coordinator = BQDataOpsCoordinator(
         project_id=params.project_id,
         nexus_backend_api_url=params.nexus_backend_api_url,
         bigquery_dataset=params.bigquery_dataset,
@@ -187,13 +187,13 @@ def mark_curriculum_as_finished_job(gcs_config_path: str):
 
     :raise Exception: If any error occurs during the process
     """
-    from cellarium.nexus.coordinator import NexusDataOpsCoordinator
+    from cellarium.nexus.coordinator import BQDataOpsCoordinator
     from cellarium.nexus.shared import utils
     from cellarium.nexus.shared.schemas.component_configs import BQOpsPrepareExtract
 
     params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=BQOpsPrepareExtract)
 
-    coordinator = NexusDataOpsCoordinator(
+    coordinator = BQDataOpsCoordinator(
         project_id=params.project_id,
         nexus_backend_api_url=params.nexus_backend_api_url,
         bigquery_dataset=params.bigquery_dataset,
