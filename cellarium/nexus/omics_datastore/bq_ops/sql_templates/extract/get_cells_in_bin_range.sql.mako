@@ -1,6 +1,6 @@
 <%
     from cellarium.nexus.omics_datastore.bq_ops import constants
-    from cellarium.nexus.omics_datastore.bq_sql import mako_helpers as mh
+    from cellarium.nexus.omics_datastore.bq_ops.bq_sql import mako_helpers as mh
 
     select_column_names_processed = mh.add_cell_info_required_columns(select_columns)
     # Remove column aliases because after creating temporary tables all the columns are

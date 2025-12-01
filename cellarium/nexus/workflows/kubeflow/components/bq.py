@@ -1,3 +1,5 @@
+"""BigQuery data operation components for Kubeflow pipelines."""
+
 from cellarium.nexus.workflows.kubeflow import conf
 from cellarium.nexus.workflows.kubeflow.utils import job
 
@@ -179,7 +181,7 @@ def mark_curriculum_as_finished_job(gcs_config_path: str):
     """
     Mark a curriculum as finished and succeeded, including extract metadata.
 
-    Retrieves metadata information from the metadata file and updates the curriculum
+    Retrieve metadata information from the metadata file and update the curriculum
     with this information, including the number of bins, extract files path, and
     metadata file path.
 
@@ -202,38 +204,4 @@ def mark_curriculum_as_finished_job(gcs_config_path: str):
         extract_name=params.extract_name,
         bucket_name=params.bucket_name,
         extract_bucket_path=params.extract_bucket_path,
-    )
-
-
-@job.dsl_component_job(
-    machine_type="e2-highmem-4",
-    display_name="validate_anndata_files",
-    base_image=conf.BASE_IMAGE,
-    service_account=conf.SERVICE_ACCOUNT,
-    labels=conf.LABELS,
-)
-def validate_anndata_files_job(gcs_config_path: str):
-    """
-    Validate multiple AnnData files and report validation results.
-
-    Downloads each AnnData file from GCS, applies validation methods, and reports results to the Nexus backend API.
-
-    :param gcs_config_path: Path to the configuration file in GCS
-
-    :raise: ValidationError if validation fails for any file
-    """
-    from cellarium.nexus.coordinator import NexusDataValidationCoordinator
-    from cellarium.nexus.shared import utils
-    from cellarium.nexus.shared.schemas.component_configs import ValidationConfig
-
-    params = utils.workflows_configs.read_component_config(gcs_path=gcs_config_path, schema_class=ValidationConfig)
-
-    coordinator = NexusDataValidationCoordinator(
-        nexus_backend_api_url=params.nexus_backend_api_url,
-        validation_report_id=params.validation_report_id,
-        max_bytes_valid_per_file=params.max_bytes_valid_per_file,
-    )
-    coordinator.validate_and_report_multiple(
-        adata_gcs_paths=params.adata_gcs_paths,
-        validation_methods=params.validation_methods,
     )

@@ -63,3 +63,47 @@ class BQOpsExtract(BaseModel):
     extract_bucket_path: str
     obs_columns: list[str] | None = None
     max_workers: int | None = None
+
+
+class SomaOpsPrepareExtract(BaseModel):
+    """Configuration for preparing a SOMA extract."""
+
+    extract_name: str
+    creator_id: int
+    experiment_uri: str
+    nexus_backend_api_url: str
+    bucket_name: str
+    extract_bucket_path: str
+    range_size: int
+    filters: dict[str, Any] | None = None
+    output_chunk_size: int | None = None
+    shuffle_ranges: bool = True
+
+
+class SomaOpsExtract(BaseModel):
+    """Configuration for running a SOMA extract."""
+
+    extract_name: str
+    experiment_uri: str
+    nexus_backend_api_url: str
+    bucket_name: str
+    plan_path: str
+    extract_bucket_path: str
+    range_indices: list[int] | None = None
+    obs_columns: list[str] | None = None
+    var_columns: list[str] | None = None
+    x_layer: str = "X"
+    output_format: str = "h5ad"
+    max_workers_extract: int | None = None
+    max_workers_shuffle: int | None = None
+
+
+class SomaOpsMarkFinished(BaseModel):
+    """Configuration for marking a SOMA curriculum as finished."""
+
+    extract_name: str
+    experiment_uri: str
+    nexus_backend_api_url: str
+    bucket_name: str
+    plan_path: str
+    extract_bucket_path: str

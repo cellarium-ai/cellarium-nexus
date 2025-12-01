@@ -1,5 +1,5 @@
 <%
-    from cellarium.nexus.omics_datastore.bq_sql import mako_helpers as mh
+    from cellarium.nexus.omics_datastore.bq_ops.bq_sql import mako_helpers as mh
 %>
 -- Calculate the total count of cells based on provided filters.
 --
