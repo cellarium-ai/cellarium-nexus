@@ -88,6 +88,47 @@ def compute_contiguous_ranges(
     return ranges
 
 
+def read_var_joinids(
+    *,
+    experiment_uri: str,
+    var_filter_column: str,
+    var_filter_values: list[str],
+) -> list[int]:
+    """
+    Read var soma_joinids matching the given filter values.
+
+    Return joinids in the same order as var_filter_values to preserve
+    the requested feature ordering.
+
+    :param experiment_uri: URI of the SOMA experiment
+    :param var_filter_column: Name of the var column to filter on
+    :param var_filter_values: List of values to match in the filter column
+
+    :raise SomaReadError: If SOMA read fails
+
+    :return: List of soma_joinids in the order of var_filter_values
+    """
+    try:
+        with tiledbsoma.open(experiment_uri, mode="r") as exp:
+            rna = exp.ms["RNA"]
+            var_df = rna.var.read(column_names=["soma_joinid", var_filter_column]).concat().to_pandas()
+
+            # Create mapping from filter value to joinid
+            value_to_joinid = dict(zip(var_df[var_filter_column], var_df["soma_joinid"]))
+
+            # Return joinids in the order of var_filter_values
+            result = []
+            for value in var_filter_values:
+                if value in value_to_joinid:
+                    result.append(int(value_to_joinid[value]))
+                else:
+                    logger.warning(f"Feature value '{value}' not found in var column '{var_filter_column}'")
+
+            return result
+    except Exception as e:
+        raise SomaReadError(f"Failed to read var joinids from {experiment_uri}: {e}") from e
+
+
 def plan_soma_extract(
     *,
     experiment_uri: str,
@@ -95,6 +136,11 @@ def plan_soma_extract(
     range_size: int,
     output_chunk_size: int,
     shuffle_ranges: bool = True,
+    var_filter_column: str | None = None,
+    var_filter_values: list[str] | None = None,
+    obs_columns: list[str] | None = None,
+    var_columns: list[str] | None = None,
+    x_layer: str = "X",
 ) -> SomaExtractPlan:
     """
     Plan a SOMA extract by computing soma_joinid ranges for a given filter.
@@ -108,6 +154,11 @@ def plan_soma_extract(
     :param range_size: Target number of cells per range (for extraction)
     :param output_chunk_size: Target number of cells per output chunk (for shuffling)
     :param shuffle_ranges: Whether to shuffle joinid ranges
+    :param var_filter_column: Name of the var column to filter features by
+    :param var_filter_values: List of values to match in the var filter column
+    :param obs_columns: List of obs columns to include in extraction
+    :param var_columns: List of var columns to include in extraction
+    :param x_layer: Name of the SOMA X layer to read counts from
 
     :raise SomaReadError: If SOMA reads fail
     :raise SomaFilterError: If filter translation fails
@@ -124,8 +175,19 @@ def plan_soma_extract(
 
     logger.info(
         f"Planning SOMA extract for {experiment_uri} with range_size={range_size}, "
-        f"filter={value_filter if value_filter else 'no filter'}"
+        f"filter={value_filter if value_filter else 'no filter'}, "
+        f"var_filter_column={var_filter_column}, var_filter_values_count={len(var_filter_values) if var_filter_values else 0}"
     )
+
+    # Compute var_joinids if feature filtering is requested
+    var_joinids: list[int] | None = None
+    if var_filter_column and var_filter_values:
+        var_joinids = read_var_joinids(
+            experiment_uri=experiment_uri,
+            var_filter_column=var_filter_column,
+            var_filter_values=var_filter_values,
+        )
+        logger.info(f"Found {len(var_joinids)} var joinids for feature filter")
 
     # Read and sort filtered joinids
     joinids = read_filtered_joinids(
@@ -146,6 +208,12 @@ def plan_soma_extract(
             range_size=range_size,
             output_chunk_size=output_chunk_size,
             filters=filters,
+            var_joinids=var_joinids,
+            var_filter_column=var_filter_column,
+            var_filter_values=var_filter_values,
+            obs_columns=obs_columns,
+            var_columns=var_columns,
+            x_layer=x_layer,
         )
 
     # Compute joinid ranges
@@ -169,6 +237,12 @@ def plan_soma_extract(
         range_size=range_size,
         output_chunk_size=output_chunk_size,
         filters=filters,
+        var_joinids=var_joinids,
+        var_filter_column=var_filter_column,
+        var_filter_values=var_filter_values,
+        obs_columns=obs_columns,
+        var_columns=var_columns,
+        x_layer=x_layer,
     )
 
     logger.info(f"Extract plan created: {plan.total_cells} cells in {len(plan.joinid_ranges)} ranges")

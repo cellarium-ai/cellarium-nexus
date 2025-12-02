@@ -86,6 +86,11 @@ class SomaDataOpsCoordinator:
         output_chunk_size: int,
         filters: dict[str, Any] | None = None,
         shuffle_ranges: bool = True,
+        var_filter_column: str | None = None,
+        var_filter_values: list[str] | None = None,
+        obs_columns: list[str] | None = None,
+        var_columns: list[str] | None = None,
+        x_layer: str = "X",
     ) -> None:
         """
         Prepare a SOMA extract by computing the plan and registering the curriculum.
@@ -101,6 +106,11 @@ class SomaDataOpsCoordinator:
         :param output_chunk_size: Target cells per output chunk (for shuffling)
         :param filters: Optional filter conditions in Nexus format
         :param shuffle_ranges: Whether to shuffle the joinid ranges
+        :param var_filter_column: Name of the var column to filter features by
+        :param var_filter_values: List of values to match in the var filter column
+        :param obs_columns: List of obs columns to include in extraction
+        :param var_columns: List of var columns to include in extraction
+        :param x_layer: Name of the SOMA X layer to read counts from
 
         :raise SomaPlanningError: If plan computation fails
         :raise IOError: If cloud storage operations fail
@@ -115,6 +125,11 @@ class SomaDataOpsCoordinator:
                 range_size=range_size,
                 output_chunk_size=output_chunk_size,
                 shuffle_ranges=shuffle_ranges,
+                var_filter_column=var_filter_column,
+                var_filter_values=var_filter_values,
+                obs_columns=obs_columns,
+                var_columns=var_columns,
+                x_layer=x_layer,
             )
             logger.info(f"Computed extract plan: {len(plan.joinid_ranges)} ranges, {plan.total_cells} total cells")
 
@@ -157,9 +172,6 @@ class SomaDataOpsCoordinator:
         plan_path: str,
         extract_bucket_path: str,
         range_indices: list[int] | None = None,
-        obs_columns: list[str] | None = None,
-        var_columns: list[str] | None = None,
-        x_layer: str = "X",
         output_format: Literal["h5ad", "zarr"] = "h5ad",
         max_workers_extract: int | None = None,
         max_workers_shuffle: int | None = None,
@@ -168,15 +180,13 @@ class SomaDataOpsCoordinator:
         Run SOMA data extraction for specified ranges.
 
         Load the extract plan from cloud storage, optionally subset to specific range indices,
-        and extract data to output files.
+        and extract data to output files. All data specification (obs_columns, var_columns,
+        var_joinids, x_layer) is taken from the plan.
 
         :param extract_name: Name of the extract/curriculum (for error reporting)
         :param plan_path: Path to the extract plan JSON within the bucket
         :param extract_bucket_path: Path within bucket for output files
         :param range_indices: Indices of ranges to extract (None = all ranges)
-        :param obs_columns: Optional list of obs columns to include
-        :param var_columns: Optional list of var columns to include
-        :param x_layer: Name of the SOMA X layer to read counts from
         :param output_format: Output format - "h5ad" or "zarr"
         :param max_workers_extract: Maximum parallel workers for extraction
         :param max_workers_shuffle: Maximum parallel workers for shuffling
@@ -202,6 +212,12 @@ class SomaDataOpsCoordinator:
                     range_size=plan.range_size,
                     output_chunk_size=plan.output_chunk_size,
                     filters=plan.filters,
+                    var_joinids=plan.var_joinids,
+                    var_filter_column=plan.var_filter_column,
+                    var_filter_values=plan.var_filter_values,
+                    obs_columns=plan.obs_columns,
+                    var_columns=plan.var_columns,
+                    x_layer=plan.x_layer,
                 )
                 logger.info(f"Subset to {len(subset_ranges)} ranges (indices {range_indices[0]}-{range_indices[-1]})")
 
@@ -219,9 +235,6 @@ class SomaDataOpsCoordinator:
                     output_dir=output_dir,
                     output_format=output_format,
                     temp_dir=temp_dir,
-                    obs_columns=obs_columns,
-                    var_columns=var_columns,
-                    x_layer=x_layer,
                     max_workers_extract=max_workers_extract,
                     max_workers_shuffle=max_workers_shuffle,
                     cleanup_temp=True,

@@ -185,6 +185,11 @@ class TileDBSOMADataOperator:
         range_size: int,
         output_chunk_size: int,
         shuffle_ranges: bool = True,
+        var_filter_column: str | None = None,
+        var_filter_values: list[str] | None = None,
+        obs_columns: list[str] | None = None,
+        var_columns: list[str] | None = None,
+        x_layer: str = "X",
     ) -> SomaExtractPlan:
         """
         Compute a SOMA extract plan from filter dict.
@@ -195,6 +200,11 @@ class TileDBSOMADataOperator:
         :param range_size: Target number of cells per range (for extraction)
         :param output_chunk_size: Target number of cells per output chunk (for shuffling)
         :param shuffle_ranges: Whether to shuffle the resulting joinid ranges
+        :param var_filter_column: Name of the var column to filter features by
+        :param var_filter_values: List of values to match in the var filter column
+        :param obs_columns: List of obs columns to include in extraction
+        :param var_columns: List of var columns to include in extraction
+        :param x_layer: Name of the SOMA X layer to read counts from
 
         :raise SomaPlanningError: If SOMA reads fail
         :raise SomaReadError: If SOMA reads fail
@@ -208,6 +218,11 @@ class TileDBSOMADataOperator:
             range_size=range_size,
             output_chunk_size=output_chunk_size,
             shuffle_ranges=shuffle_ranges,
+            var_filter_column=var_filter_column,
+            var_filter_values=var_filter_values,
+            obs_columns=obs_columns,
+            var_columns=var_columns,
+            x_layer=x_layer,
         )
 
     def extract_ranges_to_anndata(
@@ -215,10 +230,6 @@ class TileDBSOMADataOperator:
         *,
         plan: SomaExtractPlan,
         output_dir: Path,
-        obs_columns: list[str] | None = None,
-        var_columns: list[str] | None = None,
-        var_joinids: list[int] | None = None,
-        x_layer: str = "X",
         output_format: Literal["zarr", "h5ad"] = "h5ad",
         max_workers: int | None = None,
         verbose: bool = False,
@@ -227,13 +238,11 @@ class TileDBSOMADataOperator:
         Extract SOMA data for the given joinid ranges into AnnData files.
 
         Delegate to the extract module to perform parallel extraction.
+        All data specification (obs_columns, var_columns, var_joinids, x_layer)
+        is taken from the plan.
 
-        :param plan: SOMA extract plan with joinid ranges and value_filter
+        :param plan: SOMA extract plan with all data specification
         :param output_dir: Local directory to save AnnData files
-        :param obs_columns: Optional list of obs columns to include
-        :param var_columns: Optional list of var columns to include
-        :param var_joinids: Optional list of var soma_joinids to filter features by
-        :param x_layer: Name of the SOMA X layer to read counts from
         :param output_format: Output format - "zarr" or "h5ad" (default: "h5ad")
         :param max_workers: Maximum number of parallel workers
         :param verbose: If False, suppress INFO level logging in parallel workers
@@ -246,10 +255,6 @@ class TileDBSOMADataOperator:
         extract_ranges(
             plan=plan,
             output_dir=output_dir,
-            obs_columns=obs_columns,
-            var_columns=var_columns,
-            var_joinids=var_joinids,
-            x_layer=x_layer,
             output_format=output_format,
             max_workers=max_workers,
             verbose=verbose,
@@ -264,10 +269,6 @@ class TileDBSOMADataOperator:
         output_dir: Path,
         output_format: Literal["zarr", "h5ad"] = "h5ad",
         temp_dir: Path | None = None,
-        obs_columns: list[str] | None = None,
-        var_columns: list[str] | None = None,
-        var_joinids: list[int] | None = None,
-        x_layer: str = "X",
         max_workers_extract: int | None = None,
         max_workers_shuffle: int | None = None,
         cleanup_temp: bool = True,
@@ -281,15 +282,13 @@ class TileDBSOMADataOperator:
         2. Shuffle cells across final output chunks (true randomization)
 
         Delegate to extract and shuffle modules for implementation.
+        All data specification (obs_columns, var_columns, var_joinids, x_layer)
+        is taken from the plan.
 
-        :param plan: SOMA extract plan with joinid ranges, value_filter, and output_chunk_size
+        :param plan: SOMA extract plan with all data specification
         :param output_dir: Final output directory for shuffled chunks
         :param output_format: Output format - "zarr" or "h5ad" (default: "h5ad")
         :param temp_dir: Temporary directory for contiguous extracts (auto-created if None)
-        :param obs_columns: Optional list of obs columns to include
-        :param var_columns: Optional list of var columns to include
-        :param var_joinids: Optional list of var soma_joinids to filter features by
-        :param x_layer: Name of the SOMA X layer to read counts from
         :param max_workers_extract: Maximum parallel workers for extraction (network I/O intensive)
         :param max_workers_shuffle: Maximum parallel workers for shuffling (CPU/memory intensive)
         :param cleanup_temp: Whether to delete temp directory after shuffling
@@ -316,10 +315,6 @@ class TileDBSOMADataOperator:
             extract_ranges(
                 plan=plan,
                 output_dir=temp_dir,
-                obs_columns=obs_columns,
-                var_columns=var_columns,
-                var_joinids=var_joinids,
-                x_layer=x_layer,
                 output_format="h5ad",  # Use H5AD for temp files (better backed mode support)
                 max_workers=max_workers_extract,
                 verbose=verbose,

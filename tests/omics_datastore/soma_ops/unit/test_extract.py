@@ -171,6 +171,8 @@ def test_extract_range_worker(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     var_columns = ["symbol"]
     x_layer = "raw"
 
+    var_joinids = [1, 2, 3]
+
     result = extract_module._extract_range_worker(
         idx=idx,
         experiment_uri=experiment_uri,
@@ -179,6 +181,7 @@ def test_extract_range_worker(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
         output_path=output_path,
         obs_columns=obs_columns,
         var_columns=var_columns,
+        var_joinids=var_joinids,
         x_layer=x_layer,
         output_format="h5ad",
     )
@@ -192,6 +195,7 @@ def test_extract_range_worker(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     assert call_kwargs["output_path"] == output_path
     assert call_kwargs["obs_columns"] == obs_columns
     assert call_kwargs["var_columns"] == var_columns
+    assert call_kwargs["var_joinids"] == var_joinids
     assert call_kwargs["x_layer"] == x_layer
 
     # Verify return value
@@ -213,6 +217,9 @@ def test_extract_ranges_happy_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         range_size=10,
         output_chunk_size=10,
         filters={"tissue__eq": "lung"},
+        obs_columns=["cell_type"],
+        var_columns=["symbol"],
+        x_layer="raw",
     )
 
     output_dir = tmp_path / "output"
@@ -226,6 +233,7 @@ def test_extract_ranges_happy_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         output_path: Path,
         obs_columns: list[str] | None,
         var_columns: list[str] | None,
+        var_joinids: list[int] | None,
         x_layer: str,
         output_format: str,
     ) -> tuple[int, str]:
@@ -253,9 +261,6 @@ def test_extract_ranges_happy_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     extract_module.extract_ranges(
         plan=plan,
         output_dir=output_dir,
-        obs_columns=["cell_type"],
-        var_columns=["symbol"],
-        x_layer="raw",
         max_workers=2,
     )
 

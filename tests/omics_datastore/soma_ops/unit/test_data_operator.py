@@ -162,6 +162,11 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
         range_size: int,
         output_chunk_size: int,
         shuffle_ranges: bool,
+        var_filter_column: str | None,
+        var_filter_values: list[str] | None,
+        obs_columns: list[str] | None,
+        var_columns: list[str] | None,
+        x_layer: str,
     ) -> SomaExtractPlan:
         plan_calls.append(
             {
@@ -170,6 +175,11 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
                 "range_size": range_size,
                 "output_chunk_size": output_chunk_size,
                 "shuffle_ranges": shuffle_ranges,
+                "var_filter_column": var_filter_column,
+                "var_filter_values": var_filter_values,
+                "obs_columns": obs_columns,
+                "var_columns": var_columns,
+                "x_layer": x_layer,
             }
         )
         return SomaExtractPlan(
@@ -180,6 +190,11 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
             range_size=range_size,
             output_chunk_size=output_chunk_size,
             filters=filters,
+            var_filter_column=var_filter_column,
+            var_filter_values=var_filter_values,
+            obs_columns=obs_columns,
+            var_columns=var_columns,
+            x_layer=x_layer,
         )
 
     monkeypatch.setattr(data_operator_module, "plan_soma_extract", _fake_plan_soma_extract)
@@ -191,6 +206,11 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
         range_size=100,
         output_chunk_size=100,
         shuffle_ranges=False,
+        var_filter_column="gene_symbol",
+        var_filter_values=["ACTB", "GAPDH"],
+        obs_columns=["cell_type"],
+        var_columns=["symbol"],
+        x_layer="raw",
     )
 
     # Verify delegation
@@ -200,11 +220,21 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
     assert call["filters"] == filters
     assert call["range_size"] == 100
     assert call["shuffle_ranges"] is False
+    assert call["var_filter_column"] == "gene_symbol"
+    assert call["var_filter_values"] == ["ACTB", "GAPDH"]
+    assert call["obs_columns"] == ["cell_type"]
+    assert call["var_columns"] == ["symbol"]
+    assert call["x_layer"] == "raw"
 
     # Verify return value
     assert plan.experiment_uri == "gs://bucket/soma"
     assert plan.total_cells == 10
     assert plan.range_size == 100
+    assert plan.var_filter_column == "gene_symbol"
+    assert plan.var_filter_values == ["ACTB", "GAPDH"]
+    assert plan.obs_columns == ["cell_type"]
+    assert plan.var_columns == ["symbol"]
+    assert plan.x_layer == "raw"
 
 
 def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -219,10 +249,6 @@ def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.Monk
     def _fake_extract_ranges(
         plan: SomaExtractPlan,
         output_dir: Path,
-        obs_columns: list[str] | None,
-        var_columns: list[str] | None,
-        var_joinids: list[int] | None,
-        x_layer: str,
         output_format: str,
         max_workers: int | None,
         verbose: bool,
@@ -231,10 +257,6 @@ def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.Monk
             {
                 "plan": plan,
                 "output_dir": output_dir,
-                "obs_columns": obs_columns,
-                "var_columns": var_columns,
-                "var_joinids": var_joinids,
-                "x_layer": x_layer,
                 "output_format": output_format,
                 "max_workers": max_workers,
                 "verbose": verbose,
@@ -252,18 +274,17 @@ def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.Monk
         range_size=10,
         output_chunk_size=10,
         filters={"tissue__eq": "lung"},
+        var_joinids=[1, 2, 3],
+        obs_columns=["cell_type"],
+        var_columns=["symbol"],
+        x_layer="raw",
     )
 
     output_dir = tmp_path / "output"
-    obs_columns = ["cell_type"]
-    var_columns = ["symbol"]
 
     operator.extract_ranges_to_anndata(
         plan=plan,
         output_dir=output_dir,
-        obs_columns=obs_columns,
-        var_columns=var_columns,
-        x_layer="raw",
         max_workers=4,
     )
 
@@ -272,9 +293,6 @@ def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.Monk
     call = extract_calls[0]
     assert call["plan"] == plan
     assert call["output_dir"] == output_dir
-    assert call["obs_columns"] == obs_columns
-    assert call["var_columns"] == var_columns
-    assert call["x_layer"] == "raw"
     assert call["max_workers"] == 4
     assert call["verbose"] is False
 
@@ -328,9 +346,6 @@ def test_extract_ranges_shuffled_with_temp_dir(monkeypatch: pytest.MonkeyPatch, 
         output_dir=output_dir,
         output_format="zarr",
         temp_dir=temp_dir,
-        obs_columns=["cell_type"],
-        var_columns=["symbol"],
-        x_layer="raw",
         max_workers_extract=2,
         max_workers_shuffle=4,
         cleanup_temp=True,
@@ -340,10 +355,6 @@ def test_extract_ranges_shuffled_with_temp_dir(monkeypatch: pytest.MonkeyPatch, 
     assert len(extract_calls) == 1
     assert extract_calls[0]["output_dir"] == temp_dir
     assert extract_calls[0]["plan"] == plan
-    assert extract_calls[0]["obs_columns"] == ["cell_type"]
-    assert extract_calls[0]["var_columns"] == ["symbol"]
-    assert extract_calls[0]["var_joinids"] is None
-    assert extract_calls[0]["x_layer"] == "raw"
     assert extract_calls[0]["max_workers"] == 2
 
     # Verify shuffle was called

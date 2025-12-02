@@ -81,6 +81,11 @@ class SomaExtractPlan(BaseModel):
     :param output_chunk_size: Target number of cells per output chunk (for shuffling)
     :param filters: Structured filter specification, using Nexus format
     :param var_joinids: Ordered list of feature soma_joinids to retain (optional)
+    :param var_filter_column: Name of the var column used to generate var_joinids
+    :param var_filter_values: Ordered values used to filter the var column
+    :param obs_columns: List of obs columns to include in extraction
+    :param var_columns: List of var columns to include in extraction
+    :param x_layer: Name of the SOMA X layer to read counts from
     """
 
     experiment_uri: str
@@ -91,3 +96,8 @@ class SomaExtractPlan(BaseModel):
     output_chunk_size: int
     filters: dict[str, Any] | None = None
     var_joinids: list[int] | None = None
+    var_filter_column: str | None = None
+    var_filter_values: list[str] | None = None
+    obs_columns: list[str] | None = None
+    var_columns: list[str] | None = None
+    x_layer: str = "X"
