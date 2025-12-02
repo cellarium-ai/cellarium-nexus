@@ -179,8 +179,7 @@ def test_extract_range_worker(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
         output_path=output_path,
         obs_columns=obs_columns,
         var_columns=var_columns,
-        var_filter_ids=None,
-        var_filter_column="feature_id",
+        var_joinids=None,
         x_layer=x_layer,
         output_format="h5ad",
     )
@@ -228,8 +227,7 @@ def test_extract_ranges_happy_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         output_path: Path,
         obs_columns: list[str] | None,
         var_columns: list[str] | None,
-        var_filter_ids: list[str] | None,
-        var_filter_column: str,
+        var_joinids: list[int] | None,
         x_layer: str,
         output_format: str,
     ) -> tuple[int, str]:

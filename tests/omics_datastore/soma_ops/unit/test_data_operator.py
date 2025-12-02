@@ -221,8 +221,7 @@ def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.Monk
         output_dir: Path,
         obs_columns: list[str] | None,
         var_columns: list[str] | None,
-        var_filter_ids: list[str] | None,
-        var_filter_column: str,
+        var_joinids: list[int] | None,
         x_layer: str,
         output_format: str,
         max_workers: int | None,
@@ -234,8 +233,7 @@ def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.Monk
                 "output_dir": output_dir,
                 "obs_columns": obs_columns,
                 "var_columns": var_columns,
-                "var_filter_ids": var_filter_ids,
-                "var_filter_column": var_filter_column,
+                "var_joinids": var_joinids,
                 "x_layer": x_layer,
                 "output_format": output_format,
                 "max_workers": max_workers,
@@ -344,8 +342,7 @@ def test_extract_ranges_shuffled_with_temp_dir(monkeypatch: pytest.MonkeyPatch, 
     assert extract_calls[0]["plan"] == plan
     assert extract_calls[0]["obs_columns"] == ["cell_type"]
     assert extract_calls[0]["var_columns"] == ["symbol"]
-    assert extract_calls[0]["var_filter_ids"] is None
-    assert extract_calls[0]["var_filter_column"] == "feature_id"
+    assert extract_calls[0]["var_joinids"] is None
     assert extract_calls[0]["x_layer"] == "raw"
     assert extract_calls[0]["max_workers"] == 2
 

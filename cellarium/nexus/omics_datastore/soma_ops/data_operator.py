@@ -217,8 +217,7 @@ class TileDBSOMADataOperator:
         output_dir: Path,
         obs_columns: list[str] | None = None,
         var_columns: list[str] | None = None,
-        var_filter_ids: list[str] | None = None,
-        var_filter_column: str = "feature_id",
+        var_joinids: list[int] | None = None,
         x_layer: str = "X",
         output_format: Literal["zarr", "h5ad"] = "h5ad",
         max_workers: int | None = None,
@@ -233,8 +232,7 @@ class TileDBSOMADataOperator:
         :param output_dir: Local directory to save AnnData files
         :param obs_columns: Optional list of obs columns to include
         :param var_columns: Optional list of var columns to include
-        :param var_filter_ids: Optional list of feature IDs to keep (e.g., ensembl IDs)
-        :param var_filter_column: Column name in var to filter by (default: "feature_id")
+        :param var_joinids: Optional list of var soma_joinids to filter features by
         :param x_layer: Name of the SOMA X layer to read counts from
         :param output_format: Output format - "zarr" or "h5ad" (default: "h5ad")
         :param max_workers: Maximum number of parallel workers
@@ -250,8 +248,7 @@ class TileDBSOMADataOperator:
             output_dir=output_dir,
             obs_columns=obs_columns,
             var_columns=var_columns,
-            var_filter_ids=var_filter_ids,
-            var_filter_column=var_filter_column,
+            var_joinids=var_joinids,
             x_layer=x_layer,
             output_format=output_format,
             max_workers=max_workers,
@@ -269,8 +266,7 @@ class TileDBSOMADataOperator:
         temp_dir: Path | None = None,
         obs_columns: list[str] | None = None,
         var_columns: list[str] | None = None,
-        var_filter_ids: list[str] | None = None,
-        var_filter_column: str = "feature_id",
+        var_joinids: list[int] | None = None,
         x_layer: str = "X",
         max_workers_extract: int | None = None,
         max_workers_shuffle: int | None = None,
@@ -292,8 +288,7 @@ class TileDBSOMADataOperator:
         :param temp_dir: Temporary directory for contiguous extracts (auto-created if None)
         :param obs_columns: Optional list of obs columns to include
         :param var_columns: Optional list of var columns to include
-        :param var_filter_ids: Optional list of feature IDs to keep (e.g., ensembl IDs)
-        :param var_filter_column: Column name in var to filter by (default: "feature_id")
+        :param var_joinids: Optional list of var soma_joinids to filter features by
         :param x_layer: Name of the SOMA X layer to read counts from
         :param max_workers_extract: Maximum parallel workers for extraction (network I/O intensive)
         :param max_workers_shuffle: Maximum parallel workers for shuffling (CPU/memory intensive)
@@ -323,8 +318,7 @@ class TileDBSOMADataOperator:
                 output_dir=temp_dir,
                 obs_columns=obs_columns,
                 var_columns=var_columns,
-                var_filter_ids=var_filter_ids,
-                var_filter_column=var_filter_column,
+                var_joinids=var_joinids,
                 x_layer=x_layer,
                 output_format="h5ad",  # Use H5AD for temp files (better backed mode support)
                 max_workers=max_workers_extract,
