@@ -87,5 +87,5 @@ class SomaExtractPlan(BaseModel):
     joinid_ranges: list[SomaJoinIdRange]
     total_cells: int
     range_size: int
-    output_chunk_size: int | None = None
+    output_chunk_size: int
     filters: dict[str, Any] | None = None

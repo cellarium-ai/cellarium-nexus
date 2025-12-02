@@ -21,7 +21,7 @@ def test_root_redirects_to_admin(client: Client) -> None:
     assert response.headers["Location"].endswith("/admin/")
 
 
-@pytest.mark.usefixtures("default_dataset", "bigquery_cached_manager_stub")
+@pytest.mark.usefixtures("default_dataset", "omics_cached_manager_stub")
 def test_custom_admin_urls_accessible(
     admin_client: Client,
 ) -> None:

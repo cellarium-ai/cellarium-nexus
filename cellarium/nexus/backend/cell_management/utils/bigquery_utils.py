@@ -5,10 +5,8 @@ from typing import Any
 
 from django.conf import settings
 from django.core.cache import cache
-from google.cloud import bigquery
 
-from cellarium.nexus.omics_datastore import bq_ops
-from cellarium.nexus.omics_datastore.bq_ops import constants as bq_constants
+from cellarium.nexus.omics_datastore.protocols import DataOperatorProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -36,135 +34,113 @@ def _hash_to_key(prefix: str, seed: str) -> str:
     return f"{prefix}:{hashlib.md5(seed.encode('utf-8')).hexdigest()}"
 
 
-class BigQueryCachedDataManager:
+class OmicsCachedDataManager:
     """
-    Provide cached access to BigQuery cell counts using a shared client.
+    Provide cached access to omics data using a data operator.
 
-    :param project_id: Optional GCP project ID; if not provided, use settings.GCP_PROJECT_ID
+    This class wraps any operator conforming to DataOperatorProtocol and adds
+    caching for expensive operations like cell counts and distinct value queries.
 
-    :return: None
+    :param operator: Data operator implementing DataOperatorProtocol
+    :param cache_namespace: Unique namespace for cache keys (e.g., dataset name)
     """
 
-    def __init__(self, project_id: str = settings.GCP_PROJECT_ID) -> None:
-        self.project_id = project_id
-        self.bq_client = bigquery.Client(project=self.project_id)
-
-    def get_cached_count_bq(
+    def __init__(
         self,
         *,
-        dataset_name: str,
+        operator: DataOperatorProtocol,
+        cache_namespace: str,
+    ) -> None:
+        self.operator = operator
+        self.cache_namespace = cache_namespace
+
+    def get_cached_count(
+        self,
+        *,
         filters_dict: dict[str, Any],
         timeout: int = settings.COUNT_CACHE_TTL_SECONDS,
     ) -> int:
         """
-        Get cell count from BigQuery and cache the result using a stable key.
+        Get cell count and cache the result using a stable key.
 
-        The cache key derives from project ID, dataset name, and a canonical JSON
-        serialization of filters to ensure stability regardless of dict order.
+        The cache key derives from namespace and a canonical JSON serialization
+        of filters to ensure stability regardless of dict order.
 
-        :param dataset_name: Name of the BigQuery dataset to query
         :param filters_dict: Dictionary of filter statements for the count query
         :param timeout: Cache TTL in seconds
 
-        :raise: google.api_core.exceptions.GoogleAPICallError
+        :raise Exception: If operator query fails
 
         :return: Integer count of cells returned by the filter
         """
-
         serialized_filters = _canonical_json(filters_dict)
-        key_seed = f"v1|{self.project_id}|{dataset_name}|{serialized_filters}"
-        key = _hash_to_key(prefix="countcache", seed=key_seed)
+        key_seed = f"v1|{serialized_filters}"
+        key = _hash_to_key(prefix=f"countcache|{self.cache_namespace}", seed=key_seed)
 
         cached = cache.get(key)
         if cached is not None:
             return int(cached)
 
-        operator = bq_ops.BigQueryDataOperator(
-            client=self.bq_client,
-            project=self.project_id,
-            dataset=dataset_name,
-        )
-        count = operator.count_cells(filter_statements=filters_dict)
+        count = self.operator.count_cells(filter_statements=filters_dict)
         cache.set(key, int(count), timeout)
         return int(count)
 
-    def get_cached_categorical_columns_bq(
+    def get_cached_categorical_obs_columns(
         self,
         *,
-        dataset_name: str,
-        table_name: str = bq_constants.BQ_CELL_INFO_TABLE_NAME,
         distinct_threshold: int = settings.FILTERS_CATEGORICAL_UNIQUE_LIMIT,
         timeout: int = settings.SUGGEST_CACHE_TTL_SECONDS,
     ) -> set[str]:
         """
-        Get categorical string columns for a base table and cache the result.
+        Get categorical string columns for obs/cell_info and cache the result.
 
-        :param dataset_name: BigQuery dataset name
-        :param table_name: Base table name to analyze
         :param distinct_threshold: Threshold for distinct count to classify as categorical
-        :param timeout: Optional cache TTL in seconds
+        :param timeout: Cache TTL in seconds
 
-        :raise google.api_core.exceptions.GoogleAPIError: If BigQuery operations fail
+        :raise Exception: If operator query fails
 
         :return: Set of categorical column names
         """
-        threshold = distinct_threshold
-
-        key_seed = f"v1|categorical_columns|{self.project_id}|{dataset_name}|{table_name}|{threshold}"
-        key = _hash_to_key(prefix="bqcache", seed=key_seed)
+        key_seed = f"v1|{distinct_threshold}"
+        key = _hash_to_key(
+            prefix=f"omicscache|{self.cache_namespace}|categorical_obs_columns",
+            seed=key_seed,
+        )
 
         cached = cache.get(key)
         if cached is not None:
             return set(cached)
 
-        operator = bq_ops.BigQueryDataOperator(
-            client=self.bq_client,
-            project=self.project_id,
-            dataset=dataset_name,
-        )
-        categorical = operator.get_categorical_string_columns(
-            table_name=table_name,
-            threshold=int(threshold),
-        )
+        categorical = self.operator.get_categorical_obs_columns(threshold=distinct_threshold)
         cache.set(key, list(categorical), timeout)
         return categorical
 
-    def get_cached_distinct_values_bq(
+    def get_cached_distinct_obs_values(
         self,
         *,
-        dataset_name: str,
         column_name: str,
-        table_name: str = bq_constants.BQ_CELL_INFO_TABLE_NAME,
-        limit: int = settings.FILTERS_CATEGORICAL_UNIQUE_LIMIT,
         timeout: int = settings.SUGGEST_CACHE_TTL_SECONDS,
     ) -> list[str]:
         """
-        Get distinct values for a base table column and cache the result.
+        Get distinct values for an obs/cell_info column and cache the result.
 
-        :param dataset_name: BigQuery dataset name
         :param column_name: Column to fetch distinct values for
-        :param table_name: Base table name to query
-        :param limit: Maximum number of values to return
         :param timeout: Cache TTL in seconds
 
-        :raise google.api_core.exceptions.GoogleAPIError: If BigQuery operations fail
+        :raise Exception: If operator query fails
 
         :return: List of distinct values as strings
         """
-        key_seed = f"v1|distinct_values|{self.project_id}|{dataset_name}|{table_name}|{column_name}|{limit}"
-        key = _hash_to_key(prefix="bqcache", seed=key_seed)
+        key_seed = f"v1|{column_name}"
+        key = _hash_to_key(
+            prefix=f"omicscache|{self.cache_namespace}|distinct_obs_values",
+            seed=key_seed,
+        )
 
         cached = cache.get(key)
         if cached is not None:
             return list(cached)
 
-        operator = bq_ops.BigQueryDataOperator(
-            client=self.bq_client,
-            project=self.project_id,
-            dataset=dataset_name,
-        )
-        values = operator.get_distinct_values(
-            table_name=table_name, column_name=column_name, limit=limit, dataset=dataset_name
-        )
+        values = self.operator.get_distinct_obs_values(column_name=column_name)
         cache.set(key, list(values), timeout)
         return values

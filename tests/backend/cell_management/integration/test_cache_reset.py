@@ -35,9 +35,9 @@ def test_reset_cellinfo_filter_cache_delete_only() -> None:
     assert cache.get("other:untouched") == 1
 
 
-@pytest.mark.usefixtures("bigquery_cached_manager_stub")
+@pytest.mark.usefixtures("omics_cached_manager_stub")
 @pytest.mark.django_db
-def test_reset_cellinfo_filter_cache_repopulate_basic(default_dataset: models.BigQueryDataset) -> None:
+def test_reset_cellinfo_filter_cache_repopulate_basic(default_dataset: models.OmicsDataset) -> None:
     """
     Repopulate using the cached manager stub; expect 2 items per dataset:
     1 for counts; 1 for categorical columns; no distincts when categories are empty.
@@ -51,15 +51,15 @@ def test_reset_cellinfo_filter_cache_repopulate_basic(default_dataset: models.Bi
 
     result = reset_cellinfo_filter_cache(repopulate=True)
 
-    dataset_count = models.BigQueryDataset.objects.count()
+    dataset_count = models.OmicsDataset.objects.count()
     assert result["deleted"] == 0
     assert result["repopulated"] == 2 * dataset_count
 
 
-@pytest.mark.usefixtures("bigquery_cached_manager_stub")
+@pytest.mark.usefixtures("omics_cached_manager_stub")
 @pytest.mark.django_db
 def test_reset_cellinfo_filter_cache_repopulate_with_distincts(
-    default_dataset: models.BigQueryDataset, monkeypatch: pytest.MonkeyPatch
+    default_dataset: models.OmicsDataset, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """
     Repopulate when categorical columns exist; expect 3 items per dataset:
@@ -71,17 +71,17 @@ def test_reset_cellinfo_filter_cache_repopulate_with_distincts(
     :return: None
     """
     # Import the stub class installed by the fixture and adjust return values
-    from tests.backend.fixtures.mocks import BigQueryCachedManagerStub
+    from tests.backend.fixtures.mocks import OmicsCachedManagerStub
 
     monkeypatch.setattr(
-        BigQueryCachedManagerStub,
-        "get_cached_categorical_columns_bq",
+        OmicsCachedManagerStub,
+        "get_cached_categorical_obs_columns",
         lambda self, **kwargs: {"organism"},
         raising=True,
     )
     monkeypatch.setattr(
-        BigQueryCachedManagerStub,
-        "get_cached_distinct_values_bq",
+        OmicsCachedManagerStub,
+        "get_cached_distinct_obs_values",
         lambda self, **kwargs: ["Homo sapiens"],
         raising=True,
     )
@@ -90,6 +90,6 @@ def test_reset_cellinfo_filter_cache_repopulate_with_distincts(
 
     result = reset_cellinfo_filter_cache(repopulate=True)
 
-    dataset_count = models.BigQueryDataset.objects.count()
+    dataset_count = models.OmicsDataset.objects.count()
     assert result["deleted"] == 0
     assert result["repopulated"] == 3 * dataset_count

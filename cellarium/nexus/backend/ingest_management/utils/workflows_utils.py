@@ -6,13 +6,13 @@ from typing import Any
 import pandas as pd
 from django.conf import settings
 
-from cellarium.nexus.backend.cell_management.models import BigQueryDataset
+from cellarium.nexus.backend.cell_management.models import OmicsDataset
 from cellarium.nexus.shared import schemas, utils
 
 
 def submit_ingest_pipeline(
     df_ingest_file_info: pd.DataFrame,
-    bigquery_dataset: BigQueryDataset,
+    omics_dataset: OmicsDataset,
     column_mapping: dict[str, Any],
     validation_methods: list[str] | None = None,
 ) -> str:
@@ -22,7 +22,7 @@ def submit_ingest_pipeline(
     Create task configs for each file in the dataframe, save them to GCS, and submit the pipeline.
 
     :param df_ingest_file_info: DataFrame containing information about files to ingest, must include gcs_file_path column
-    :param bigquery_dataset: BigQuery dataset where data will be ingested
+    :param omics_dataset: Omics dataset where data will be ingested
     :param column_mapping: Dictionary mapping input columns to schema columns
     :param validation_methods: List of validation method names to apply to each file, if provided.
 
@@ -56,7 +56,7 @@ def submit_ingest_pipeline(
             schemas.component_configs.CreateIngestFilesConfig(
                 project_id=settings.GCP_PROJECT_ID,
                 nexus_backend_api_url=settings.SITE_URL,
-                bigquery_dataset=bigquery_dataset.name,
+                bigquery_dataset=omics_dataset.name,
                 input_file_path=file_path,
                 bucket_name=settings.BUCKET_NAME_PRIVATE,
                 bucket_stage_dir=stage_dir,
@@ -74,7 +74,7 @@ def submit_ingest_pipeline(
     ingest_config = schemas.component_configs.IngestFilesConfig(
         project_id=settings.GCP_PROJECT_ID,
         nexus_backend_api_url=settings.SITE_URL,
-        bigquery_dataset=bigquery_dataset.name,
+        bigquery_dataset=omics_dataset.name,
         bucket_name=settings.BUCKET_NAME_PRIVATE,
         bucket_stage_dirs=stage_dirs,
         num_workers=settings.INGEST_NUM_WORKERS,
@@ -92,7 +92,7 @@ def submit_ingest_pipeline(
 
     return submit_pipeline(
         pipeline_component=ingest_data_to_bigquery_pipeline,
-        display_name=f"Nexus Ingest Data - {bigquery_dataset.name}",
+        display_name=f"Nexus Ingest Data - {omics_dataset.name}",
         gcp_project=settings.GCP_PROJECT_ID,
         pipeline_kwargs={
             "create_ingest_files_configs": create_ingest_configs_paths,

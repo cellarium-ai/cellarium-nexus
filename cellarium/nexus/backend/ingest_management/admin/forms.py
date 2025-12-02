@@ -2,7 +2,7 @@ from django import forms
 from django.utils.translation import gettext_lazy as _
 from unfold.widgets import UnfoldAdminFileFieldWidget, UnfoldAdminSelectWidget
 
-from cellarium.nexus.backend.cell_management.models import BigQueryDataset
+from cellarium.nexus.backend.cell_management.models import OmicsDataset
 from cellarium.nexus.backend.ingest_management.models import ColumnMapping
 
 GENCODE_CHOICES = [
@@ -23,11 +23,11 @@ class IngestNewDataChangeListActionForm(forms.Form):
         widget=UnfoldAdminFileFieldWidget,
         help_text=_("CSV file with GCS Bucket paths of files to ingest"),
     )
-    bigquery_dataset = forms.ModelChoiceField(
-        label=_("BigQuery Dataset"),
-        queryset=BigQueryDataset.objects.all(),
+    omics_dataset = forms.ModelChoiceField(
+        label=_("Omics Dataset"),
+        queryset=OmicsDataset.objects.all(),
         widget=UnfoldAdminSelectWidget,
-        help_text=_("BigQuery Dataset to ingest the input files to"),
+        help_text=_("Omics dataset to ingest the input files to"),
     )
     column_mapping = forms.ModelChoiceField(
         required=False,

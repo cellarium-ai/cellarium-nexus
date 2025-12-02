@@ -1,5 +1,5 @@
 """
-Admin module for BigQuery dataset management.
+Admin module for omics dataset management.
 """
 
 import logging
@@ -13,33 +13,35 @@ from google.cloud import bigquery
 from unfold.admin import ModelAdmin
 
 from cellarium.nexus.backend.cell_management.admin import constants
-from cellarium.nexus.backend.cell_management.models import BigQueryDataset
+from cellarium.nexus.backend.cell_management.models import OmicsDataset, OmicsDatasetBackend
 from cellarium.nexus.omics_datastore.bq_ops import create_bq_tables
 
 logger = logging.getLogger(__name__)
 
 
-@admin.register(BigQueryDataset)
-class BigQueryDatasetAdmin(ModelAdmin):
+@admin.register(OmicsDataset)
+class OmicsDatasetAdmin(ModelAdmin):
     """
-    Admin interface for managing BigQuery datasets.
+    Admin interface for managing omics datasets.
 
-    Provides functionality to create and manage BigQuery datasets in GCP.
+    Provides functionality to create and manage omics datasets with different backends.
     """
 
-    list_display = ("id", "name", "description", "link_display")
+    list_display = ("id", "name", "backend", "description", "link_display")
     search_fields = ("name",)
-    list_filter = ("name",)
+    list_filter = ("name", "backend")
     ordering = ("name",)
     readonly_fields = ("link",)
-    fieldsets = ((None, {"fields": ("name", "description", "link")}),)
+    fieldsets = ((None, {"fields": ("name", "backend", "description", "uri", "link")}),)
 
-    def save_model(self, request: HttpRequest, obj: BigQueryDataset, form: forms.Form, change: bool) -> None:
+    def save_model(self, request: HttpRequest, obj: OmicsDataset, form: forms.Form, change: bool) -> None:
         """
-        Create a BigQuery dataset when a new record is created.
+        Create backend resources when a new record is created.
+
+        For BigQuery backend, create the BigQuery dataset in GCP.
 
         :param request: The HTTP request
-        :param obj: The BigQueryDataset instance being saved
+        :param obj: The OmicsDataset instance being saved
         :param form: The form used to create/edit the instance
         :param change: Boolean indicating if this is a change to an existing record
 
@@ -47,7 +49,7 @@ class BigQueryDatasetAdmin(ModelAdmin):
         """
         is_new = not change  # `change` is False if adding a new object
 
-        if is_new:
+        if is_new and obj.backend == OmicsDatasetBackend.BIGQUERY:
             try:
                 bq_client = bigquery.Client()
                 link_to_dataset = create_bq_tables.create_bigquery_objects(
@@ -64,7 +66,7 @@ class BigQueryDatasetAdmin(ModelAdmin):
 
         super().save_model(request=request, obj=obj, form=form, change=change)
 
-        if is_new:
+        if is_new and obj.backend == OmicsDatasetBackend.BIGQUERY:
             html_link = format_html(constants.BIGQUERY_SUCCESS_MESSAGE_LINK_FORMAT, url_link=obj.link)
             self.message_user(
                 request=request,
@@ -72,17 +74,17 @@ class BigQueryDatasetAdmin(ModelAdmin):
                 level=messages.SUCCESS,
             )
 
-    def link_display(self, obj: BigQueryDataset) -> str:
+    def link_display(self, obj: OmicsDataset) -> str:
         """
-        Generate clickable link to BigQuery dataset.
+        Generate clickable link for the dataset dashboard.
 
-        :param obj: The current BigQueryDataset object
+        :param obj: The current OmicsDataset object
 
-        :return: HTML anchor tag with the link
+        :return: HTML anchor tag with the link or plain text
         """
         if obj.link:
             return format_html(constants.BIGQUERY_SUCCESS_MESSAGE_LINK_FORMAT, url_link=obj.link)
         return "-"
 
-    link_display.short_description = "BigQuery Link"
+    link_display.short_description = "Dashboard Link"
     link_display.allow_tags = True

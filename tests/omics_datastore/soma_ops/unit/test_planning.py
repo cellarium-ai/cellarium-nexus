@@ -131,6 +131,7 @@ def test_plan_soma_extract_invalid_range_size(range_size: int) -> None:
             experiment_uri="gs://bucket/soma",
             filters=None,
             range_size=range_size,
+            output_chunk_size=100,
         )
 
 
@@ -152,6 +153,7 @@ def test_plan_soma_extract_no_cells(monkeypatch: pytest.MonkeyPatch) -> None:
         experiment_uri=experiment_uri,
         filters=filters,
         range_size=100,
+        output_chunk_size=100,
         shuffle_ranges=False,
     )
 
@@ -160,6 +162,7 @@ def test_plan_soma_extract_no_cells(monkeypatch: pytest.MonkeyPatch) -> None:
     assert plan.joinid_ranges == []
     assert plan.total_cells == 0
     assert plan.range_size == 100
+    assert plan.output_chunk_size == 100
     assert plan.filters == filters
 
 
@@ -181,6 +184,7 @@ def test_plan_soma_extract_normal_flow(monkeypatch: pytest.MonkeyPatch) -> None:
         experiment_uri=experiment_uri,
         filters=filters,
         range_size=2,
+        output_chunk_size=2,
         shuffle_ranges=False,
     )
 
@@ -188,6 +192,7 @@ def test_plan_soma_extract_normal_flow(monkeypatch: pytest.MonkeyPatch) -> None:
     assert plan.value_filter == '(tissue == "lung")'
     assert plan.total_cells == 4
     assert plan.range_size == 2
+    assert plan.output_chunk_size == 2
     assert plan.filters == filters
     assert len(plan.joinid_ranges) == 2
     assert plan.joinid_ranges[0] == SomaJoinIdRange(start=5, end=10)
@@ -224,6 +229,7 @@ def test_plan_soma_extract_with_shuffle(monkeypatch: pytest.MonkeyPatch) -> None
         experiment_uri=experiment_uri,
         filters=filters,
         range_size=2,
+        output_chunk_size=2,
         shuffle_ranges=True,
     )
 
@@ -245,6 +251,7 @@ def test_plan_soma_extract_filter_error_propagation(monkeypatch: pytest.MonkeyPa
             experiment_uri="gs://bucket/soma",
             filters={"bad__unsupported_op": "value"},
             range_size=100,
+            output_chunk_size=100,
         )
 
 
@@ -266,4 +273,5 @@ def test_plan_soma_extract_read_error_propagation(monkeypatch: pytest.MonkeyPatc
             experiment_uri="gs://bucket/soma",
             filters=None,
             range_size=100,
+            output_chunk_size=100,
         )

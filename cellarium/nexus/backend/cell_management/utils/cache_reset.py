@@ -12,10 +12,12 @@ import logging
 
 import django.conf as dj_conf
 import django.db as dj_db
+from django.conf import settings
+from google.cloud import bigquery
 
 from cellarium.nexus.backend.cell_management import models as cell_models
 from cellarium.nexus.backend.cell_management.utils import bigquery_utils
-from cellarium.nexus.omics_datastore.bq_ops import constants as bq_constants
+from cellarium.nexus.omics_datastore.bq_ops.data_operator import BigQueryDataOperator
 
 logger = logging.getLogger(__name__)
 
@@ -70,28 +72,37 @@ def reset_cellinfo_filter_cache(*, repopulate: bool = True) -> dict[str, int]:
         return {"deleted": int(deleted_rows), "repopulated": int(repopulated_items)}
 
     # Repopulate caches by warming commonly used entries
-    manager = bigquery_utils.BigQueryCachedDataManager()
-
     # Retrieve datasets
-    datasets_qs = cell_models.BigQueryDataset.objects.all().order_by("name")
+    datasets_qs = cell_models.OmicsDataset.objects.all().order_by("name")
     dataset_names: list[str] = [ds.name for ds in datasets_qs]
+
+    bq_client = bigquery.Client(project=settings.GCP_PROJECT_ID)
 
     for ds in dataset_names:
         if not ds:
             continue
+
+        # Create manager for this dataset
+        operator = BigQueryDataOperator(
+            client=bq_client,
+            project=settings.GCP_PROJECT_ID,
+            dataset=ds,
+        )
+        manager = bigquery_utils.OmicsCachedDataManager(
+            operator=operator,
+            cache_namespace=f"bq|{settings.GCP_PROJECT_ID}|{ds}",
+        )
+
         # Warm count for empty filters
         try:
-            manager.get_cached_count_bq(dataset_name=ds, filters_dict={})
+            manager.get_cached_count(filters_dict={})
             repopulated_items += 1
         except Exception as exc:  # noqa: BLE001 - continue warming others
             logger.warning(f"Failed to warm count cache for dataset '{ds}': {exc}")
 
         # Warm categorical columns
         try:
-            categorical = manager.get_cached_categorical_columns_bq(
-                dataset_name=ds,
-                table_name=bq_constants.BQ_CELL_INFO_TABLE_NAME,
-            )
+            categorical = manager.get_cached_categorical_obs_columns()
             repopulated_items += 1
         except Exception as exc:  # noqa: BLE001 - continue warming others
             logger.warning(f"Failed to warm categorical columns for dataset '{ds}': {exc}")
@@ -100,11 +111,7 @@ def reset_cellinfo_filter_cache(*, repopulate: bool = True) -> dict[str, int]:
         # Warm distinct values for each categorical column
         for col in sorted(categorical):
             try:
-                manager.get_cached_distinct_values_bq(
-                    dataset_name=ds,
-                    column_name=col,
-                    table_name=bq_constants.BQ_CELL_INFO_TABLE_NAME,
-                )
+                manager.get_cached_distinct_obs_values(column_name=col)
                 repopulated_items += 1
             except Exception as exc:  # noqa: BLE001 - continue warming others
                 logger.warning(f"Failed to warm distinct values for dataset '{ds}', column '{col}': {exc}")

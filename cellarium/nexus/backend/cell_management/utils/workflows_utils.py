@@ -12,11 +12,11 @@ from cellarium.nexus.shared.schemas import component_configs
 from cellarium.nexus.shared.utils import workflows_configs
 
 
-def get_total_cell_in_bq_number(bigquery_dataset: models.BigQueryDataset, filters: dict | None = None) -> int:
+def get_total_cell_in_bq_number(omics_dataset: models.OmicsDataset, filters: dict | None = None) -> int:
     """
     Get total number of cells in BigQuery dataset that match the given filters.
 
-    :param bigquery_dataset: BigQuery dataset containing cell data
+    :param omics_dataset: Omics dataset containing cell data
     :param filters: Optional dictionary of filter statements to apply
 
     :raise: google.api_core.exceptions.GoogleAPIError: If BigQuery API request fails
@@ -26,7 +26,7 @@ def get_total_cell_in_bq_number(bigquery_dataset: models.BigQueryDataset, filter
     """
     bq_client = bigquery.Client(project=settings.GCP_PROJECT_ID)
     bq_data_operator = BigQueryDataOperator(
-        client=bq_client, project=settings.GCP_PROJECT_ID, dataset=bigquery_dataset.name
+        client=bq_client, project=settings.GCP_PROJECT_ID, dataset=omics_dataset.name
     )
     return bq_data_operator.count_cells(filter_statements=filters)
 
@@ -35,7 +35,7 @@ def compose_extract_curriculum_configs(
     name: str,
     creator_id: int,
     feature_schema: models.FeatureSchema,
-    bigquery_dataset: models.BigQueryDataset,
+    omics_dataset: models.OmicsDataset,
     extract_bin_size: int,
     categorical_column_count_limit: int,
     obs_columns: list[str],
@@ -49,7 +49,7 @@ def compose_extract_curriculum_configs(
     :param name: Prefix for extract table names
     :param creator_id: ID of a user who initiated the extract.
     :param feature_schema: Feature schema containing gene features
-    :param bigquery_dataset: BigQuery dataset to extract from
+    :param omics_dataset: Omics dataset to extract from
     :param extract_bin_size: Number of cells per extract bin
     :param categorical_column_count_limit: Maximum number of categories per categorical column to be considered as
             categorical. If the number of categories exceeds this limit, the column will not be unified across all
@@ -68,7 +68,7 @@ def compose_extract_curriculum_configs(
     if extract_bin_size <= 0:
         raise ValueError(f"Extract bin size must be greater than 0. Received: {extract_bin_size}")
 
-    total_cells = get_total_cell_in_bq_number(bigquery_dataset=bigquery_dataset, filters=filters)
+    total_cells = get_total_cell_in_bq_number(omics_dataset=omics_dataset, filters=filters)
     num_bins = math.ceil(total_cells / extract_bin_size)
     features = [
         schemas.FeatureSchema(id=idx, symbol=feature.symbol, ensemble_id=feature.ensemble_id)
@@ -76,7 +76,7 @@ def compose_extract_curriculum_configs(
     ]
 
     if total_cells == 0:
-        raise exceptions.ZeroCellsReturnedError("BigQuery dataset contains no cells matching the filters.")
+        raise exceptions.ZeroCellsReturnedError("Omics dataset contains no cells matching the filters.")
 
     extract_bucket_path = f"{settings.BACKEND_PIPELINE_DIR}/{settings.PIPELINE_DATA_EXTRACTS_DIR}/{name}"
 
@@ -87,7 +87,7 @@ def compose_extract_curriculum_configs(
         extract_name=name,
         project_id=settings.GCP_PROJECT_ID,
         nexus_backend_api_url=settings.SITE_URL,
-        bigquery_dataset=bigquery_dataset.name,
+        bigquery_dataset=omics_dataset.name,
         features=features,
         categorical_column_count_limit=categorical_column_count_limit,
         filters=normalized_filters,
@@ -114,7 +114,7 @@ def compose_extract_curriculum_configs(
                 extract_name=name,
                 project_id=settings.GCP_PROJECT_ID,
                 nexus_backend_api_url=settings.SITE_URL,
-                bigquery_dataset=bigquery_dataset.name,
+                bigquery_dataset=omics_dataset.name,
                 bins=worker_bins,
                 bucket_name=settings.BUCKET_NAME_PRIVATE,
                 extract_bucket_path=extract_bucket_path,
@@ -128,7 +128,7 @@ def compose_extract_curriculum_configs(
 def compose_and_dump_configs(
     feature_schema: models.FeatureSchema,
     creator_id: int,
-    bigquery_dataset: models.BigQueryDataset,
+    omics_dataset: models.OmicsDataset,
     name: str,
     extract_bin_size: int,
     categorical_column_count_limit: int,
@@ -145,7 +145,7 @@ def compose_and_dump_configs(
 
     :param feature_schema: Feature schema containing gene features to extract
     :param creator_id: ID of a user who initiated the extract.
-    :param bigquery_dataset: BigQuery dataset to extract data from
+    :param omics_dataset: Omics dataset to extract data from
     :param name: Name for the extract
     :param extract_bin_size: Number of cells per extract bin
     :param obs_columns: Obs columns to include in output anndata files
@@ -167,7 +167,7 @@ def compose_and_dump_configs(
     prepare_extract_config, extract_configs = compose_extract_curriculum_configs(
         feature_schema=feature_schema,
         creator_id=creator_id,
-        bigquery_dataset=bigquery_dataset,
+        omics_dataset=omics_dataset,
         name=name,
         extract_bin_size=extract_bin_size,
         categorical_column_count_limit=categorical_column_count_limit,
@@ -191,7 +191,7 @@ def compose_and_dump_configs(
 def submit_extract_pipeline(
     feature_schema: models.FeatureSchema,
     creator_id: int,
-    bigquery_dataset: models.BigQueryDataset,
+    omics_dataset: models.OmicsDataset,
     name: str,
     extract_bin_size: int,
     categorical_column_count_limit: int,
@@ -207,7 +207,7 @@ def submit_extract_pipeline(
 
     :param feature_schema: Feature schema containing gene features to extract
     :param creator_id: ID of a user who initiated the extract.
-    :param bigquery_dataset: BigQuery dataset to extract data from
+    :param omics_dataset: Omics dataset to extract data from
     :param name: Name for the extract
     :param extract_bin_size: Number of cells per extract bin
     :param categorical_column_count_limit: Maximum number of categories per categorical column to be considered as
@@ -232,7 +232,7 @@ def submit_extract_pipeline(
     prepare_extract_config_path, extract_config_paths = compose_and_dump_configs(
         feature_schema=feature_schema,
         creator_id=creator_id,
-        bigquery_dataset=bigquery_dataset,
+        omics_dataset=omics_dataset,
         name=name,
         categorical_column_count_limit=categorical_column_count_limit,
         extract_bin_size=extract_bin_size,
@@ -243,7 +243,7 @@ def submit_extract_pipeline(
     )
     return submit_pipeline(
         pipeline_component=extract_data_pipeline,
-        display_name=f"Nexus Extract Data - {bigquery_dataset.name}",
+        display_name=f"Nexus Extract Data - {omics_dataset.name}",
         gcp_project=settings.GCP_PROJECT_ID,
         pipeline_kwargs={
             "prepare_extract_config": prepare_extract_config_path,

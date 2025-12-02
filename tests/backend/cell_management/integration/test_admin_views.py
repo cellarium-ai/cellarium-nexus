@@ -33,10 +33,10 @@ def test_cellinfo_filters_count_missing_dataset(client: Client, admin_user: obje
     assert payload.get("error") == "invalid_dataset"
 
 
-@pytest.mark.usefixtures("backend_cache_cleaner", "bigquery_cached_manager_stub")
+@pytest.mark.usefixtures("backend_cache_cleaner", "omics_cached_manager_stub")
 @pytest.mark.django_db
 def test_cellinfo_filters_count_success(
-    client: Client, admin_user: object, default_dataset: cm_models.BigQueryDataset
+    client: Client, admin_user: object, default_dataset: cm_models.OmicsDataset
 ) -> None:
     client.force_login(user=admin_user)
     url = reverse("admin:cell_management_cellinfo_filters_count")
@@ -47,10 +47,10 @@ def test_cellinfo_filters_count_success(
     assert resp.json()["count"] == 42
 
 
-@pytest.mark.usefixtures("backend_cache_cleaner", "bigquery_cached_manager_stub")
+@pytest.mark.usefixtures("backend_cache_cleaner", "omics_cached_manager_stub")
 @pytest.mark.django_db
 def test_cellinfo_admin_view_renders(
-    client: Client, admin_user: object, default_dataset: cm_models.BigQueryDataset
+    client: Client, admin_user: object, default_dataset: cm_models.OmicsDataset
 ) -> None:
     client.force_login(user=admin_user)
     url = reverse("admin:cell_management_cellinfo_changelist")

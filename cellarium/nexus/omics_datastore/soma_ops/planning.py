@@ -93,7 +93,7 @@ def plan_soma_extract(
     experiment_uri: str,
     filters: dict[str, object] | None,
     range_size: int,
-    output_chunk_size: int | None = None,
+    output_chunk_size: int,
     shuffle_ranges: bool = True,
 ) -> SomaExtractPlan:
     """
@@ -106,17 +106,19 @@ def plan_soma_extract(
     :param experiment_uri: URI of the SOMA experiment
     :param filters: Dict of filter conditions using the Nexus format
     :param range_size: Target number of cells per range (for extraction)
-    :param output_chunk_size: Target number of cells per output chunk (for shuffling, default: range_size)
+    :param output_chunk_size: Target number of cells per output chunk (for shuffling)
     :param shuffle_ranges: Whether to shuffle joinid ranges
 
     :raise SomaReadError: If SOMA reads fail
     :raise SomaFilterError: If filter translation fails
-    :raise ValueError: If range_size is not positive
+    :raise ValueError: If range_size or output_chunk_size is not positive
 
     :return: SomaExtractPlan object
     """
     if range_size <= 0:
         raise ValueError(f"range_size must be positive, got {range_size}")
+    if output_chunk_size <= 0:
+        raise ValueError(f"output_chunk_size must be positive, got {output_chunk_size}")
 
     value_filter = build_soma_value_filter(filters=filters)
 

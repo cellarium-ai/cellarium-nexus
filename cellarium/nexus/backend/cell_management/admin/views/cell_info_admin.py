@@ -5,6 +5,7 @@ Admin module for cell information management.
 import builtins
 import decimal as py_decimal
 import json as py_json
+import logging
 import typing as t
 
 import django.forms as dj_forms
@@ -17,14 +18,53 @@ from django.conf import settings
 from django.contrib import admin, messages
 from django.http import HttpResponseRedirect as http_HttpResponseRedirect
 from django.http import JsonResponse as http_JsonResponse
+from google.cloud import bigquery
 
 from cellarium.nexus.backend.cell_management import models as cell_models
 from cellarium.nexus.backend.cell_management.admin import forms as admin_forms
 from cellarium.nexus.backend.cell_management.admin import schemas as admin_schemas
-from cellarium.nexus.backend.cell_management.utils import bigquery_utils, workflows_utils
+from cellarium.nexus.backend.cell_management.utils import bigquery_utils, soma_workflows_utils, workflows_utils
 from cellarium.nexus.backend.cell_management.utils import filters as filters_utils
-from cellarium.nexus.omics_datastore.bq_ops import constants as bq_constants
 from cellarium.nexus.omics_datastore.bq_ops.bq_avro_schemas import cell_management as bq_schemas
+from cellarium.nexus.omics_datastore.bq_ops.data_operator import BigQueryDataOperator
+from cellarium.nexus.omics_datastore.protocols import DataOperatorProtocol
+from cellarium.nexus.omics_datastore.soma_ops.data_operator import TileDBSOMADataOperator
+
+logger = logging.getLogger(__name__)
+
+
+def _create_cached_manager_for_dataset(*, dataset_name: str) -> bigquery_utils.OmicsCachedDataManager:
+    """
+    Create an OmicsCachedDataManager for a dataset based on its backend type.
+
+    :param dataset_name: Name of the omics dataset
+
+    :raise cell_models.OmicsDataset.DoesNotExist: If dataset not found
+
+    :return: Configured OmicsCachedDataManager instance
+    """
+    dataset = cell_models.OmicsDataset.objects.get(name=dataset_name)
+    operator: DataOperatorProtocol
+
+    if dataset.backend == cell_models.OmicsDatasetBackend.TILEDB_SOMA:
+        if not dataset.uri:
+            raise ValueError(f"TileDB SOMA dataset '{dataset_name}' has no URI configured")
+        operator = TileDBSOMADataOperator(experiment_uri=dataset.uri)
+        cache_namespace = f"soma|{dataset.uri}"
+    else:
+        # Default to BigQuery
+        bq_client = bigquery.Client(project=settings.GCP_PROJECT_ID)
+        operator = BigQueryDataOperator(
+            client=bq_client,
+            project=settings.GCP_PROJECT_ID,
+            dataset=dataset_name,
+        )
+        cache_namespace = f"bq|{settings.GCP_PROJECT_ID}|{dataset_name}"
+
+    return bigquery_utils.OmicsCachedDataManager(
+        operator=operator,
+        cache_namespace=cache_namespace,
+    )
 
 
 class CellInfoAdminView(generic.TemplateView):
@@ -53,7 +93,7 @@ class CellInfoAdminView(generic.TemplateView):
         context = super().get_context_data(**kwargs)
 
         # Load datasets from the database
-        bq_datasets_qs = cell_models.BigQueryDataset.objects.all().order_by("name")
+        bq_datasets_qs = cell_models.OmicsDataset.objects.all().order_by("name")
         datasets_list: list[dict[str, str]] = [
             {"name": ds.name, "description": ds.description or ""} for ds in bq_datasets_qs
         ]
@@ -67,10 +107,10 @@ class CellInfoAdminView(generic.TemplateView):
 
         # Compute counts with caching; handle BigQuery errors gracefully
         dataset_counts: dict[str, int] = {}
-        manager = bigquery_utils.BigQueryCachedDataManager()
         try:
             for ds in datasets:
-                dataset_counts[ds] = manager.get_cached_count_bq(dataset_name=ds, filters_dict={})
+                manager = _create_cached_manager_for_dataset(dataset_name=ds)
+                dataset_counts[ds] = manager.get_cached_count(filters_dict={})
         except google_api_core.exceptions.GoogleAPICallError:
             messages.error(
                 request=self.request,
@@ -118,26 +158,29 @@ class CellInfoAdminView(generic.TemplateView):
                 for ds in datasets:
                     if not ds:
                         continue
-                    cat = manager.get_cached_categorical_columns_bq(
-                        dataset_name=ds,
-                        table_name=bq_constants.BQ_CELL_INFO_TABLE_NAME,
+                    ds_manager = _create_cached_manager_for_dataset(dataset_name=ds)
+                    cat = ds_manager.get_cached_categorical_obs_columns(
                         distinct_threshold=settings.FILTERS_CATEGORICAL_UNIQUE_LIMIT,
                     )
                     precomputed_categorical_all[ds] = sorted(list(cat))
                     ds_map: dict[str, list[str]] = {}
-                    for col in string_columns:
-                        if col not in cat:
-                            continue
-                        vals = manager.get_cached_distinct_values_bq(
-                            dataset_name=ds,
+
+                    # For SOMA, use all categorical columns; for BQ, filter through schema
+                    dataset_obj = cell_models.OmicsDataset.objects.get(name=ds)
+                    if dataset_obj.backend == cell_models.OmicsDatasetBackend.TILEDB_SOMA:
+                        columns_to_fetch = cat
+                    else:
+                        columns_to_fetch = [col for col in string_columns if col in cat]
+
+                    for col in columns_to_fetch:
+                        vals = ds_manager.get_cached_distinct_obs_values(
                             column_name=col,
-                            table_name=bq_constants.BQ_CELL_INFO_TABLE_NAME,
-                            limit=settings.FILTERS_CATEGORICAL_UNIQUE_LIMIT,
                         )
                         if vals:
                             ds_map[col] = vals
                     precomputed_suggestions_all[ds] = ds_map
-        except Exception:
+        except Exception as exc:
+            logger.exception(f"Failed to precompute categorical columns/suggestions for datasets {datasets}: {exc}")
             # Do not block page rendering if suggestions warm-up fails
             precomputed_categorical_all = {}
             precomputed_suggestions_all = {}
@@ -161,67 +204,94 @@ def _get_cellinfo_filters_fields(*, dataset: str | None = None) -> list[dict]:
     """
     Return filters metadata used by the server-rendered formset and API endpoints.
 
-    :raise: None
+    For BigQuery datasets, fields are derived from CellInfoBQAvroSchema.
+    For TileDB SOMA datasets, fields are derived from categorical columns in the obs table.
+
+    :param dataset: Optional dataset name to determine backend and categorical columns
 
     :return: List of field metadata dictionaries
     """
-    # Dynamically build fields from CellInfoBQAvroSchema, excluding metadata_extra and ontology term ids
-    schema_fields = bq_schemas.CellInfoBQAvroSchema.model_fields
-    type_hints = t.get_type_hints(bq_schemas.CellInfoBQAvroSchema, include_extras=True)
-    exclude_keys = {"metadata_extra"}
     results: list[dict] = []
 
     # Determine which string columns are categorical based on distinct count per dataset
-    # Use cached manager instead of querying directly from the view
     categorical_columns: set[str] = set()
+    is_soma = False
     if dataset:
-        manager = bigquery_utils.BigQueryCachedDataManager()
-        categorical_columns = manager.get_cached_categorical_columns_bq(
-            dataset_name=dataset,
-            table_name=bq_constants.BQ_CELL_INFO_TABLE_NAME,
+        try:
+            dataset_obj = cell_models.OmicsDataset.objects.get(name=dataset)
+            is_soma = dataset_obj.backend == cell_models.OmicsDatasetBackend.TILEDB_SOMA
+            logger.info(
+                f"_get_cellinfo_filters_fields: dataset={dataset}, backend={dataset_obj.backend}, is_soma={is_soma}"
+            )
+        except cell_models.OmicsDataset.DoesNotExist:
+            logger.warning(f"_get_cellinfo_filters_fields: dataset={dataset} not found")
+
+        manager = _create_cached_manager_for_dataset(dataset_name=dataset)
+        categorical_columns = manager.get_cached_categorical_obs_columns(
             distinct_threshold=settings.FILTERS_CATEGORICAL_UNIQUE_LIMIT,
         )
+        logger.info(f"_get_cellinfo_filters_fields: categorical_columns={categorical_columns}")
 
-    for key, field_info in schema_fields.items():
-        if key in exclude_keys or key.endswith("_ontology_term_id"):
-            continue
+    if is_soma:
+        # For SOMA, build fields directly from categorical columns (all are strings with suggestions)
+        for col in sorted(categorical_columns):
+            results.append(
+                {
+                    "key": col,
+                    "label": col.replace("_", " ").title(),
+                    "type": "string",
+                    "operators": ["in", "not_in"],
+                    "suggest": True,
+                    "suggest_mode": "prefix",
+                    "suggest_min_chars": 2,
+                }
+            )
+    else:
+        # For BigQuery, build fields from CellInfoBQAvroSchema
+        schema_fields = bq_schemas.CellInfoBQAvroSchema.model_fields
+        type_hints = t.get_type_hints(bq_schemas.CellInfoBQAvroSchema, include_extras=True)
+        exclude_keys = {"metadata_extra"}
 
-        # Determine type and operators
-        anno = type_hints.get(key, field_info.annotation)
-        ftype: str
-        operators: list[str]
-        suggest: bool = False
-
-        base = filters_utils.resolve_base_type(anno)
-
-        match base:
-            # --- scalar primitives (note: bool is a subclass of int; handle it first)
-            case builtins.bool:
-                ftype = "boolean"
-                operators = ["eq", "not_eq"]
-            case builtins.float | py_decimal.Decimal | builtins.int:
-                ftype = "number"
-                operators = ["eq", "gt", "gte", "lt", "lte"]
-            case builtins.str:
-                ftype = "string"
-                # suggest only for categorical string columns (<= limit distinct values)
-                suggest = key in categorical_columns if dataset else False
-                # Split operators for plain string vs categorical string
-                operators = ["in", "not_in"] if suggest else ["eq", "not_eq", "in", "not_in"]
-            case _:
-                # Skip unsupported/complex types
+        for key, field_info in schema_fields.items():
+            if key in exclude_keys or key.endswith("_ontology_term_id"):
                 continue
 
-        results.append(
-            {
-                "key": key,
-                "label": (field_info.title or key.replace("_", " ").title()),
-                "type": ftype,
-                "operators": operators,
-                "suggest": suggest,
-                **({"suggest_mode": "prefix", "suggest_min_chars": 2} if suggest else {}),
-            }
-        )
+            # Determine type and operators
+            anno = type_hints.get(key, field_info.annotation)
+            ftype: str
+            operators: list[str]
+            suggest: bool = False
+
+            base = filters_utils.resolve_base_type(anno)
+
+            match base:
+                # --- scalar primitives (note: bool is a subclass of int; handle it first)
+                case builtins.bool:
+                    ftype = "boolean"
+                    operators = ["eq", "not_eq"]
+                case builtins.float | py_decimal.Decimal | builtins.int:
+                    ftype = "number"
+                    operators = ["eq", "gt", "gte", "lt", "lte"]
+                case builtins.str:
+                    ftype = "string"
+                    # suggest only for categorical string columns (<= limit distinct values)
+                    suggest = key in categorical_columns if dataset else False
+                    # Split operators for plain string vs categorical string
+                    operators = ["in", "not_in"] if suggest else ["eq", "not_eq", "in", "not_in"]
+                case _:
+                    # Skip unsupported/complex types
+                    continue
+
+            results.append(
+                {
+                    "key": key,
+                    "label": (field_info.title or key.replace("_", " ").title()),
+                    "type": ftype,
+                    "operators": operators,
+                    "suggest": suggest,
+                    **({"suggest_mode": "prefix", "suggest_min_chars": 2} if suggest else {}),
+                }
+            )
 
     return results
 
@@ -250,9 +320,9 @@ def cellinfo_filters_count(request):
     filter_statements = parsed.filters
     normalized_filters = filters_utils.normalize_filter_statements(filter_statements=filter_statements)
 
-    manager = bigquery_utils.BigQueryCachedDataManager()
+    manager = _create_cached_manager_for_dataset(dataset_name=dataset)
     try:
-        count = manager.get_cached_count_bq(dataset_name=dataset, filters_dict=normalized_filters)
+        count = manager.get_cached_count(filters_dict=normalized_filters)
     except google_api_core.exceptions.GoogleAPICallError as exc:
         return http_JsonResponse(data={"error": "bigquery_error", "detail": str(exc)}, status=502)
 
@@ -265,7 +335,7 @@ class ExtractCurriculumAdminView(generic.FormView):
     Render and submit the Extract Curriculum form.
 
     Pre-fill initial values from query parameters if provided:
-    - ``dataset`` (BigQuery dataset name)
+    - ``dataset`` (omics dataset name)
     - ``filters`` (JSON-encoded string of filter statements)
     """
 
@@ -309,9 +379,9 @@ class ExtractCurriculumAdminView(generic.FormView):
 
         if dataset_name:
             try:
-                ds_obj = cell_models.BigQueryDataset.objects.get(name=dataset_name)
-                initial["bigquery_dataset"] = ds_obj.pk
-            except cell_models.BigQueryDataset.DoesNotExist:
+                ds_obj = cell_models.OmicsDataset.objects.get(name=dataset_name)
+                initial["omics_dataset"] = ds_obj.pk
+            except cell_models.OmicsDataset.DoesNotExist:
                 pass
 
         if filters_raw:
@@ -332,37 +402,58 @@ class ExtractCurriculumAdminView(generic.FormView):
         """
         Submit the extract pipeline using validated form data.
 
+        Detect the dataset backend and submit the appropriate pipeline:
+        - BigQuery datasets use the BQ extract pipeline
+        - TileDB SOMA datasets use the SOMA extract pipeline
+
         :param form: Validated ExtractCurriculumForm
 
-        :raise: google.api_core.exceptions.GoogleAPIError, ValueError
+        :raise google.api_core.exceptions.GoogleAPIError: If pipeline submission fails
+        :raise ValueError: If dataset configuration is invalid
 
         :return: HTTP redirect to the Vertex AI Pipeline run URL
         """
         cleaned = form.cleaned_data
+        omics_dataset = cleaned["omics_dataset"]
+
         try:
-            pipeline_url = workflows_utils.submit_extract_pipeline(
-                feature_schema=cleaned["feature_schema"],
-                creator_id=self.request.user.id,
-                bigquery_dataset=cleaned["bigquery_dataset"],
-                name=cleaned["name"],
-                extract_bin_size=cleaned["extract_bin_size"],
-                categorical_column_count_limit=cleaned["categorical_column_count_limit"],
-                obs_columns=cleaned["obs_columns"],
-                extract_bin_keys=cleaned.get("extract_bin_keys") or None,
-                filters=cleaned.get("filters") or None,
-                metadata_extra_columns=cleaned.get("metadata_extra_columns") or None,
-            )
+            if omics_dataset.backend == cell_models.OmicsDatasetBackend.TILEDB_SOMA:
+                # Run SOMA extract pipeline locally
+                # Use extract_bin_size for both range_size and output_chunk_size
+                soma_workflows_utils.run_soma_extract_pipeline_locally(
+                    name=cleaned["name"],
+                    creator_id=self.request.user.id,
+                    omics_dataset=omics_dataset,
+                    range_size=cleaned["extract_bin_size"],
+                    output_chunk_size=cleaned["extract_bin_size"],
+                    filters=cleaned.get("filters") or None,
+                    obs_columns=cleaned.get("obs_columns") or None,
+                )
+                messages.success(self.request, "SOMA extract pipeline completed successfully.")
+            else:
+                # Submit BigQuery extract pipeline
+                pipeline_url = workflows_utils.submit_extract_pipeline(
+                    feature_schema=cleaned["feature_schema"],
+                    creator_id=self.request.user.id,
+                    omics_dataset=omics_dataset,
+                    name=cleaned["name"],
+                    extract_bin_size=cleaned["extract_bin_size"],
+                    categorical_column_count_limit=cleaned["categorical_column_count_limit"],
+                    obs_columns=cleaned["obs_columns"],
+                    extract_bin_keys=cleaned.get("extract_bin_keys") or None,
+                    filters=cleaned.get("filters") or None,
+                    metadata_extra_columns=cleaned.get("metadata_extra_columns") or None,
+                )
+                messages.success(
+                    self.request,
+                    django_html.format_html(
+                        'Extract pipeline submitted successfully. <a href="{url}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">View run</a>',
+                        url=pipeline_url,
+                    ),
+                )
         except Exception as exc:  # Surface error to admin as message and redisplay form
-            messages.error(self.request, f"Failed to submit extract pipeline: {exc}")
+            messages.error(self.request, f"Failed to run extract pipeline: {exc}")
             return self.form_invalid(form)
 
-        # Success message with a clickable link (rendered safely)
-        messages.success(
-            self.request,
-            django_html.format_html(
-                'Extract pipeline submitted successfully. <a href="{url}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">View run</a>',
-                url=pipeline_url,
-            ),
-        )
         # Redirect back to Cell Info page within Admin
         return http_HttpResponseRedirect(django_urls.reverse("admin:cell_management_cellinfo_changelist"))

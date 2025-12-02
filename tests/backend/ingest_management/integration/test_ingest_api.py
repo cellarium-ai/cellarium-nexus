@@ -12,13 +12,13 @@ from cellarium.nexus.backend.ingest_management import models as im_models
 
 
 @pytest.mark.django_db
-def test_ingest_create_retrieve_and_update(client: Client, default_dataset: cm_models.BigQueryDataset) -> None:
+def test_ingest_create_retrieve_and_update(client: Client, default_dataset: cm_models.OmicsDataset) -> None:
     """
     Create an ingest via API, retrieve it, then update fields via PATCH.
     """
     # Create
     create_url = reverse("ingest-create")
-    payload = {"bigquery_dataset": default_dataset.name}
+    payload = {"omics_dataset": default_dataset.name}
     resp = client.post(path=create_url, data=json.dumps(payload), content_type="application/json")
     assert resp.status_code in (200, 201)
     created = resp.json()
@@ -29,7 +29,7 @@ def test_ingest_create_retrieve_and_update(client: Client, default_dataset: cm_m
     resp = client.get(path=detail_url)
     assert resp.status_code == 200
     data = resp.json()
-    assert data["bigquery_dataset"] == default_dataset.name
+    assert data["omics_dataset"] == default_dataset.name
 
     # Update metadata_extra and status via PATCH
     patch_payload = {"metadata_extra": {"foo": "bar"}, "status": im_models.IngestInfo.STATUS_SUCCEEDED}
@@ -41,23 +41,23 @@ def test_ingest_create_retrieve_and_update(client: Client, default_dataset: cm_m
 
 
 @pytest.mark.django_db
-def test_reserve_indexes_cell_info_db_side_effects(client: Client, default_dataset: cm_models.BigQueryDataset) -> None:
+def test_reserve_indexes_cell_info_db_side_effects(client: Client, default_dataset: cm_models.OmicsDataset) -> None:
     """
     Reserve indexes for cell_info and assert IndexTracking row is created/updated.
     """
 
     url = reverse("reserve-indexes-cell-info")
-    payload = {"bigquery_dataset": default_dataset.name, "batch_size": 100}
+    payload = {"omics_dataset": default_dataset.name, "batch_size": 100}
 
     # First reservation should create tracking row and allocate 1..100
     resp = client.post(path=url, data=json.dumps(payload), content_type="application/json")
     assert resp.status_code == 200
     assert resp.json() == {"index_start": 1, "index_end": 100}
-    tracking = im_models.IndexTracking.objects.get(bigquery_dataset=default_dataset, resource_key="cell_info")
+    tracking = im_models.IndexTracking.objects.get(omics_dataset=default_dataset, resource_key="cell_info")
     assert tracking.largest_index == 100
 
     # Second reservation should continue from 101
-    payload = {"bigquery_dataset": default_dataset.name, "batch_size": 50}
+    payload = {"omics_dataset": default_dataset.name, "batch_size": 50}
     resp = client.post(path=url, data=json.dumps(payload), content_type="application/json")
     assert resp.status_code == 200
     assert resp.json() == {"index_start": 101, "index_end": 150}
@@ -66,19 +66,17 @@ def test_reserve_indexes_cell_info_db_side_effects(client: Client, default_datas
 
 
 @pytest.mark.django_db
-def test_reserve_indexes_feature_info_db_side_effects(
-    client: Client, default_dataset: cm_models.BigQueryDataset
-) -> None:
+def test_reserve_indexes_feature_info_db_side_effects(client: Client, default_dataset: cm_models.OmicsDataset) -> None:
     """
     Reserve indexes for feature_info and assert IndexTracking row is created/updated.
     """
     url = reverse("reserve-indexes-feature-info")
-    payload = {"bigquery_dataset": default_dataset.name, "batch_size": 50}
+    payload = {"omics_dataset": default_dataset.name, "batch_size": 50}
 
     resp = client.post(path=url, data=json.dumps(payload), content_type="application/json")
     assert resp.status_code == 200
     assert resp.json() == {"index_start": 1, "index_end": 50}
-    tracking = im_models.IndexTracking.objects.get(bigquery_dataset=default_dataset, resource_key="feature_info")
+    tracking = im_models.IndexTracking.objects.get(omics_dataset=default_dataset, resource_key="feature_info")
     assert tracking.largest_index == 50
 
 
@@ -106,7 +104,7 @@ def test_validation_report_item_create(client: Client, admin_user: object) -> No
 
 
 @pytest.mark.django_db
-@pytest.mark.usefixtures("bigquery_cached_manager_stub")
+@pytest.mark.usefixtures("omics_cached_manager_stub")
 def test_reset_cache_endpoint_e2e(client: Client, admin_user: object) -> None:
     """
     POST reset-cache and assert cache side effects and response envelope.

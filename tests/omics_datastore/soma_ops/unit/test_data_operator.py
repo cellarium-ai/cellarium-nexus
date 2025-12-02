@@ -67,7 +67,7 @@ def test_count_cells_happy_path(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Execute
     filters = {"tissue__eq": "lung"}
-    count = operator.count_cells(filters=filters)
+    count = operator.count_cells(filter_statements=filters)
 
     # Verify
     assert count == 5
@@ -117,7 +117,7 @@ def test_count_cells_empty_filter(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(tiledbsoma, "open", _fake_open)
 
     # Execute
-    count = operator.count_cells(filters=None)
+    count = operator.count_cells(filter_statements=None)
 
     # Verify
     assert count == 3
@@ -144,7 +144,7 @@ def test_count_cells_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Execute and expect error
     with pytest.raises(SomaReadError):
-        operator.count_cells(filters=None)
+        operator.count_cells(filter_statements=None)
 
 
 def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -160,7 +160,7 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
         experiment_uri: str,
         filters: object,
         range_size: int,
-        output_chunk_size: int | None,
+        output_chunk_size: int,
         shuffle_ranges: bool,
     ) -> SomaExtractPlan:
         plan_calls.append(
@@ -189,6 +189,7 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
     plan = operator.compute_extract_plan(
         filters=filters,
         range_size=100,
+        output_chunk_size=100,
         shuffle_ranges=False,
     )
 
@@ -220,6 +221,8 @@ def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.Monk
         output_dir: Path,
         obs_columns: list[str] | None,
         var_columns: list[str] | None,
+        var_filter_ids: list[str] | None,
+        var_filter_column: str,
         x_layer: str,
         output_format: str,
         max_workers: int | None,
@@ -231,6 +234,8 @@ def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.Monk
                 "output_dir": output_dir,
                 "obs_columns": obs_columns,
                 "var_columns": var_columns,
+                "var_filter_ids": var_filter_ids,
+                "var_filter_column": var_filter_column,
                 "x_layer": x_layer,
                 "output_format": output_format,
                 "max_workers": max_workers,
@@ -247,6 +252,7 @@ def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.Monk
         joinid_ranges=[SomaJoinIdRange(start=0, end=10)],
         total_cells=10,
         range_size=10,
+        output_chunk_size=10,
         filters={"tissue__eq": "lung"},
     )
 
@@ -311,6 +317,7 @@ def test_extract_ranges_shuffled_with_temp_dir(monkeypatch: pytest.MonkeyPatch, 
         joinid_ranges=[SomaJoinIdRange(start=0, end=10)],
         total_cells=10,
         range_size=10,
+        output_chunk_size=10,
         filters=None,
     )
 
@@ -337,6 +344,8 @@ def test_extract_ranges_shuffled_with_temp_dir(monkeypatch: pytest.MonkeyPatch, 
     assert extract_calls[0]["plan"] == plan
     assert extract_calls[0]["obs_columns"] == ["cell_type"]
     assert extract_calls[0]["var_columns"] == ["symbol"]
+    assert extract_calls[0]["var_filter_ids"] is None
+    assert extract_calls[0]["var_filter_column"] == "feature_id"
     assert extract_calls[0]["x_layer"] == "raw"
     assert extract_calls[0]["max_workers"] == 2
 
@@ -401,6 +410,7 @@ def test_extract_ranges_shuffled_auto_temp_dir(monkeypatch: pytest.MonkeyPatch, 
         joinid_ranges=[SomaJoinIdRange(start=0, end=10)],
         total_cells=10,
         range_size=10,
+        output_chunk_size=10,
         filters=None,
     )
 
@@ -459,6 +469,7 @@ def test_extract_ranges_shuffled_no_cleanup(monkeypatch: pytest.MonkeyPatch, tmp
         joinid_ranges=[SomaJoinIdRange(start=0, end=10)],
         total_cells=10,
         range_size=10,
+        output_chunk_size=10,
         filters=None,
     )
 

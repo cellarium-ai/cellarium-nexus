@@ -303,58 +303,50 @@ class BigQueryDataOperator:
         results = list(query_job.result())
         return int(results[0][0]) if results else 0
 
-    def get_distinct_values(
-        self, *, table_name: str, column_name: str, limit: int = 1000, dataset: str | None = None
+    def get_distinct_obs_values(
+        self,
+        *,
+        column_name: str,
     ) -> list[str]:
         """
-        Fetch distinct values for a column in a base table.
+        Fetch distinct values for an obs/cell_info column.
 
-        :param table_name: Base table name to query
         :param column_name: Column to retrieve values for
-        :param limit: Maximum number of values to return
-        :param dataset: Optional override dataset; defaults to operator's dataset
 
         :raise google.api_core.exceptions.GoogleAPIError: If query execution fails
 
         :return: List of distinct values
         """
-        target_dataset = dataset if dataset else self.dataset
         template_path = Path(__file__).parent / "sql_templates" / "general" / "column_distinct_values.sql.mako"
         template_data = bq_sql.TemplateData(
             project=self.project,
-            dataset=target_dataset,
-            table_name=table_name,
+            dataset=self.dataset,
+            table_name=constants.BQ_CELL_INFO_TABLE_NAME,
             column_name=column_name,
-            limit=limit,
         )
         sql = bq_sql.render(str(template_path), template_data)
         query_job = self.client.query(sql)
         results = list(query_job.result())
         return [str(row[0]) for row in results if row[0] is not None]
 
-    def get_categorical_string_columns(
+    def get_categorical_obs_columns(
         self,
         *,
-        table_name: str,
         threshold: int,
         exclude: list[str] | None = None,
-        dataset: str | None = None,
     ) -> set[str]:
         """
-        Determine categorical string columns for a base table by distinct count threshold.
+        Determine categorical string columns in obs/cell_info by distinct count threshold.
 
-        :param table_name: Base table name to analyze
         :param threshold: Maximum distinct values to consider a column categorical
         :param exclude: Optional list of column names to skip
-        :param dataset: Optional override dataset; defaults to operator's dataset
 
         :raise google.api_core.exceptions.GoogleAPIError: If schema or query fails
 
         :return: Set of column names that are categorical
         """
-        target_dataset = dataset if dataset else self.dataset
         exclude_set = set(exclude or [])
-        table_ref = f"{self.project}.{target_dataset}.{table_name}"
+        table_ref = f"{self.project}.{self.dataset}.{constants.BQ_CELL_INFO_TABLE_NAME}"
         table = self.client.get_table(table_ref)
 
         # Collect string columns to evaluate
@@ -366,8 +358,9 @@ class BigQueryDataOperator:
             return set()
 
         # Use a single query to get distinct counts for all columns
-        counts = self.get_multi_distinct_counts(
-            table_name=table_name, column_names=string_columns, dataset=target_dataset
+        counts = self._get_multi_distinct_counts(
+            table_name=constants.BQ_CELL_INFO_TABLE_NAME,
+            column_names=string_columns,
         )
 
         categorical: set[str] = set()
@@ -376,15 +369,17 @@ class BigQueryDataOperator:
                 categorical.add(col)
         return categorical
 
-    def get_multi_distinct_counts(
-        self, *, table_name: str, column_names: list[str], dataset: str | None = None
+    def _get_multi_distinct_counts(
+        self,
+        *,
+        table_name: str,
+        column_names: list[str],
     ) -> dict[str, int]:
         """
         Count distinct values for multiple columns in a single query.
 
         :param table_name: Base table name to query
         :param column_names: List of column names to include in the count
-        :param dataset: Optional override dataset; defaults to operator's dataset
 
         :raise google.api_core.exceptions.GoogleAPIError: If query execution fails
 
@@ -393,11 +388,10 @@ class BigQueryDataOperator:
         if not column_names:
             return {}
 
-        target_dataset = dataset if dataset else self.dataset
         template_path = Path(__file__).parent / "sql_templates" / "general" / "multi_column_distinct_counts.sql.mako"
         template_data = bq_sql.TemplateData(
             project=self.project,
-            dataset=target_dataset,
+            dataset=self.dataset,
             table_name=table_name,
             column_names=column_names,
         )

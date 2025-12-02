@@ -38,13 +38,13 @@ class ReserveIndexesAPIViewAbstract(GenericAPIView):
         :return: Dictionary with start_index and end_index.
         """
         batch_size = serializer.validated_data["batch_size"]
-        bigquery_dataset = serializer.validated_data["bigquery_dataset"]
+        omics_dataset = serializer.validated_data["omics_dataset"]
 
         if not self.resource_key:
             raise exceptions.ValidationError("Resource key is not configured for this endpoint")
 
         start_index, end_index = index_tracking.reserve_indexes(
-            bigquery_dataset=bigquery_dataset, resource_key=self.resource_key, batch_size=batch_size
+            omics_dataset=omics_dataset, resource_key=self.resource_key, batch_size=batch_size
         )
 
         return {"index_start": start_index, "index_end": end_index}

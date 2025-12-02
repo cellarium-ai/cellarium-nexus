@@ -39,6 +39,7 @@ def prepare_soma_extract_job(config_path: str):
         extract_name=params.extract_name,
         creator_id=params.creator_id,
         extract_bucket_path=params.extract_bucket_path,
+        plan_path=params.plan_path,
         range_size=params.range_size,
         filters=params.filters,
         output_chunk_size=params.output_chunk_size,
@@ -100,7 +101,7 @@ def mark_soma_curriculum_as_finished_job(config_path: str):
     """
     Mark a SOMA curriculum as finished and update with final metadata.
 
-    Read a SomaOpsMarkFinished configuration from cloud storage and use
+    Read a SomaOpsPrepareExtract configuration from cloud storage and use
     SomaDataOpsCoordinator to update the curriculum status to SUCCEEDED.
 
     :param config_path: Path to the configuration file in cloud storage
@@ -109,9 +110,9 @@ def mark_soma_curriculum_as_finished_job(config_path: str):
     """
     from cellarium.nexus.coordinator import SomaDataOpsCoordinator
     from cellarium.nexus.shared import utils
-    from cellarium.nexus.shared.schemas.component_configs import SomaOpsMarkFinished
+    from cellarium.nexus.shared.schemas.component_configs import SomaOpsPrepareExtract
 
-    params = utils.workflows_configs.read_component_config(gcs_path=config_path, schema_class=SomaOpsMarkFinished)
+    params = utils.workflows_configs.read_component_config(gcs_path=config_path, schema_class=SomaOpsPrepareExtract)
 
     coordinator = SomaDataOpsCoordinator(
         experiment_uri=params.experiment_uri,

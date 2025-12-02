@@ -224,9 +224,9 @@ UNFOLD = {
                 "expanded": False,
                 "items": [
                     {
-                        "title": _("BigQuery Datasets"),
+                        "title": _("Omics Datasets"),
                         "icon": "database",
-                        "link": reverse_lazy("admin:cell_management_bigquerydataset_changelist"),
+                        "link": reverse_lazy("admin:cell_management_omicsdataset_changelist"),
                     },
                     {
                         "title": _("Data Ingests"),

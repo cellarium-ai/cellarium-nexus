@@ -7,7 +7,7 @@ from django_json_widget.widgets import JSONEditorWidget as BaseJSONEditorWidget
 from unfold import widgets as unfold_widgets
 
 from cellarium.nexus.backend.cell_management.admin import constants
-from cellarium.nexus.backend.cell_management.models import BigQueryDataset, FeatureSchema
+from cellarium.nexus.backend.cell_management.models import FeatureSchema, OmicsDataset
 from cellarium.nexus.backend.cell_management.utils.check_curriculum import check_curriculum_exists
 from cellarium.nexus.backend.curriculum.models import Curriculum
 
@@ -152,11 +152,11 @@ class ExtractCurriculumForm(forms.Form):
         help_text=_("Bin size for the extract tables"),
         widget=unfold_widgets.UnfoldAdminIntegerFieldWidget,
     )
-    bigquery_dataset = forms.ModelChoiceField(
-        label=_("BigQuery Dataset"),
-        queryset=BigQueryDataset.objects.all(),
+    omics_dataset = forms.ModelChoiceField(
+        label=_("Omics Dataset"),
+        queryset=OmicsDataset.objects.all(),
         widget=unfold_widgets.UnfoldAdminSelect2Widget,
-        help_text=_("BigQuery Dataset to extract data from"),
+        help_text=_("Omics dataset to extract data from"),
     )
     obs_columns = forms.MultipleChoiceField(
         label=_("Observation Columns"),

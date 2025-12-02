@@ -29,7 +29,7 @@ def _make_feature_schema(*, symbols: list[tuple[str, str]] = None) -> models.Fea
 
 
 def test_get_total_cell_in_bq_number_counts(
-    monkeypatch: pytest.MonkeyPatch, default_dataset: models.BigQueryDataset
+    monkeypatch: pytest.MonkeyPatch, default_dataset: models.OmicsDataset
 ) -> None:
     """
     Assert BigQueryDataOperator.count_cells is invoked and its value returned.
@@ -44,11 +44,11 @@ def test_get_total_cell_in_bq_number_counts(
 
     monkeypatch.setattr(workflows_utils, "BigQueryDataOperator", _Op, raising=True)
 
-    out = workflows_utils.get_total_cell_in_bq_number(bigquery_dataset=default_dataset, filters={"a": 1})
+    out = workflows_utils.get_total_cell_in_bq_number(omics_dataset=default_dataset, filters={"a": 1})
     assert out == 1234
 
 
-def test_compose_extract_curriculum_configs_invalid_bin_size(default_dataset: models.BigQueryDataset) -> None:
+def test_compose_extract_curriculum_configs_invalid_bin_size(default_dataset: models.OmicsDataset) -> None:
     """
     Raise ValueError when extract_bin_size <= 0.
     """
@@ -59,7 +59,7 @@ def test_compose_extract_curriculum_configs_invalid_bin_size(default_dataset: mo
             name="x",
             creator_id=1,
             feature_schema=fs,
-            bigquery_dataset=default_dataset,
+            omics_dataset=default_dataset,
             extract_bin_size=0,
             categorical_column_count_limit=2000,
             obs_columns=["organism"],
@@ -67,7 +67,7 @@ def test_compose_extract_curriculum_configs_invalid_bin_size(default_dataset: mo
 
 
 def test_compose_extract_curriculum_configs_zero_cells(
-    monkeypatch: pytest.MonkeyPatch, default_dataset: models.BigQueryDataset
+    monkeypatch: pytest.MonkeyPatch, default_dataset: models.OmicsDataset
 ) -> None:
     """
     Raise ZeroCellsReturnedError when total cell count is zero.
@@ -80,7 +80,7 @@ def test_compose_extract_curriculum_configs_zero_cells(
             name="x",
             creator_id=1,
             feature_schema=fs,
-            bigquery_dataset=default_dataset,
+            omics_dataset=default_dataset,
             extract_bin_size=100,
             categorical_column_count_limit=2000,
             obs_columns=["organism"],
@@ -88,7 +88,7 @@ def test_compose_extract_curriculum_configs_zero_cells(
 
 
 def test_compose_extract_curriculum_configs_happy_path(
-    monkeypatch: pytest.MonkeyPatch, default_dataset: models.BigQueryDataset
+    monkeypatch: pytest.MonkeyPatch, default_dataset: models.OmicsDataset
 ) -> None:
     """
     Compose configs with correct number of bins, features, and merged obs columns.
@@ -101,7 +101,7 @@ def test_compose_extract_curriculum_configs_happy_path(
         name="extract-1",
         creator_id=7,
         feature_schema=fs,
-        bigquery_dataset=default_dataset,
+        omics_dataset=default_dataset,
         extract_bin_size=2,
         categorical_column_count_limit=2000,
         obs_columns=["organism"],
@@ -119,7 +119,7 @@ def test_compose_extract_curriculum_configs_happy_path(
 
 
 def test_compose_and_dump_configs_delegates_and_returns_paths(
-    monkeypatch: pytest.MonkeyPatch, default_dataset: models.BigQueryDataset
+    monkeypatch: pytest.MonkeyPatch, default_dataset: models.OmicsDataset
 ) -> None:
     """
     Ensure compose_and_dump_configs dumps both prepare and extract configs and returns their paths.
@@ -148,7 +148,7 @@ def test_compose_and_dump_configs_delegates_and_returns_paths(
     prepare_path, extract_paths = workflows_utils.compose_and_dump_configs(
         feature_schema=fs,
         creator_id=42,
-        bigquery_dataset=default_dataset,
+        omics_dataset=default_dataset,
         name="ex",
         extract_bin_size=5,
         categorical_column_count_limit=2000,
@@ -167,7 +167,7 @@ def test_compose_and_dump_configs_delegates_and_returns_paths(
 @pytest.mark.usefixtures("vertex_ai_pipeline_stub")
 def test_submit_extract_pipeline_calls_submit(
     monkeypatch: pytest.MonkeyPatch,
-    default_dataset: models.BigQueryDataset,
+    default_dataset: models.OmicsDataset,
     vertex_ai_pipeline_stub,
 ) -> None:
     """
@@ -194,7 +194,7 @@ def test_submit_extract_pipeline_calls_submit(
     url = workflows_utils.submit_extract_pipeline(
         feature_schema=fs,
         creator_id=1,
-        bigquery_dataset=default_dataset,
+        omics_dataset=default_dataset,
         name="e",
         extract_bin_size=10,
         categorical_column_count_limit=2000,

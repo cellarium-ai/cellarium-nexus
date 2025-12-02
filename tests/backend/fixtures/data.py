@@ -40,13 +40,13 @@ def feature_schema_factory() -> Callable:
 
 
 @pytest.fixture()
-def default_dataset() -> models.BigQueryDataset:
+def default_dataset() -> models.OmicsDataset:
     """
-    Create default BigQuery dataset row for backend tests.
+    Create default omics dataset row for backend tests.
 
-    :return: BigQueryDataset instance
+    :return: OmicsDataset instance
     """
-    return models.BigQueryDataset.objects.create(name="default", description="Default dataset")
+    return models.OmicsDataset.objects.create(name="default", description="Default dataset")
 
 
 @pytest.fixture()

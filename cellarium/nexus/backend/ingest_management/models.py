@@ -17,11 +17,11 @@ class IngestInfo(models.Model):
     STATUS_CHOICES = [(STATUS_STARTED, "Started"), (STATUS_SUCCEEDED, "Succeeded"), (STATUS_FAILED, "Failed")]
     nexus_uuid = models.UUIDField(default=uuid.uuid4, verbose_name=_("nexus uuid"), unique=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_STARTED, verbose_name=_("status"))
-    bigquery_dataset = models.ForeignKey(
-        to="cell_management.BigQueryDataset",
+    omics_dataset = models.ForeignKey(
+        to="cell_management.OmicsDataset",
         on_delete=models.CASCADE,
         related_name="ingest_management_ingests",
-        verbose_name=_("BigQuery dataset"),
+        verbose_name=_("omics dataset"),
     )
     metadata_extra = models.JSONField(verbose_name=_("metadata extra"), null=True, blank=True)
     ingest_start_timestamp = models.DateTimeField(
@@ -103,11 +103,11 @@ class VarColumnMapping(models.Model):
 
 
 class IndexTracking(models.Model):
-    bigquery_dataset = models.ForeignKey(
-        to="cell_management.BigQueryDataset",
+    omics_dataset = models.ForeignKey(
+        to="cell_management.OmicsDataset",
         on_delete=models.CASCADE,
         related_name="ingest_management_index_trackings",
-        verbose_name=_("BigQuery dataset"),
+        verbose_name=_("omics dataset"),
     )
     resource_key = models.CharField(max_length=100, verbose_name=_("resource key"))
     largest_index = models.BigIntegerField(default=0, verbose_name=_("largest assigned index"))
@@ -116,10 +116,10 @@ class IndexTracking(models.Model):
         verbose_name = "Index Tracking"
         verbose_name_plural = "Index Tracking Entries"
         app_label = "ingest_management"
-        unique_together = ("bigquery_dataset", "resource_key")
+        unique_together = ("omics_dataset", "resource_key")
 
     def __str__(self):
-        return f"{self.bigquery_dataset} | {self.resource_key} -- {self.largest_index}"
+        return f"{self.omics_dataset} | {self.resource_key} -- {self.largest_index}"
 
 
 class ValidationReport(models.Model):

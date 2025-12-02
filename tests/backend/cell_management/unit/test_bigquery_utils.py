@@ -34,147 +34,126 @@ def test_hash_to_key_prefix_and_md5_length() -> None:
 
 
 @pytest.fixture()
-def project_id() -> str:
+def cache_namespace() -> str:
     """
-    Provide a test project id for manager construction.
+    Provide a test cache namespace for manager construction.
 
-    :return: Project ID string
+    :return: Cache namespace string
     """
-    return "test-project"
+    return "test-namespace"
 
 
-def _patch_bq_operator(monkeypatch: pytest.MonkeyPatch, **impls):
+class MockDataOperator:
     """
-    Patch BigQueryDataOperator methods used by BigQueryCachedDataManager.
-
-    :param monkeypatch: Pytest monkeypatch fixture
-
-    :return: A recorder namespace with call counters
+    Mock data operator implementing DataOperatorProtocol for testing.
     """
-    # Recorder object to track calls
-    rec = types.SimpleNamespace(count_cells=0, get_categorical_string_columns=0, get_distinct_values=0)
 
-    class _Op:
-        def __init__(self, *args, **kwargs) -> None:  # noqa: D401
-            """Accept any args without side effects."""
+    def __init__(self, *, impls: dict | None = None, recorder: types.SimpleNamespace | None = None) -> None:
+        self.impls = impls or {}
+        self.recorder = recorder or types.SimpleNamespace(
+            count_cells=0, get_categorical_obs_columns=0, get_distinct_obs_values=0
+        )
 
-        def count_cells(self, *args, **kwargs) -> int:  # noqa: D401
-            """Return a value and record call count."""
-            rec.count_cells += 1
-            fn = impls.get("count_cells")
-            return 123 if fn is None else fn(**kwargs)
+    def count_cells(self, *, filter_statements: dict | None = None) -> int:
+        """Return a value and record call count."""
+        self.recorder.count_cells += 1
+        fn = self.impls.get("count_cells")
+        return 123 if fn is None else fn(filter_statements=filter_statements)
 
-        def get_categorical_string_columns(self, *args, **kwargs) -> set[str]:  # noqa: D401
-            """Return a set and record call count."""
-            rec.get_categorical_string_columns += 1
-            fn = impls.get("get_categorical_string_columns")
-            return {"organism"} if fn is None else fn(**kwargs)
+    def get_categorical_obs_columns(self, *, threshold: int, exclude: list[str] | None = None) -> set[str]:
+        """Return a set and record call count."""
+        self.recorder.get_categorical_obs_columns += 1
+        fn = self.impls.get("get_categorical_obs_columns")
+        return {"organism"} if fn is None else fn(threshold=threshold, exclude=exclude)
 
-        def get_distinct_values(self, *args, **kwargs) -> list[str]:  # noqa: D401
-            """Return a list and record call count."""
-            rec.get_distinct_values += 1
-            fn = impls.get("get_distinct_values")
-            return ["Homo sapiens"] if fn is None else fn(**kwargs)
-
-    monkeypatch.setattr(bigquery_utils.bq_ops, "BigQueryDataOperator", _Op, raising=True)
-    return rec
+    def get_distinct_obs_values(self, *, column_name: str) -> list[str]:
+        """Return a list and record call count."""
+        self.recorder.get_distinct_obs_values += 1
+        fn = self.impls.get("get_distinct_obs_values")
+        return ["Homo sapiens"] if fn is None else fn(column_name=column_name)
 
 
-def test_get_cached_count_bq_uses_cache(monkeypatch: pytest.MonkeyPatch, project_id: str) -> None:
+def test_get_cached_count_uses_cache(cache_namespace: str) -> None:
     """
     Assert first call hits operator and subsequent calls read cache for same inputs.
     Also assert canonical JSON means dict order does not affect the cache key.
     """
-    rec = _patch_bq_operator(monkeypatch, count_cells=lambda **kwargs: 42)
+    rec = types.SimpleNamespace(count_cells=0, get_categorical_obs_columns=0, get_distinct_obs_values=0)
+    operator = MockDataOperator(
+        impls={"count_cells": lambda **kwargs: 42},
+        recorder=rec,
+    )
 
-    mgr = bigquery_utils.BigQueryCachedDataManager(project_id=project_id)
+    mgr = bigquery_utils.OmicsCachedDataManager(operator=operator, cache_namespace=cache_namespace)
 
     filters_a = {"b": 1, "a": 2}
     filters_b = {"a": 2, "b": 1}  # same content, different order
 
     # First call should invoke operator
-    out1 = mgr.get_cached_count_bq(dataset_name="ds1", filters_dict=filters_a)
+    out1 = mgr.get_cached_count(filters_dict=filters_a)
     assert out1 == 42
     assert rec.count_cells == 1
 
     # Second call with same inputs should use cache (no additional operator call)
-    out2 = mgr.get_cached_count_bq(dataset_name="ds1", filters_dict=filters_a)
+    out2 = mgr.get_cached_count(filters_dict=filters_a)
     assert out2 == 42
     assert rec.count_cells == 1
 
     # Same filter content, different order should still be cached
-    out3 = mgr.get_cached_count_bq(dataset_name="ds1", filters_dict=filters_b)
+    out3 = mgr.get_cached_count(filters_dict=filters_b)
     assert out3 == 42
     assert rec.count_cells == 1
 
-    # Different dataset should miss cache and call operator
-    out4 = mgr.get_cached_count_bq(dataset_name="ds2", filters_dict=filters_a)
-    assert out4 == 42
-    assert rec.count_cells == 2
 
-
-def test_get_cached_categorical_columns_bq_caches(monkeypatch: pytest.MonkeyPatch, project_id: str) -> None:
+def test_get_cached_categorical_obs_columns_caches(cache_namespace: str) -> None:
     """
-    Assert categorical columns are cached per dataset/table/threshold namespace.
+    Assert categorical columns are cached per namespace/threshold.
     """
-    rec = _patch_bq_operator(
-        monkeypatch,
-        get_categorical_string_columns=lambda **kwargs: {"organism", "tissue"},
+    rec = types.SimpleNamespace(count_cells=0, get_categorical_obs_columns=0, get_distinct_obs_values=0)
+    operator = MockDataOperator(
+        impls={"get_categorical_obs_columns": lambda **kwargs: {"organism", "tissue"}},
+        recorder=rec,
     )
 
-    mgr = bigquery_utils.BigQueryCachedDataManager(project_id=project_id)
+    mgr = bigquery_utils.OmicsCachedDataManager(operator=operator, cache_namespace=cache_namespace)
 
-    out1 = mgr.get_cached_categorical_columns_bq(dataset_name="ds1", table_name="cell_info", distinct_threshold=100)
+    out1 = mgr.get_cached_categorical_obs_columns(distinct_threshold=100)
     assert out1 == {"organism", "tissue"}
-    assert rec.get_categorical_string_columns == 1
+    assert rec.get_categorical_obs_columns == 1
 
     # Repeat same request → served from cache
-    out2 = mgr.get_cached_categorical_columns_bq(dataset_name="ds1", table_name="cell_info", distinct_threshold=100)
+    out2 = mgr.get_cached_categorical_obs_columns(distinct_threshold=100)
     assert out2 == {"organism", "tissue"}
-    assert rec.get_categorical_string_columns == 1
+    assert rec.get_categorical_obs_columns == 1
 
     # Change threshold → cache miss
-    out3 = mgr.get_cached_categorical_columns_bq(dataset_name="ds1", table_name="cell_info", distinct_threshold=200)
+    out3 = mgr.get_cached_categorical_obs_columns(distinct_threshold=200)
     assert out3 == {"organism", "tissue"}
-    assert rec.get_categorical_string_columns == 2
+    assert rec.get_categorical_obs_columns == 2
 
 
-def test_get_cached_distinct_values_bq_caches(monkeypatch: pytest.MonkeyPatch, project_id: str) -> None:
+def test_get_cached_distinct_obs_values_caches(cache_namespace: str) -> None:
     """
-    Assert distinct values are cached per dataset/table/column/limit.
+    Assert distinct values are cached per namespace/column.
     """
-    rec = _patch_bq_operator(
-        monkeypatch,
-        get_distinct_values=lambda **kwargs: ["A", "B"],
+    rec = types.SimpleNamespace(count_cells=0, get_categorical_obs_columns=0, get_distinct_obs_values=0)
+    operator = MockDataOperator(
+        impls={"get_distinct_obs_values": lambda **kwargs: ["A", "B"]},
+        recorder=rec,
     )
 
-    mgr = bigquery_utils.BigQueryCachedDataManager(project_id=project_id)
+    mgr = bigquery_utils.OmicsCachedDataManager(operator=operator, cache_namespace=cache_namespace)
 
-    out1 = mgr.get_cached_distinct_values_bq(
-        dataset_name="ds1",
-        column_name="organism",
-        table_name="cell_info",
-        limit=100,
-    )
+    out1 = mgr.get_cached_distinct_obs_values(column_name="organism")
     assert out1 == ["A", "B"]
-    assert rec.get_distinct_values == 1
+    assert rec.get_distinct_obs_values == 1
 
     # Repeat same request → served from cache
-    out2 = mgr.get_cached_distinct_values_bq(
-        dataset_name="ds1",
-        column_name="organism",
-        table_name="cell_info",
-        limit=100,
-    )
+    out2 = mgr.get_cached_distinct_obs_values(column_name="organism")
     assert out2 == ["A", "B"]
-    assert rec.get_distinct_values == 1
+    assert rec.get_distinct_obs_values == 1
 
-    # Change limit → cache miss
-    out3 = mgr.get_cached_distinct_values_bq(
-        dataset_name="ds1",
-        column_name="organism",
-        table_name="cell_info",
-        limit=200,
-    )
+    # Different column → cache miss
+    out3 = mgr.get_cached_distinct_obs_values(column_name="tissue")
     assert out3 == ["A", "B"]
-    assert rec.get_distinct_values == 2
+    assert rec.get_distinct_obs_values == 2

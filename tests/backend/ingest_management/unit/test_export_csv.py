@@ -17,23 +17,23 @@ def _parse_response_csv(resp) -> list[list[str]]:
 
 
 def test_export_model_queryset_to_csv_raises_on_empty_queryset() -> None:
-    qs = cm_models.BigQueryDataset.objects.none()
+    qs = cm_models.OmicsDataset.objects.none()
     with pytest.raises(ValueError):
         export_model_queryset_to_csv(queryset=qs)
 
 
-def test_export_model_queryset_to_csv_default_filename_and_header(default_dataset: cm_models.BigQueryDataset) -> None:
-    qs = cm_models.BigQueryDataset.objects.filter(pk=default_dataset.pk)
+def test_export_model_queryset_to_csv_default_filename_and_header(default_dataset: cm_models.OmicsDataset) -> None:
+    qs = cm_models.OmicsDataset.objects.filter(pk=default_dataset.pk)
 
     resp = export_model_queryset_to_csv(queryset=qs)
 
     # Filename header
     disp = resp["Content-Disposition"]
-    assert disp.startswith("attachment; filename=bigquerydataset_export_")
+    assert disp.startswith("attachment; filename=omicsdataset_export_")
     assert disp.endswith(".csv")
 
     # Header row should match model field names in order
-    expected_fields = [f.name for f in cm_models.BigQueryDataset._meta.fields]
+    expected_fields = [f.name for f in cm_models.OmicsDataset._meta.fields]
     rows = _parse_response_csv(resp)
     assert rows[0] == expected_fields
 
@@ -43,8 +43,8 @@ def test_export_model_queryset_to_csv_default_filename_and_header(default_datase
     assert rows[1][expected_fields.index("name")] == default_dataset.name
 
 
-def test_export_model_queryset_to_csv_exclude_fields(default_dataset: cm_models.BigQueryDataset) -> None:
-    qs = cm_models.BigQueryDataset.objects.filter(pk=default_dataset.pk)
+def test_export_model_queryset_to_csv_exclude_fields(default_dataset: cm_models.OmicsDataset) -> None:
+    qs = cm_models.OmicsDataset.objects.filter(pk=default_dataset.pk)
 
     resp = export_model_queryset_to_csv(queryset=qs, exclude_fields=["description"])
     rows = _parse_response_csv(resp)
@@ -53,8 +53,8 @@ def test_export_model_queryset_to_csv_exclude_fields(default_dataset: cm_models.
     assert "description" not in rows[0]
 
 
-def test_export_model_queryset_to_csv_foreign_key_id(default_dataset: cm_models.BigQueryDataset) -> None:
-    ingest = im_models.IngestInfo.objects.create(bigquery_dataset=default_dataset)
+def test_export_model_queryset_to_csv_foreign_key_id(default_dataset: cm_models.OmicsDataset) -> None:
+    ingest = im_models.IngestInfo.objects.create(omics_dataset=default_dataset)
 
     qs = im_models.IngestInfo.objects.filter(pk=ingest.pk)
     resp = export_model_queryset_to_csv(queryset=qs)
@@ -64,5 +64,5 @@ def test_export_model_queryset_to_csv_foreign_key_id(default_dataset: cm_models.
     data = rows[1]
 
     # Find FK column index
-    idx = header.index("bigquery_dataset")
+    idx = header.index("omics_dataset")
     assert data[idx] == str(default_dataset.pk)

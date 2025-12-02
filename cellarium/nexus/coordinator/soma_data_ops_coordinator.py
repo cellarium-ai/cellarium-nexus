@@ -6,7 +6,6 @@ import logging
 from typing import Any, Literal
 
 from cellarium.nexus.clients import NexusBackendAPIClient
-from cellarium.nexus.coordinator import constants
 from cellarium.nexus.omics_datastore.soma_ops import TileDBSOMADataOperator
 from cellarium.nexus.shared.schemas.omics_datastore import SomaExtractPlan
 from cellarium.nexus.shared.utils.workspace_file_manager import WorkspaceFileManager
@@ -82,11 +81,12 @@ class SomaDataOpsCoordinator:
         extract_name: str,
         creator_id: int,
         extract_bucket_path: str,
+        plan_path: str,
         range_size: int,
+        output_chunk_size: int,
         filters: dict[str, Any] | None = None,
-        output_chunk_size: int | None = None,
         shuffle_ranges: bool = True,
-    ) -> str:
+    ) -> None:
         """
         Prepare a SOMA extract by computing the plan and registering the curriculum.
 
@@ -96,16 +96,15 @@ class SomaDataOpsCoordinator:
         :param extract_name: Name for this extract/curriculum
         :param creator_id: ID of the user creating the extract
         :param extract_bucket_path: Path within bucket for this extract
+        :param plan_path: Path within bucket where the plan will be saved
         :param range_size: Target number of cells per range
-        :param filters: Optional filter conditions in Nexus format
         :param output_chunk_size: Target cells per output chunk (for shuffling)
+        :param filters: Optional filter conditions in Nexus format
         :param shuffle_ranges: Whether to shuffle the joinid ranges
 
         :raise SomaPlanningError: If plan computation fails
         :raise IOError: If cloud storage operations fail
         :raise HTTPError: If backend API calls fail
-
-        :return: Path within bucket where the plan was saved
         """
         logger.info(f"Preparing SOMA extract '{extract_name}' with range_size={range_size}")
 
@@ -117,10 +116,9 @@ class SomaDataOpsCoordinator:
                 output_chunk_size=output_chunk_size,
                 shuffle_ranges=shuffle_ranges,
             )
-            logger.info(f"Computed extract plan: {len(plan.joinid_ranges)} ranges, " f"{plan.total_cells} total cells")
+            logger.info(f"Computed extract plan: {len(plan.joinid_ranges)} ranges, {plan.total_cells} total cells")
 
             # Step 2: Save plan to cloud storage
-            plan_path = f"{extract_bucket_path}/{constants.SOMA_EXTRACT_PLAN_FILE_NAME}"
             full_plan_path = self.workspace.save_json_to_bucket(
                 data=plan.model_dump(),
                 remote_path=plan_path,
@@ -143,8 +141,6 @@ class SomaDataOpsCoordinator:
                 metadata_file_path=full_plan_path,
             )
             logger.info(f"Updated curriculum '{extract_name}' status to EXTRACTING")
-
-            return plan_path
 
         except Exception as e:
             logger.error(f"Failed to prepare SOMA extract: {e}")
