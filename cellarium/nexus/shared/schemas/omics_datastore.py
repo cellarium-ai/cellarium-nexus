@@ -80,6 +80,7 @@ class SomaExtractPlan(BaseModel):
     :param range_size: Target number of cells per range (for extraction)
     :param output_chunk_size: Target number of cells per output chunk (for shuffling)
     :param filters: Structured filter specification, using Nexus format
+    :param var_joinids: Ordered list of feature soma_joinids to retain (optional)
     """
 
     experiment_uri: str
@@ -89,3 +90,4 @@ class SomaExtractPlan(BaseModel):
     range_size: int
     output_chunk_size: int
     filters: dict[str, Any] | None = None
+    var_joinids: list[int] | None = None

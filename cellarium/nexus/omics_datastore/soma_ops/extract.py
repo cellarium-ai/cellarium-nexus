@@ -53,7 +53,6 @@ def extract_range_to_anndata(
     output_path: Path,
     obs_columns: list[str] | None = None,
     var_columns: list[str] | None = None,
-    var_joinids: list[int] | None = None,
     x_layer: str = "X",
     output_format: Literal["zarr", "h5ad"] = "zarr",
 ) -> None:
@@ -69,8 +68,6 @@ def extract_range_to_anndata(
     :param output_path: Local path to save AnnData file
     :param obs_columns: Optional obs columns to include
     :param var_columns: Optional var columns to include
-    :param var_filter_ids: Optional list of feature IDs to keep (e.g., ensembl IDs)
-    :param var_filter_column: Column name in var to filter by (default: "feature_id")
     :param x_layer: Name of the SOMA X layer to read counts from
     :param output_format: Output format - "zarr" or "h5ad"
 
@@ -118,24 +115,14 @@ def extract_range_to_anndata(
             # Set index to soma_joinid
             obs_df = obs_df.set_index("soma_joinid")
 
-            # Read var data
+            # Read var data (always read full var table; slicing happens later if needed)
             logger.info("Reading var data")
 
             rna = exp.ms["RNA"]
-
-            if var_joinids is not None:
-                # Read var with coords for only the joinids we need
-                var_joinids_arr = np.asarray(var_joinids, dtype=np.int64)
-                logger.info(f"Reading {len(var_joinids_arr)} specific var joinids")
-                var_df = rna.var.read(coords=(var_joinids_arr,)).concat().to_pandas().set_index("soma_joinid")
-                # Reorder to match var_joinids order
-                var_df = var_df.loc[var_joinids_arr]
-            else:
-                # Read all var
-                var_df = rna.var.read().concat().to_pandas()
-                logger.info(f"Found {len(var_df)} features in var")
-                var_joinids_arr = np.asarray(var_df["soma_joinid"].to_numpy(), dtype=np.int64)
-                var_df = var_df.set_index("soma_joinid")
+            var_df = rna.var.read().concat().to_pandas()
+            logger.info(f"Found {len(var_df)} features in var")
+            var_df = var_df.set_index("soma_joinid")
+            var_joinids = var_df.index.to_numpy(dtype=np.int64)
 
             # Filter var columns if specified
             if var_columns is not None:
@@ -151,11 +138,11 @@ def extract_range_to_anndata(
             # Get the joinids we actually have in obs (ensure int64 for SOMA)
             obs_joinids = np.asarray(obs_df.index.to_numpy(), dtype=np.int64)
 
-            logger.info(f"Reading X data for {len(obs_joinids)} cells and {len(var_joinids_arr)} features")
+            logger.info(f"Reading X data for {len(obs_joinids)} cells and {len(var_joinids)} features")
 
             # Read X data for specific obs and var joinids
             x_query = x_data.read(
-                coords=(obs_joinids, var_joinids_arr),
+                coords=(obs_joinids, var_joinids),
             )
 
             logger.info("Converting X query to COO format")
@@ -178,8 +165,8 @@ def extract_range_to_anndata(
             row_positions = np.searchsorted(obs_joinids_sorted, x_coo_matrix.row)
             remapped_rows = obs_joinids_sorted_idx[row_positions]
 
-            var_joinids_sorted_idx = np.argsort(var_joinids_arr)
-            var_joinids_sorted = var_joinids_arr[var_joinids_sorted_idx]
+            var_joinids_sorted_idx = np.argsort(var_joinids)
+            var_joinids_sorted = var_joinids[var_joinids_sorted_idx]
             col_positions = np.searchsorted(var_joinids_sorted, x_coo_matrix.col)
             remapped_cols = var_joinids_sorted_idx[col_positions]
 
@@ -223,7 +210,6 @@ def _extract_range_worker(
     output_path: Path,
     obs_columns: list[str] | None,
     var_columns: list[str] | None,
-    var_joinids: list[int] | None,
     x_layer: str,
     output_format: Literal["zarr", "h5ad"],
 ) -> tuple[int, str]:
@@ -252,7 +238,6 @@ def _extract_range_worker(
         output_path=output_path,
         obs_columns=obs_columns,
         var_columns=var_columns,
-        var_joinids=var_joinids,
         x_layer=x_layer,
         output_format=output_format,
     )
@@ -266,7 +251,6 @@ def extract_ranges(
     output_dir: Path,
     obs_columns: list[str] | None = None,
     var_columns: list[str] | None = None,
-    var_joinids: list[int] | None = None,
     x_layer: str = "X",
     output_format: Literal["zarr", "h5ad"] = "zarr",
     max_workers: int | None = None,
@@ -282,7 +266,6 @@ def extract_ranges(
     :param output_dir: Local directory to save AnnData files
     :param obs_columns: Optional obs columns to include
     :param var_columns: Optional var columns to include
-    :param var_joinids: Optional list of var soma_joinids to filter features by
     :param x_layer: Name of the SOMA X layer to read counts from
     :param output_format: Output format - "zarr" or "h5ad" (default: "zarr")
     :param max_workers: Maximum number of parallel workers
@@ -332,7 +315,6 @@ def extract_ranges(
                 output_path,
                 obs_columns,
                 var_columns,
-                var_joinids,
                 x_layer,
                 output_format,
             )
