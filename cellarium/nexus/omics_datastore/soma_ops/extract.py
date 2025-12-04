@@ -128,9 +128,19 @@ def extract_range_to_anndata(
 
             # Filter var columns if specified
             if var_columns is not None:
-                # Keep only requested columns (soma_joinid is already the index)
-                columns_to_keep = [col for col in var_columns if col in var_df.columns]
-                var_df = var_df[columns_to_keep]
+                # Keep only requested columns (soma_joinid is already the index, skip it)
+                columns_to_keep = [col for col in var_columns if col in var_df.columns and col != "soma_joinid"]
+                missing_cols = [col for col in var_columns if col not in var_df.columns and col != "soma_joinid"]
+                if missing_cols:
+                    logger.warning(
+                        f"Requested var columns not found: {missing_cols}. "
+                        f"Available columns: {var_df.columns.tolist()}"
+                    )
+                if columns_to_keep:
+                    var_df = var_df[columns_to_keep]
+                    logger.info(f"Keeping var columns: {columns_to_keep}")
+                else:
+                    logger.info("No matching var columns found, keeping all columns")
 
             # Read X data
             logger.info(f"Accessing X layer: {x_layer}")
@@ -374,12 +384,14 @@ def _write_shuffled_chunk(
         join_vars="inner",
     )
 
-    # Extract shuffled cells with optional feature filtering (preserves var_joinids order)
+    # Extract shuffled cells
+    chunk_adata = ann_collection[chunk_indices].to_adata()
+
+    # Apply feature filtering if var_joinids provided (preserves var_joinids order)
     if var_joinids is not None:
-        chunk_adata = ann_collection[chunk_indices, var_joinids].to_adata()
-        logger.info(f"Filtered to {len(var_joinids)} features")
-    else:
-        chunk_adata = ann_collection[chunk_indices].to_adata()
+        # var index contains soma_joinid values, use direct label-based slicing
+        chunk_adata = chunk_adata[:, var_joinids].copy()
+        logger.info(f"Filtered to {chunk_adata.n_vars} features")
 
     # Write output
     if output_format == "zarr":
