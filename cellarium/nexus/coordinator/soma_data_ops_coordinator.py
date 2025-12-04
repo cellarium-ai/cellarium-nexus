@@ -80,7 +80,6 @@ class SomaDataOpsCoordinator:
         *,
         extract_name: str,
         creator_id: int,
-        extract_bucket_path: str,
         plan_path: str,
         range_size: int,
         output_chunk_size: int,
@@ -100,7 +99,6 @@ class SomaDataOpsCoordinator:
 
         :param extract_name: Name for this extract/curriculum
         :param creator_id: ID of the user creating the extract
-        :param extract_bucket_path: Path within bucket for this extract
         :param plan_path: Path within bucket where the plan will be saved
         :param range_size: Target number of cells per range
         :param output_chunk_size: Target cells per output chunk (for shuffling)

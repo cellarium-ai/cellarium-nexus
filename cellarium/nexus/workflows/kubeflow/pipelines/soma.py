@@ -27,19 +27,19 @@ def run_soma_extracts_pipeline(extract_configs: t.List[str]) -> None:
     name="nexus-pipelines-soma-extract-data",
     description="Extract data from SOMA experiment",
 )
-def soma_extract_data_pipeline(prepare_extract_config: str, extract_configs: t.List[str]) -> None:
+def soma_extract_data_pipeline(extract_configs: t.List[str], mark_finished_config: str) -> None:
     """
     Extract data from SOMA experiment into AnnData files.
 
-    :param prepare_extract_config: Path to configuration file for prepare_soma_extract_job
+    The extract plan and curriculum registration must already be created before
+    this pipeline is invoked (e.g., by the admin flow). This pipeline only
+    runs extraction workers and marks the curriculum as finished.
+
     :param extract_configs: List of paths to configuration files for soma_extract_job
 
     :raise RuntimeError: If any component fails
     """
-    prepare_op = components.prepare_soma_extract_job(config_path=prepare_extract_config)
-
     extract_op = run_soma_extracts_pipeline(extract_configs=extract_configs)
-    extract_op.after(prepare_op)
 
-    mark_finished_op = components.mark_soma_curriculum_as_finished_job(config_path=prepare_extract_config)
+    mark_finished_op = components.mark_soma_curriculum_as_finished_job(config_path=mark_finished_config)
     mark_finished_op.after(extract_op)

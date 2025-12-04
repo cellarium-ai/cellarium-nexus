@@ -424,10 +424,18 @@ class ExtractCurriculumAdminView(generic.FormView):
                     name=cleaned["name"],
                     creator_id=self.request.user.id,
                     omics_dataset=omics_dataset,
-                    range_size=cleaned["extract_bin_size"],
+                    range_size=settings.TILEDB_SOMA_EXTRACT_CONTIGUOUS_RANGE,
                     output_chunk_size=cleaned["extract_bin_size"],
                     filters=cleaned.get("filters") or None,
+                    shuffle_ranges=True,
+                    var_filter_column="feature_id",
+                    feature_schema=cleaned.get("feature_schema"),
                     obs_columns=cleaned.get("obs_columns") or None,
+                    var_columns=settings.TILEDB_SOMA_EXTRACT_VAR_COLUMNS,
+                    x_layer=settings.TILEDB_SOMA_EXTRACT_X_LAYER,
+                    output_format=settings.TILEDB_SOMA_EXTRACT_OUTPUT_FORMAT,
+                    max_workers_extract=14,
+                    max_workers_shuffle=3,
                 )
                 messages.success(self.request, "SOMA extract pipeline completed successfully.")
             else:

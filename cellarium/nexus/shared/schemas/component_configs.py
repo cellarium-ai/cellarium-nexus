@@ -65,22 +65,6 @@ class BQOpsExtract(BaseModel):
     max_workers: int | None = None
 
 
-class SomaOpsPrepareExtract(BaseModel):
-    """Configuration for preparing a SOMA extract."""
-
-    extract_name: str
-    creator_id: int
-    experiment_uri: str
-    nexus_backend_api_url: str
-    bucket_name: str
-    extract_bucket_path: str
-    plan_path: str
-    range_size: int
-    output_chunk_size: int
-    filters: dict[str, Any] | None = None
-    shuffle_ranges: bool = True
-
-
 class SomaOpsExtract(BaseModel):
     """Configuration for running a SOMA extract."""
 
@@ -93,7 +77,7 @@ class SomaOpsExtract(BaseModel):
     range_indices: list[int] | None = None
     obs_columns: list[str] | None = None
     var_columns: list[str] | None = None
-    x_layer: str = "X"
+    x_layer: str = "raw"
     output_format: str = "h5ad"
     max_workers_extract: int | None = None
     max_workers_shuffle: int | None = None
