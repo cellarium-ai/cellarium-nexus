@@ -387,6 +387,10 @@ def _write_shuffled_chunk(
     # Extract shuffled cells
     chunk_adata = ann_collection[chunk_indices].to_adata()
 
+    # AnnCollection.to_adata() doesn't preserve var columns, copy from source
+    # All input files have the same var structure, so use the first one
+    chunk_adata.var = adatas[0].var.loc[chunk_adata.var.index].copy()
+
     # Apply feature filtering if var_joinids provided (preserves var_joinids order)
     if var_joinids is not None:
         # var index contains soma_joinid values, use direct label-based slicing
