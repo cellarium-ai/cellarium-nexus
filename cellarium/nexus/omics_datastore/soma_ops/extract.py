@@ -53,7 +53,6 @@ def extract_range_to_anndata(
     output_path: Path,
     obs_columns: list[str] | None = None,
     var_columns: list[str] | None = None,
-    var_joinids: list[int] | None = None,
     x_layer: str = "X",
     output_format: Literal["zarr", "h5ad"] = "zarr",
 ) -> None:
@@ -61,7 +60,8 @@ def extract_range_to_anndata(
     Extract a single soma_joinid range to an AnnData file.
 
     Read obs, var, and X data from a SOMA experiment for a specific joinid range
-    and write to an AnnData file in the specified format.
+    and write to an AnnData file in the specified format. Feature filtering is
+    deferred to the shuffle stage for better SOMA query performance.
 
     :param experiment_uri: URI of the SOMA experiment
     :param value_filter: SOMA obs value_filter expression
@@ -69,7 +69,6 @@ def extract_range_to_anndata(
     :param output_path: Local path to save AnnData file
     :param obs_columns: Optional obs columns to include
     :param var_columns: Optional var columns to include
-    :param var_joinids: Optional list of var soma_joinids to filter features by
     :param x_layer: Name of the SOMA X layer to read counts from
     :param output_format: Output format - "zarr" or "h5ad"
 
@@ -117,22 +116,13 @@ def extract_range_to_anndata(
             # Set index to soma_joinid
             obs_df = obs_df.set_index("soma_joinid")
 
-            # Read var data
+            # Read var data (all features - filtering deferred to shuffle stage)
             logger.info("Reading var data")
 
             rna = exp.ms["RNA"]
-            if var_joinids is not None:
-                # Filter var by provided joinids, preserving order
-                var_joinids_array = np.array(var_joinids, dtype=np.int64)
-                var_df = rna.var.read(coords=(var_joinids_array,)).concat().to_pandas()
-                var_df = var_df.set_index("soma_joinid")
-                # Reindex to preserve the order of var_joinids
-                var_df = var_df.reindex(var_joinids_array)
-                logger.info(f"Filtered to {len(var_df)} features by var_joinids")
-            else:
-                var_df = rna.var.read().concat().to_pandas()
-                var_df = var_df.set_index("soma_joinid")
-                logger.info(f"Found {len(var_df)} features in var")
+            var_df = rna.var.read().concat().to_pandas()
+            var_df = var_df.set_index("soma_joinid")
+            logger.info(f"Found {len(var_df)} features in var")
 
             var_joinids_array = var_df.index.to_numpy(dtype=np.int64)
 
@@ -222,7 +212,6 @@ def _extract_range_worker(
     output_path: Path,
     obs_columns: list[str] | None,
     var_columns: list[str] | None,
-    var_joinids: list[int] | None,
     x_layer: str,
     output_format: Literal["zarr", "h5ad"],
 ) -> tuple[int, str]:
@@ -236,7 +225,6 @@ def _extract_range_worker(
     :param output_path: Path to write the output file
     :param obs_columns: Optional list of obs columns to include
     :param var_columns: Optional list of var columns to include
-    :param var_joinids: Optional list of var soma_joinids to filter features by
     :param x_layer: Name of the X layer to read
     :param output_format: Output format, either "zarr" or "h5ad"
 
@@ -251,7 +239,6 @@ def _extract_range_worker(
         output_path=output_path,
         obs_columns=obs_columns,
         var_columns=var_columns,
-        var_joinids=var_joinids,
         x_layer=x_layer,
         output_format=output_format,
     )
@@ -324,7 +311,6 @@ def extract_ranges(
                 output_path,
                 plan.obs_columns,
                 plan.var_columns,
-                plan.var_joinids,
                 plan.x_layer,
                 output_format,
             )
@@ -355,12 +341,14 @@ def _write_shuffled_chunk(
     input_format: Literal["zarr", "h5ad"],
     output_dir: Path,
     output_format: Literal["zarr", "h5ad"],
+    var_joinids: list[int] | None,
 ) -> tuple[int, str]:
     """
     Worker function to write a single shuffled chunk.
 
     Each worker creates its own AnnCollection from all input files to enable
     complete shuffling across all ranges while avoiding pickling issues.
+    Feature filtering is applied here for better SOMA query performance.
 
     :param chunk_idx: Index of the chunk being written
     :param chunk_indices: Array of cell indices for this chunk
@@ -368,6 +356,7 @@ def _write_shuffled_chunk(
     :param input_format: Input format
     :param output_dir: Output directory
     :param output_format: Output format
+    :param var_joinids: Optional list of var soma_joinids to filter features by
 
     :return: Tuple of (chunk_idx, output_path_str)
     """
@@ -385,8 +374,12 @@ def _write_shuffled_chunk(
         join_vars="inner",
     )
 
-    # Extract shuffled cells (may come from any/all ranges)
-    chunk_adata = ann_collection[chunk_indices].to_adata()
+    # Extract shuffled cells with optional feature filtering (preserves var_joinids order)
+    if var_joinids is not None:
+        chunk_adata = ann_collection[chunk_indices, var_joinids].to_adata()
+        logger.info(f"Filtered to {len(var_joinids)} features")
+    else:
+        chunk_adata = ann_collection[chunk_indices].to_adata()
 
     # Write output
     if output_format == "zarr":
@@ -408,6 +401,7 @@ def shuffle_extracted_chunks(
     chunk_size: int,
     input_format: Literal["zarr", "h5ad"] = "zarr",
     output_format: Literal["zarr", "h5ad"] = "h5ad",
+    var_joinids: list[int] | None = None,
     max_workers: int | None = None,
     verbose: bool = True,
 ) -> None:
@@ -416,13 +410,15 @@ def shuffle_extracted_chunks(
 
     Read contiguous range files from input directory, redistribute cells
     randomly across new chunks of the specified size, and write shuffled
-    output in the specified format.
+    output in the specified format. Feature filtering is applied during
+    this stage for better SOMA query performance.
 
     :param input_dir: Directory with contiguous range files
     :param output_dir: Directory to write shuffled chunks
     :param chunk_size: Number of cells per output chunk
     :param input_format: Input format - "zarr" or "h5ad" (default: "zarr")
     :param output_format: Output format - "zarr" or "h5ad" (default: "h5ad")
+    :param var_joinids: Optional list of var soma_joinids to filter features by
     :param max_workers: Maximum parallel workers for writing
     :param verbose: If False, suppress INFO level logging in parallel workers
 
@@ -502,6 +498,7 @@ def shuffle_extracted_chunks(
                 input_format,
                 output_dir,
                 output_format,
+                var_joinids,
             )
             futures[future] = chunk_idx
 

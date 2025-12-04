@@ -320,7 +320,7 @@ class TileDBSOMADataOperator:
                 verbose=verbose,
             )
 
-            # Stage 2: Shuffle cells across chunks
+            # Stage 2: Shuffle cells across chunks (feature filtering applied here)
             logger.info("Stage 2: Shuffling cells across chunks...")
             shuffle_extracted_chunks(
                 input_dir=temp_dir,
@@ -328,6 +328,7 @@ class TileDBSOMADataOperator:
                 chunk_size=plan.output_chunk_size,
                 input_format="h5ad",  # Read from H5AD temp files
                 output_format=output_format,  # Write in requested format
+                var_joinids=plan.var_joinids,  # Apply feature filtering during shuffle
                 max_workers=max_workers_shuffle,
                 verbose=verbose,
             )
