@@ -31,6 +31,7 @@ def _make_settings(**overrides) -> mock.Mock:
     settings.PIPELINE_SERVICE_ACCOUNT = "sa@test.iam.gserviceaccount.com"
     settings.PIPELINE_ROOT_PATH = "gs://bucket/pipeline-root"
     settings.GCP_APPLICATION_BILLING_LABEL = "nexus"
+    settings.TILEDB_SOMA_RANGES_PER_WORKER = 32
     for key, value in overrides.items():
         setattr(settings, key, value)
     return settings
@@ -140,7 +141,6 @@ def test_compose_soma_extract_configs_happy_path(
         range_size=1000,
         output_chunk_size=1000,
         filters={"cell_type__eq": "T cell"},
-        obs_columns=["cell_type", "tissue"],
     )
 
     assert len(extract_configs) == 1
@@ -149,7 +149,6 @@ def test_compose_soma_extract_configs_happy_path(
     assert cfg.extract_name == "test_extract"
     assert cfg.plan_path == "backend/extracts/test_extract/soma_extract_plan.json"
     assert cfg.range_indices == [0, 1, 2, 3, 4]
-    assert cfg.obs_columns == ["cell_type", "tissue"]
 
 
 def test_compose_soma_extract_configs_multiple_batches(
@@ -184,14 +183,14 @@ def test_compose_and_dump_soma_configs(monkeypatch: pytest.MonkeyPatch, soma_dat
             nexus_backend_api_url="https://site",
             bucket_name="private-bucket",
             plan_path="plan1",
-            var_filter_values=None,
+            extract_name="test_extract",
         ),
         mock.Mock(
             experiment_uri="gs://exp",
             nexus_backend_api_url="https://site",
             bucket_name="private-bucket",
             plan_path="plan2",
-            var_filter_values=None,
+            extract_name="test_extract",
         ),
     ]
     monkeypatch.setattr(

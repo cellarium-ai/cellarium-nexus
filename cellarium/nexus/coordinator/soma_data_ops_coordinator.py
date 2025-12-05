@@ -129,7 +129,7 @@ class SomaDataOpsCoordinator:
                 var_columns=var_columns,
                 x_layer=x_layer,
             )
-            logger.info(f"Computed extract plan: {len(plan.joinid_ranges)} ranges, {plan.total_cells} total cells")
+            logger.info(f"Computed extract plan: {len(plan.id_ranges)} ranges, {plan.total_cells} total cells")
 
             # Step 2: Save plan to cloud storage
             full_plan_path = self.workspace.save_json_to_bucket(
@@ -197,15 +197,15 @@ class SomaDataOpsCoordinator:
         try:
             # Step 1: Load plan from cloud storage
             plan = self._load_plan_from_bucket(plan_path=plan_path)
-            logger.info(f"Loaded extract plan with {len(plan.joinid_ranges)} ranges")
+            logger.info(f"Loaded extract plan with {len(plan.id_ranges)} ranges")
 
             # Step 2: Subset ranges if indices provided
             if range_indices is not None:
-                subset_ranges = [plan.joinid_ranges[i] for i in range_indices]
+                subset_ranges = [plan.id_ranges[i] for i in range_indices]
                 plan = SomaExtractPlan(
                     experiment_uri=plan.experiment_uri,
                     value_filter=plan.value_filter,
-                    joinid_ranges=subset_ranges,
+                    id_ranges=subset_ranges,
                     total_cells=sum(r.end - r.start + 1 for r in subset_ranges),
                     range_size=plan.range_size,
                     output_chunk_size=plan.output_chunk_size,
@@ -287,13 +287,13 @@ class SomaDataOpsCoordinator:
                 name=extract_name,
                 status="SUCCEEDED",
                 cell_count=plan.total_cells,
-                extract_bin_count=len(plan.joinid_ranges),
+                extract_bin_count=len(plan.id_ranges),
                 extract_files_path=extract_files_path,
                 metadata_file_path=metadata_file_path,
             )
             logger.info(
                 f"Marked curriculum '{extract_name}' as SUCCEEDED "
-                f"(cells: {plan.total_cells}, ranges: {len(plan.joinid_ranges)})"
+                f"(cells: {plan.total_cells}, ranges: {len(plan.id_ranges)})"
             )
 
         except Exception as e:

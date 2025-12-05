@@ -5,7 +5,7 @@ import pytest
 
 from cellarium.nexus.omics_datastore.soma_ops import SomaReadError
 from cellarium.nexus.omics_datastore.soma_ops import data_operator as data_operator_module
-from cellarium.nexus.shared.schemas.omics_datastore import SomaExtractPlan, SomaJoinIdRange
+from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, SomaExtractPlan
 
 
 def test_init_valid_experiment_uri() -> None:
@@ -185,10 +185,12 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
         return SomaExtractPlan(
             experiment_uri=experiment_uri,
             value_filter='tissue == "lung"',
-            joinid_ranges=[SomaJoinIdRange(start=0, end=10)],
+            id_ranges=[IdContiguousRange(start=0, end=10)],
             total_cells=10,
             range_size=range_size,
             output_chunk_size=output_chunk_size,
+            num_output_chunks=1,
+            output_chunk_indexes=[0],
             filters=filters,
             var_filter_column=var_filter_column,
             var_filter_values=var_filter_values,
@@ -269,10 +271,12 @@ def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.Monk
     plan = SomaExtractPlan(
         experiment_uri="gs://bucket/soma",
         value_filter='tissue == "lung"',
-        joinid_ranges=[SomaJoinIdRange(start=0, end=10)],
+        id_ranges=[IdContiguousRange(start=0, end=10)],
         total_cells=10,
         range_size=10,
         output_chunk_size=10,
+        num_output_chunks=1,
+        output_chunk_indexes=[0],
         filters={"tissue__eq": "lung"},
         var_joinids=[1, 2, 3],
         obs_columns=["cell_type"],
@@ -330,10 +334,12 @@ def test_extract_ranges_shuffled_with_temp_dir(monkeypatch: pytest.MonkeyPatch, 
     plan = SomaExtractPlan(
         experiment_uri="gs://bucket/soma",
         value_filter="",
-        joinid_ranges=[SomaJoinIdRange(start=0, end=10)],
+        id_ranges=[IdContiguousRange(start=0, end=10)],
         total_cells=10,
         range_size=10,
         output_chunk_size=10,
+        num_output_chunks=1,
+        output_chunk_indexes=[0],
         filters=None,
     )
 
@@ -415,10 +421,12 @@ def test_extract_ranges_shuffled_auto_temp_dir(monkeypatch: pytest.MonkeyPatch, 
     plan = SomaExtractPlan(
         experiment_uri="gs://bucket/soma",
         value_filter="",
-        joinid_ranges=[SomaJoinIdRange(start=0, end=10)],
+        id_ranges=[IdContiguousRange(start=0, end=10)],
         total_cells=10,
         range_size=10,
         output_chunk_size=10,
+        num_output_chunks=1,
+        output_chunk_indexes=[0],
         filters=None,
     )
 
@@ -474,10 +482,12 @@ def test_extract_ranges_shuffled_no_cleanup(monkeypatch: pytest.MonkeyPatch, tmp
     plan = SomaExtractPlan(
         experiment_uri="gs://bucket/soma",
         value_filter="",
-        joinid_ranges=[SomaJoinIdRange(start=0, end=10)],
+        id_ranges=[IdContiguousRange(start=0, end=10)],
         total_cells=10,
         range_size=10,
         output_chunk_size=10,
+        num_output_chunks=1,
+        output_chunk_indexes=[0],
         filters=None,
     )
 

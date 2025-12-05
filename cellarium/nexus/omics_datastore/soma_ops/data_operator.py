@@ -250,7 +250,7 @@ class TileDBSOMADataOperator:
         :raise SomaExtractError: If SOMA reads fail
         :raise IOError: If file operations fail
         """
-        logger.info(f"Extracting {len(plan.joinid_ranges)} ranges to {output_dir} (format: {output_format})")
+        logger.info(f"Extracting {len(plan.id_ranges)} ranges to {output_dir} (format: {output_format})")
 
         extract_ranges(
             plan=plan,
@@ -299,7 +299,7 @@ class TileDBSOMADataOperator:
         :raise ValueError: If output_format is invalid
         """
         logger.info(
-            f"Extracting and shuffling {len(plan.joinid_ranges)} ranges to {output_dir} "
+            f"Extracting and shuffling {len(plan.id_ranges)} ranges to {output_dir} "
             f"(output_chunk_size: {plan.output_chunk_size}, format: {output_format})"
         )
 
@@ -320,12 +320,13 @@ class TileDBSOMADataOperator:
                 verbose=verbose,
             )
 
-            # Stage 2: Shuffle cells across chunks (feature filtering applied here)
-            logger.info("Stage 2: Shuffling cells across chunks...")
+            # Stage 2: Shuffle cells across extracts (feature filtering applied here)
+            logger.info("Stage 2: Shuffling cells across extracts...")
             shuffle_extracted_chunks(
                 input_dir=temp_dir,
                 output_dir=output_dir,
                 chunk_size=plan.output_chunk_size,
+                output_chunk_indexes=plan.output_chunk_indexes,
                 input_format="h5ad",  # Read from H5AD temp files
                 output_format=output_format,  # Write in requested format
                 var_joinids=plan.var_joinids,  # Apply feature filtering during shuffle

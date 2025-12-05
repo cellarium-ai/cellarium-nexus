@@ -418,9 +418,8 @@ class ExtractCurriculumAdminView(generic.FormView):
 
         try:
             if omics_dataset.backend == cell_models.OmicsDatasetBackend.TILEDB_SOMA:
-                # Run SOMA extract pipeline locally
-                # Use extract_bin_size for both range_size and output_chunk_size
-                soma_workflows_utils.run_soma_extract_pipeline_locally(
+                # Submit SOMA extract pipeline
+                pipeline_url = soma_workflows_utils.submit_soma_extract_pipeline(
                     name=cleaned["name"],
                     creator_id=self.request.user.id,
                     omics_dataset=omics_dataset,
@@ -434,10 +433,9 @@ class ExtractCurriculumAdminView(generic.FormView):
                     var_columns=settings.TILEDB_SOMA_EXTRACT_VAR_COLUMNS,
                     x_layer=settings.TILEDB_SOMA_EXTRACT_X_LAYER,
                     output_format=settings.TILEDB_SOMA_EXTRACT_OUTPUT_FORMAT,
-                    max_workers_extract=14,
-                    max_workers_shuffle=3,
+                    max_workers_extract=16,
+                    max_workers_shuffle=6,
                 )
-                messages.success(self.request, "SOMA extract pipeline completed successfully.")
             else:
                 # Submit BigQuery extract pipeline
                 pipeline_url = workflows_utils.submit_extract_pipeline(
@@ -452,13 +450,13 @@ class ExtractCurriculumAdminView(generic.FormView):
                     filters=cleaned.get("filters") or None,
                     metadata_extra_columns=cleaned.get("metadata_extra_columns") or None,
                 )
-                messages.success(
-                    self.request,
-                    django_html.format_html(
-                        'Extract pipeline submitted successfully. <a href="{url}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">View run</a>',
-                        url=pipeline_url,
-                    ),
-                )
+            messages.success(
+                self.request,
+                django_html.format_html(
+                    'Extract pipeline submitted successfully. <a href="{url}" target="_blank" rel="noopener noreferrer" style="text-decoration: underline;">View run</a>',
+                    url=pipeline_url,
+                ),
+            )
         except Exception as exc:  # Surface error to admin as message and redisplay form
             messages.error(self.request, f"Failed to run extract pipeline: {exc}")
             return self.form_invalid(form)

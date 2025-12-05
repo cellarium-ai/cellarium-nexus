@@ -7,7 +7,6 @@ import math
 from django.conf import settings
 
 from cellarium.nexus.backend.cell_management import models
-from cellarium.nexus.backend.cell_management.admin import constants
 from cellarium.nexus.backend.cell_management.utils import exceptions
 from cellarium.nexus.coordinator import SomaDataOpsCoordinator
 from cellarium.nexus.omics_datastore.soma_ops import TileDBSOMADataOperator
@@ -115,8 +114,9 @@ def compose_soma_extract_configs(
     extract_bucket_path, plan_path = _get_extract_paths(name=name)
 
     extract_configs = []
-    for start_range in range(0, num_ranges, constants.BINS_PER_WORKER):
-        end_range = min(start_range + constants.BINS_PER_WORKER, num_ranges)
+    ranges_per_worker = settings.TILEDB_SOMA_RANGES_PER_WORKER
+    for start_range in range(0, num_ranges, ranges_per_worker):
+        end_range = min(start_range + ranges_per_worker, num_ranges)
         worker_range_indices = list(range(start_range, end_range))
 
         if not worker_range_indices:
@@ -131,9 +131,6 @@ def compose_soma_extract_configs(
                 plan_path=plan_path,
                 extract_bucket_path=extract_bucket_path,
                 range_indices=worker_range_indices,
-                obs_columns=obs_columns,
-                var_columns=var_columns,
-                x_layer=x_layer,
                 output_format=output_format,
                 max_workers_extract=max_workers_extract,
                 max_workers_shuffle=max_workers_shuffle,
@@ -225,7 +222,7 @@ def compose_and_dump_soma_configs(
             filters=filters,
             shuffle_ranges=shuffle_ranges,
             var_filter_column=var_filter_column,
-            var_filter_values=extract_configs[0].var_filter_values,
+            var_filter_values=var_filter_values,
             obs_columns=obs_columns,
             var_columns=var_columns,
             x_layer=x_layer,

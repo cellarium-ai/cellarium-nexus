@@ -8,33 +8,12 @@ from pydantic import BaseModel, Field
 
 
 class FeatureSchema(BaseModel):
-    """
-    Schema for feature data.
-
-    :param id: Unique identifier for the feature
-    :param symbol: Gene symbol
-    :param ensemble_id: Ensemble identifier
-    """
-
     id: int
     symbol: str
     ensemble_id: str
 
 
 class ExtractMetadata(BaseModel):
-    """
-    Store metadata about the extract.
-
-    :param total_bins: Total number of extract bins
-    :param last_bin_size: Size of the last bin
-    :param total_cells: Total number of cells in the extract
-    :param filters: Filters used for the extract
-    :param extract_bin_size: Size of extract bins
-    :param category_metadata: Metadata about categorical columns
-
-    :raise ValueError: If validation fails
-    """
-
     total_bins: int
     last_bin_size: int
     total_cells: int = 0
@@ -57,43 +36,20 @@ class ExtractMetadata(BaseModel):
         return bin_size * (self.total_bins - 1) + self.last_bin_size if self.total_bins > 0 else 0
 
 
-class SomaJoinIdRange(BaseModel):
-    """
-    Store a contiguous joinid range.
-
-    :param start: Inclusive start soma_joinid
-    :param end: Inclusive end soma_joinid
-    """
-
+class IdContiguousRange(BaseModel):
     start: int
     end: int
 
 
 class SomaExtractPlan(BaseModel):
-    """
-    Store SOMA extract plan information.
-
-    :param experiment_uri: URI of the SOMA experiment
-    :param value_filter: SOMA obs filter expression used for this plan
-    :param joinid_ranges: List of contiguous soma_joinid ranges
-    :param total_cells: Total number of cells matching the filter
-    :param range_size: Target number of cells per range (for extraction)
-    :param output_chunk_size: Target number of cells per output chunk (for shuffling)
-    :param filters: Structured filter specification, using Nexus format
-    :param var_joinids: Ordered list of feature soma_joinids to retain (optional)
-    :param var_filter_column: Name of the var column used to generate var_joinids
-    :param var_filter_values: Ordered values used to filter the var column
-    :param obs_columns: List of obs columns to include in extraction
-    :param var_columns: List of var columns to include in extraction
-    :param x_layer: Name of the SOMA X layer to read counts from
-    """
-
     experiment_uri: str
     value_filter: str
-    joinid_ranges: list[SomaJoinIdRange]
+    id_ranges: list[IdContiguousRange]
     total_cells: int
     range_size: int
+    num_output_chunks: int
     output_chunk_size: int
+    output_chunk_indexes: list[int] | None = None
     filters: dict[str, Any] | None = None
     var_joinids: list[int] | None = None
     var_filter_column: str | None = None

@@ -20,7 +20,7 @@ from scipy.sparse import coo_matrix
 from tqdm import tqdm
 
 from cellarium.nexus.omics_datastore.soma_ops.exceptions import SomaExtractError
-from cellarium.nexus.shared.schemas.omics_datastore import SomaExtractPlan, SomaJoinIdRange
+from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, SomaExtractPlan
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ def extract_range_to_anndata(
     *,
     experiment_uri: str,
     value_filter: str,
-    joinid_range: SomaJoinIdRange,
+    joinid_range: IdContiguousRange,
     output_path: Path,
     obs_columns: list[str] | None = None,
     var_columns: list[str] | None = None,
@@ -218,7 +218,7 @@ def _extract_range_worker(
     idx: int,
     experiment_uri: str,
     value_filter: str,
-    joinid_range: SomaJoinIdRange,
+    joinid_range: IdContiguousRange,
     output_path: Path,
     obs_columns: list[str] | None,
     var_columns: list[str] | None,
@@ -290,7 +290,7 @@ def extract_ranges(
     # Ensure output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Extracting {len(plan.joinid_ranges)} ranges using {max_workers} workers (spawn mode)")
+    logger.info(f"Extracting {len(plan.id_ranges)} ranges using {max_workers} workers (spawn mode)")
 
     # Execute in parallel
     completed = 0
@@ -310,7 +310,7 @@ def extract_ranges(
     ) as executor:
         # Submit all extraction jobs
         futures = {}
-        for idx, joinid_range in enumerate(plan.joinid_ranges):
+        for idx, joinid_range in enumerate(plan.id_ranges):
             output_path = output_dir / f"range_{idx:06d}{file_ext}"
             future = executor.submit(
                 _extract_range_worker,
@@ -327,7 +327,7 @@ def extract_ranges(
             futures[future] = idx
 
         # Wait for completion
-        for future in tqdm(as_completed(futures), total=len(plan.joinid_ranges), desc="Extracting ranges"):
+        for future in tqdm(as_completed(futures), total=len(plan.id_ranges), desc="Extracting ranges"):
             try:
                 idx, output_path = future.result()
                 completed += 1
@@ -341,18 +341,19 @@ def extract_ranges(
         logger.error(error_msg)
         raise SomaExtractError(error_msg)
 
-    logger.info(f"Successfully extracted all {len(plan.joinid_ranges)} ranges to {output_dir}")
+    logger.info(f"Successfully extracted all {len(plan.id_ranges)} ranges to {output_dir}")
 
 
 def _write_shuffled_chunk(
     chunk_idx: int,
+    output_chunk_idx: int,
     chunk_indices: np.ndarray,
     input_files: list[Path],
     input_format: Literal["zarr", "h5ad"],
     output_dir: Path,
     output_format: Literal["zarr", "h5ad"],
     var_joinids: list[int] | None,
-) -> tuple[int, str]:
+) -> tuple[int, int, str]:
     """
     Worker function to write a single shuffled chunk.
 
@@ -360,7 +361,8 @@ def _write_shuffled_chunk(
     complete shuffling across all ranges while avoiding pickling issues.
     Feature filtering is applied here for better SOMA query performance.
 
-    :param chunk_idx: Index of the chunk being written
+    :param chunk_idx: Internal index of the chunk being processed
+    :param output_chunk_idx: Pre-computed output index for the extract file name
     :param chunk_indices: Array of cell indices for this chunk
     :param input_files: List of all input file paths
     :param input_format: Input format
@@ -368,9 +370,9 @@ def _write_shuffled_chunk(
     :param output_format: Output format
     :param var_joinids: Optional list of var soma_joinids to filter features by
 
-    :return: Tuple of (chunk_idx, output_path_str)
+    :return: Tuple of (chunk_idx, output_chunk_idx, output_path_str)
     """
-    logger.info(f"Processing chunk {chunk_idx} ({len(chunk_indices)} cells)...")
+    logger.info(f"Processing chunk {chunk_idx} -> extract_{output_chunk_idx:06d} ({len(chunk_indices)} cells)...")
 
     # Each worker creates its own AnnCollection with ALL files (backed mode)
     if input_format == "zarr":
@@ -397,17 +399,17 @@ def _write_shuffled_chunk(
         chunk_adata = chunk_adata[:, var_joinids].copy()
         logger.info(f"Filtered to {chunk_adata.n_vars} features")
 
-    # Write output
+    # Write output with pre-computed output index
     if output_format == "zarr":
-        output_path = output_dir / f"chunk_{chunk_idx:06d}.zarr"
+        output_path = output_dir / f"extract_{output_chunk_idx:06d}.zarr"
         chunk_adata.write_zarr(output_path)
     else:  # h5ad
-        output_path = output_dir / f"chunk_{chunk_idx:06d}.h5ad"
+        output_path = output_dir / f"extract_{output_chunk_idx:06d}.h5ad"
         chunk_adata.write_h5ad(output_path, compression="gzip")
 
-    logger.info(f"Successfully wrote chunk {chunk_idx} with {len(chunk_indices)} cells to {output_path}")
+    logger.info(f"Successfully wrote extract_{output_chunk_idx:06d} with {len(chunk_indices)} cells to {output_path}")
 
-    return chunk_idx, str(output_path)
+    return chunk_idx, output_chunk_idx, str(output_path)
 
 
 def shuffle_extracted_chunks(
@@ -415,6 +417,7 @@ def shuffle_extracted_chunks(
     input_dir: Path,
     output_dir: Path,
     chunk_size: int,
+    output_chunk_indexes: list[int] | None = None,
     input_format: Literal["zarr", "h5ad"] = "zarr",
     output_format: Literal["zarr", "h5ad"] = "h5ad",
     var_joinids: list[int] | None = None,
@@ -432,6 +435,7 @@ def shuffle_extracted_chunks(
     :param input_dir: Directory with contiguous range files
     :param output_dir: Directory to write shuffled chunks
     :param chunk_size: Number of cells per output chunk
+    :param output_chunk_indexes: Pre-computed output indexes for each chunk (shuffled)
     :param input_format: Input format - "zarr" or "h5ad" (default: "zarr")
     :param output_format: Output format - "zarr" or "h5ad" (default: "h5ad")
     :param var_joinids: Optional list of var soma_joinids to filter features by
@@ -483,6 +487,16 @@ def shuffle_extracted_chunks(
     num_chunks = (total_cells + chunk_size - 1) // chunk_size
     logger.info(f"Creating {num_chunks} output chunks")
 
+    # Use pre-computed output indexes if provided, otherwise generate sequential
+    if output_chunk_indexes is not None:
+        if len(output_chunk_indexes) != num_chunks:
+            raise ValueError(
+                f"output_chunk_indexes length ({len(output_chunk_indexes)}) "
+                f"does not match num_chunks ({num_chunks})"
+            )
+    else:
+        output_chunk_indexes = list(range(num_chunks))
+
     # Ensure output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -503,12 +517,14 @@ def shuffle_extracted_chunks(
             start_idx = chunk_idx * chunk_size
             end_idx = min(start_idx + chunk_size, total_cells)
             chunk_indices = cell_permutation[start_idx:end_idx]
+            output_chunk_idx = output_chunk_indexes[chunk_idx]
 
             # Submit chunk processing job
             # Each worker will create its own AnnCollection with all files
             future = executor.submit(
                 _write_shuffled_chunk,
                 chunk_idx,
+                output_chunk_idx,
                 chunk_indices,
                 input_files,
                 input_format,
@@ -520,13 +536,13 @@ def shuffle_extracted_chunks(
 
         # Wait for completion and track progress
         completed = 0
-        for future in tqdm(as_completed(futures), total=num_chunks, desc="Shuffling chunks"):
+        for future in tqdm(as_completed(futures), total=num_chunks, desc="Shuffling extracts"):
             try:
-                chunk_idx, output_path = future.result()
+                chunk_idx, output_chunk_idx, output_path = future.result()
                 completed += 1
             except Exception as e:
                 chunk_idx = futures[future]
-                logger.error(f"Failed to write chunk {chunk_idx}: {e}")
+                logger.error(f"Failed to write extract {chunk_idx}: {e}")
                 raise
 
-    logger.info(f"Successfully shuffled {total_cells} cells into {num_chunks} chunks")
+    logger.info(f"Successfully shuffled {total_cells} cells into {num_chunks} extracts")

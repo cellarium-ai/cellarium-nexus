@@ -7,7 +7,7 @@ import scipy.sparse as sp
 
 from cellarium.nexus.omics_datastore.soma_ops import SomaExtractError
 from cellarium.nexus.omics_datastore.soma_ops import extract as extract_module
-from cellarium.nexus.shared.schemas.omics_datastore import SomaExtractPlan, SomaJoinIdRange
+from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, SomaExtractPlan
 from tests.omics_datastore.soma_ops.conftest import FakeAnnData, FakeExecutor, FakeFuture, FakeSomaExperiment
 
 
@@ -17,7 +17,7 @@ def test_extract_range_to_anndata_happy_path(monkeypatch: pytest.MonkeyPatch, tm
     """
     experiment_uri = "gs://bucket/soma"
     value_filter = 'tissue == "lung"'
-    joinid_range = SomaJoinIdRange(start=10, end=20)
+    joinid_range = IdContiguousRange(start=10, end=20)
     output_path = tmp_path / "output.h5ad"
 
     # Mock SOMA experiment
@@ -92,7 +92,7 @@ def test_extract_range_to_anndata_empty_obs(monkeypatch: pytest.MonkeyPatch, tmp
     """
     experiment_uri = "gs://bucket/soma"
     value_filter = 'tissue == "mars"'
-    joinid_range = SomaJoinIdRange(start=10, end=20)
+    joinid_range = IdContiguousRange(start=10, end=20)
     output_path = tmp_path / "output.h5ad"
 
     # Mock SOMA experiment returning empty obs
@@ -133,7 +133,7 @@ def test_extract_range_to_anndata_error_handling(monkeypatch: pytest.MonkeyPatch
     """
     experiment_uri = "gs://bucket/soma"
     value_filter = ""
-    joinid_range = SomaJoinIdRange(start=10, end=20)
+    joinid_range = IdContiguousRange(start=10, end=20)
     output_path = tmp_path / "output.h5ad"
 
     def fake_open(uri: str, mode: str) -> object:
@@ -165,7 +165,7 @@ def test_extract_range_worker(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     idx = 5
     experiment_uri = "gs://bucket/soma"
     value_filter = 'tissue == "lung"'
-    joinid_range = SomaJoinIdRange(start=10, end=20)
+    joinid_range = IdContiguousRange(start=10, end=20)
     output_path = tmp_path / "output.h5ad"
     obs_columns = ["cell_type"]
     var_columns = ["symbol"]
@@ -205,13 +205,15 @@ def test_extract_ranges_happy_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
     plan = SomaExtractPlan(
         experiment_uri="gs://bucket/soma",
         value_filter='tissue == "lung"',
-        joinid_ranges=[
-            SomaJoinIdRange(start=0, end=10),
-            SomaJoinIdRange(start=11, end=20),
+        id_ranges=[
+            IdContiguousRange(start=0, end=10),
+            IdContiguousRange(start=11, end=20),
         ],
         total_cells=20,
         range_size=10,
         output_chunk_size=10,
+        num_output_chunks=2,
+        output_chunk_indexes=[0, 1],
         filters={"tissue__eq": "lung"},
         obs_columns=["cell_type"],
         var_columns=["symbol"],
@@ -225,7 +227,7 @@ def test_extract_ranges_happy_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         idx: int,
         experiment_uri: str,
         value_filter: str,
-        joinid_range: SomaJoinIdRange,
+        joinid_range: IdContiguousRange,
         output_path: Path,
         obs_columns: list[str] | None,
         var_columns: list[str] | None,
@@ -277,13 +279,15 @@ def test_extract_ranges_failure_handling(monkeypatch: pytest.MonkeyPatch, tmp_pa
     plan = SomaExtractPlan(
         experiment_uri="gs://bucket/soma",
         value_filter="",
-        joinid_ranges=[
-            SomaJoinIdRange(start=0, end=10),
-            SomaJoinIdRange(start=11, end=20),
+        id_ranges=[
+            IdContiguousRange(start=0, end=10),
+            IdContiguousRange(start=11, end=20),
         ],
         total_cells=20,
         range_size=10,
         output_chunk_size=10,
+        num_output_chunks=2,
+        output_chunk_indexes=[0, 1],
         filters=None,
     )
 
@@ -390,22 +394,23 @@ def test_shuffle_extracted_chunks_happy_path(monkeypatch: pytest.MonkeyPatch, tm
     # Mock _write_shuffled_chunk worker
     def fake_write_chunk(
         chunk_idx: int,
+        output_chunk_idx: int,
         chunk_indices: object,
         input_files: object,
         input_format: str,
         output_dir: Path,
         output_format: str,
         var_joinids: list[int] | None,
-    ) -> tuple[int, str]:
+    ) -> tuple[int, int, str]:
         # Create output file
         output_dir.mkdir(parents=True, exist_ok=True)
         if output_format == "zarr":
-            output_path = output_dir / f"chunk_{chunk_idx:06d}.zarr"
+            output_path = output_dir / f"extract_{output_chunk_idx:06d}.zarr"
             output_path.mkdir(exist_ok=True)
         else:
-            output_path = output_dir / f"chunk_{chunk_idx:06d}.h5ad"
+            output_path = output_dir / f"extract_{output_chunk_idx:06d}.h5ad"
             output_path.touch()
-        return chunk_idx, str(output_path)
+        return chunk_idx, output_chunk_idx, str(output_path)
 
     # Mock ProcessPoolExecutor
     executor = FakeExecutor(max_workers=1, worker_fn=fake_write_chunk)
@@ -430,6 +435,6 @@ def test_shuffle_extracted_chunks_happy_path(monkeypatch: pytest.MonkeyPatch, tm
     # Verify output directory was created
     assert output_dir.exists()
 
-    # With 6 total cells and chunk_size=4, should create 2 chunks
-    assert (output_dir / "chunk_000000.h5ad").exists()
-    assert (output_dir / "chunk_000001.h5ad").exists()
+    # With 6 total cells and chunk_size=4, should create 2 extracts
+    assert (output_dir / "extract_000000.h5ad").exists()
+    assert (output_dir / "extract_000001.h5ad").exists()
