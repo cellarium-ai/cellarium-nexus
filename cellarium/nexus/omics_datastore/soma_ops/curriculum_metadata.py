@@ -14,7 +14,7 @@ import tiledbsoma
 
 from cellarium.nexus.omics_datastore.soma_ops import exceptions
 from cellarium.nexus.omics_datastore.soma_ops.filters import build_soma_value_filter
-from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, SomaExtractPlan
+from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, SomaCurriculumMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -162,7 +162,7 @@ def read_var_joinids(
         raise exceptions.SomaReadError(f"Failed to read var joinids from {experiment_uri}: {e}") from e
 
 
-def plan_soma_extract(
+def prepare_extract_curriculum(
     *,
     experiment_uri: str,
     filters: dict[str, object] | None,
@@ -175,13 +175,13 @@ def plan_soma_extract(
     obs_columns: list[str] | None = None,
     var_columns: list[str] | None = None,
     x_layer: str = "X",
-) -> SomaExtractPlan:
+) -> SomaCurriculumMetadata:
     """
     Plan a SOMA extract by computing soma_joinid ranges for a given filter.
 
     Read filtered obs data, compute contiguous joinid ranges, and return
-    an extract plan. This is the main entry point for dashboard/backend
-    to plan SOMA extracts.
+    an extract metadata. This is the main entry point for dashboard/backend
+    to metadata SOMA extracts.
 
     :param experiment_uri: URI of the SOMA experiment.
     :param filters: Dict of filter conditions using the Nexus format.
@@ -199,7 +199,7 @@ def plan_soma_extract(
     :raise SomaFilterError: If filter translation fails
     :raise ValueError: If range_size or output_chunk_size is not positive
 
-    :return: SomaExtractPlan object
+    :return: SomaCurriculumMetadata object
     """
     if range_size <= 0:
         raise ValueError(f"range_size must be positive, got {range_size}")
@@ -235,21 +235,27 @@ def plan_soma_extract(
     logger.info(f"Found {total_cells} cells to extract")
 
     if total_cells == 0:
-        raise exceptions.SomaPlanningError(f"No cells found matching the filter: {value_filter}")
+        raise exceptions.SomaPrepareCurriculumMetadataError(f"No cells found matching the filter: {value_filter}")
 
     # Compute contiguous id ranges
     id_ranges = compute_contiguous_ranges(values=joinids, chunk_size=range_size, shuffle=shuffle_ranges)
     output_ids = compute_output_ids(n_values=total_cells, chunk_size=output_chunk_size, shuffle=shuffle_output_ids)
     logger.info(f"Computed {len(id_ranges)} ranges. Output chunk n: {output_ids}")
 
-    plan = SomaExtractPlan(
+    num_output_chunks = len(output_ids)
+    num_ranges = len(id_ranges)
+    last_chunk_size = total_cells % output_chunk_size
+
+    metadata = SomaCurriculumMetadata(
         experiment_uri=experiment_uri,
         value_filter=value_filter,
         id_ranges=id_ranges,
         total_cells=total_cells,
         range_size=range_size,
+        num_ranges=num_ranges,
         output_chunk_size=output_chunk_size,
-        num_output_chunks=len(output_ids),
+        num_output_chunks=num_output_chunks,
+        last_chunk_size=last_chunk_size,
         output_chunk_indexes=output_ids,
         filters=filters,
         var_joinids=var_joinids,
@@ -260,6 +266,6 @@ def plan_soma_extract(
         x_layer=x_layer,
     )
 
-    logger.info(f"Extract plan created: {plan.total_cells} cells in {len(plan.id_ranges)} ranges")
+    logger.info(f"Extract metadata created: {metadata.total_cells} cells in {len(metadata.id_ranges)} ranges")
 
-    return plan
+    return metadata

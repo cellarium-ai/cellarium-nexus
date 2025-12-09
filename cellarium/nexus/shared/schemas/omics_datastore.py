@@ -41,14 +41,16 @@ class IdContiguousRange(BaseModel):
     end: int
 
 
-class SomaExtractPlan(BaseModel):
+class SomaCurriculumMetadata(BaseModel):
     experiment_uri: str
     value_filter: str
-    id_ranges: list[IdContiguousRange]
     total_cells: int
+    id_ranges: list[IdContiguousRange]
     range_size: int
+    num_ranges: int
     num_output_chunks: int
     output_chunk_size: int
+    last_chunk_size: int
     output_chunk_indexes: list[int] | None = None
     filters: dict[str, Any] | None = None
     var_joinids: list[int] | None = None

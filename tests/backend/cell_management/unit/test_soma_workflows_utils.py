@@ -148,7 +148,7 @@ def test_compose_soma_extract_configs_happy_path(
     assert isinstance(cfg, component_configs.SomaOpsExtract)
     assert cfg.extract_name == "test_extract"
     assert cfg.plan_path == "backend/extracts/test_extract/soma_extract_plan.json"
-    assert cfg.range_indices == [0, 1, 2, 3, 4]
+    assert cfg.range_indices_slice == [0, 1, 2, 3, 4]
 
 
 def test_compose_soma_extract_configs_multiple_batches(
@@ -167,10 +167,10 @@ def test_compose_soma_extract_configs_multiple_batches(
     )
 
     assert len(extract_configs) == 4
-    assert extract_configs[0].range_indices == list(range(0, 32))
-    assert extract_configs[1].range_indices == list(range(32, 64))
-    assert extract_configs[2].range_indices == list(range(64, 96))
-    assert extract_configs[3].range_indices == list(range(96, 100))
+    assert extract_configs[0].range_indices_slice == list(range(0, 32))
+    assert extract_configs[1].range_indices_slice == list(range(32, 64))
+    assert extract_configs[2].range_indices_slice == list(range(64, 96))
+    assert extract_configs[3].range_indices_slice == list(range(96, 100))
 
 
 def test_compose_and_dump_soma_configs(monkeypatch: pytest.MonkeyPatch, soma_dataset: models.OmicsDataset) -> None:

@@ -13,11 +13,11 @@ from typing import Any, Literal
 import pyarrow as pa
 import tiledbsoma
 
+from cellarium.nexus.omics_datastore.soma_ops.curriculum_metadata import prepare_extract_curriculum
 from cellarium.nexus.omics_datastore.soma_ops.exceptions import SomaReadError
 from cellarium.nexus.omics_datastore.soma_ops.extract import extract_ranges, shuffle_extracted_chunks
 from cellarium.nexus.omics_datastore.soma_ops.filters import build_soma_value_filter
-from cellarium.nexus.omics_datastore.soma_ops.planning import plan_soma_extract
-from cellarium.nexus.shared.schemas.omics_datastore import SomaExtractPlan
+from cellarium.nexus.shared.schemas.omics_datastore import SomaCurriculumMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +178,7 @@ class TileDBSOMADataOperator:
             logger.error(f"Failed to get distinct obs values: {e}")
             raise SomaReadError("SOMA distinct values operation failed") from e
 
-    def compute_extract_plan(
+    def prepare_curriculum_metadata(
         self,
         *,
         filters: dict[str, object] | None,
@@ -190,21 +190,21 @@ class TileDBSOMADataOperator:
         obs_columns: list[str] | None = None,
         var_columns: list[str] | None = None,
         x_layer: str = "X",
-    ) -> SomaExtractPlan:
+    ) -> SomaCurriculumMetadata:
         """
         Compute a SOMA extract plan from filter dict.
 
         Delegate to the planning module to compute contiguous joinid ranges.
 
-        :param filters: Dict of filter conditions using the Nexus format
-        :param range_size: Target number of cells per range (for extraction)
-        :param output_chunk_size: Target number of cells per output chunk (for shuffling)
-        :param shuffle_ranges: Whether to shuffle the resulting joinid ranges
-        :param var_filter_column: Name of the var column to filter features by
-        :param var_filter_values: List of values to match in the var filter column
-        :param obs_columns: List of obs columns to include in extraction
-        :param var_columns: List of var columns to include in extraction
-        :param x_layer: Name of the SOMA X layer to read counts from
+        :param filters: Dict of filter conditions using the Nexus format.
+        :param range_size: Target number of cells per range (for extraction).
+        :param output_chunk_size: Target number of cells per output chunk (for shuffling).
+        :param shuffle_ranges: Whether to shuffle the resulting joinid ranges.
+        :param var_filter_column: Name of the var column to filter features by.
+        :param var_filter_values: List of values to match in the var filter column.
+        :param obs_columns: List of obs columns to include in extraction.
+        :param var_columns: List of var columns to include in extraction.
+        :param x_layer: Name of the SOMA X layer to read counts from.
 
         :raise SomaPlanningError: If SOMA reads fail
         :raise SomaReadError: If SOMA reads fail
@@ -212,7 +212,7 @@ class TileDBSOMADataOperator:
 
         :return: SomaExtractPlan with joinid ranges and total cell count
         """
-        return plan_soma_extract(
+        return prepare_extract_curriculum(
             experiment_uri=self.experiment_uri,
             filters=filters,
             range_size=range_size,
@@ -228,7 +228,7 @@ class TileDBSOMADataOperator:
     def extract_ranges_to_anndata(
         self,
         *,
-        plan: SomaExtractPlan,
+        plan: SomaCurriculumMetadata,
         output_dir: Path,
         output_format: Literal["zarr", "h5ad"] = "h5ad",
         max_workers: int | None = None,
@@ -241,11 +241,11 @@ class TileDBSOMADataOperator:
         All data specification (obs_columns, var_columns, var_joinids, x_layer)
         is taken from the plan.
 
-        :param plan: SOMA extract plan with all data specification
-        :param output_dir: Local directory to save AnnData files
-        :param output_format: Output format - "zarr" or "h5ad" (default: "h5ad")
-        :param max_workers: Maximum number of parallel workers
-        :param verbose: If False, suppress INFO level logging in parallel workers
+        :param plan: SOMA extract plan with all data specification.
+        :param output_dir: Local directory to save AnnData files.
+        :param output_format: Output format - "zarr" or "h5ad" (default: "h5ad").
+        :param max_workers: Maximum number of parallel workers.
+        :param verbose: If False, suppress INFO level logging in parallel workers.
 
         :raise SomaExtractError: If SOMA reads fail
         :raise IOError: If file operations fail
@@ -253,7 +253,7 @@ class TileDBSOMADataOperator:
         logger.info(f"Extracting {len(plan.id_ranges)} ranges to {output_dir} (format: {output_format})")
 
         extract_ranges(
-            plan=plan,
+            curriculum_metadata=plan,
             output_dir=output_dir,
             output_format=output_format,
             max_workers=max_workers,
@@ -265,8 +265,10 @@ class TileDBSOMADataOperator:
     def extract_ranges_shuffled(
         self,
         *,
-        plan: SomaExtractPlan,
+        curriculum_metadata: SomaCurriculumMetadata,
         output_dir: Path,
+        curriculum_partition_index: int = 0,
+        curriculum_partition_total_num: int = 1,
         output_format: Literal["zarr", "h5ad"] = "h5ad",
         temp_dir: Path | None = None,
         max_workers_extract: int | None = None,
@@ -285,22 +287,25 @@ class TileDBSOMADataOperator:
         All data specification (obs_columns, var_columns, var_joinids, x_layer)
         is taken from the plan.
 
-        :param plan: SOMA extract plan with all data specification
-        :param output_dir: Final output directory for shuffled chunks
-        :param output_format: Output format - "zarr" or "h5ad" (default: "h5ad")
-        :param temp_dir: Temporary directory for contiguous extracts (auto-created if None)
-        :param max_workers_extract: Maximum parallel workers for extraction (network I/O intensive)
-        :param max_workers_shuffle: Maximum parallel workers for shuffling (CPU/memory intensive)
-        :param cleanup_temp: Whether to delete temp directory after shuffling
-        :param verbose: If False, suppress INFO level logging in parallel workers
+        :param curriculum_metadata: SOMA curriculum metadata with all data specification.
+        :param output_dir: Final output directory for shuffled chunks.
+        :param curriculum_partition_index: Index used for slicing ranges and output chunk indexes.
+            Needed for distributing extracting over multiple distributed VMs. Default is 0 (single VM execution).
+        :param curriculum_partition_total_num: Total number of partitions.
+        :param output_format: Output format - "zarr" or "h5ad" (default: "h5ad").
+        :param temp_dir: Temporary directory for contiguous extracts (auto-created if None).
+        :param max_workers_extract: Maximum parallel workers for extraction (network I/O intensive).
+        :param max_workers_shuffle: Maximum parallel workers for shuffling (CPU/memory intensive).
+        :param cleanup_temp: Whether to delete temp directory after shuffling.
+        :param verbose: If False, suppress INFO level logging in parallel workers.
 
         :raise SomaExtractError: If SOMA reads fail
         :raise IOError: If file operations fail
         :raise ValueError: If output_format is invalid
         """
         logger.info(
-            f"Extracting and shuffling {len(plan.id_ranges)} ranges to {output_dir} "
-            f"(output_chunk_size: {plan.output_chunk_size}, format: {output_format})"
+            f"Extracting and shuffling {len(curriculum_metadata.id_ranges)} ranges to {output_dir} "
+            f"(output_chunk_size: {curriculum_metadata.output_chunk_size}, format: {output_format})"
         )
 
         # Stage 1: Extract contiguous ranges to temp directory
@@ -313,9 +318,9 @@ class TileDBSOMADataOperator:
         try:
             logger.info("Stage 1: Extracting contiguous ranges to H5AD format...")
             extract_ranges(
-                plan=plan,
+                curriculum_metadata=curriculum_metadata,
                 output_dir=temp_dir,
-                output_format="h5ad",  # Use H5AD for temp files (better backed mode support)
+                output_format="h5ad",
                 max_workers=max_workers_extract,
                 verbose=verbose,
             )
@@ -323,13 +328,13 @@ class TileDBSOMADataOperator:
             # Stage 2: Shuffle cells across extracts (feature filtering applied here)
             logger.info("Stage 2: Shuffling cells across extracts...")
             shuffle_extracted_chunks(
+                curriculum_metadata=curriculum_metadata,
                 input_dir=temp_dir,
                 output_dir=output_dir,
-                chunk_size=plan.output_chunk_size,
-                output_chunk_indexes=plan.output_chunk_indexes,
+                curriculum_partition_index=curriculum_partition_index,
+                curriculum_partition_total_num=curriculum_partition_total_num,
                 input_format="h5ad",  # Read from H5AD temp files
                 output_format=output_format,  # Write in requested format
-                var_joinids=plan.var_joinids,  # Apply feature filtering during shuffle
                 max_workers=max_workers_shuffle,
                 verbose=verbose,
             )

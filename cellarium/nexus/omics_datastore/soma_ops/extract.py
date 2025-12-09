@@ -19,8 +19,9 @@ from anndata.experimental import AnnCollection
 from scipy.sparse import coo_matrix
 from tqdm import tqdm
 
+from cellarium.nexus.omics_datastore.soma_ops import utils
 from cellarium.nexus.omics_datastore.soma_ops.exceptions import SomaExtractError
-from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, SomaExtractPlan
+from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, SomaCurriculumMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -258,8 +259,10 @@ def _extract_range_worker(
 
 def extract_ranges(
     *,
-    plan: SomaExtractPlan,
+    curriculum_metadata: SomaCurriculumMetadata,
     output_dir: Path,
+    curriculum_partition_index: int = 0,
+    curriculum_partition_total_num: int = 1,
     output_format: Literal["zarr", "h5ad"] = "zarr",
     max_workers: int | None = None,
     verbose: bool = True,
@@ -267,15 +270,18 @@ def extract_ranges(
     """
     Extract multiple soma_joinid ranges in parallel.
 
-    Process all joinid ranges from the extract plan and write separate AnnData files
+    Process all joinid ranges from the curriculum metadata and write separate AnnData files
     for each range in the specified format. All data specification (obs_columns,
-    var_columns, var_joinids, x_layer) is taken from the plan.
+    var_columns, var_joinids, x_layer) is taken from the curriculum metadata.
 
-    :param plan: SOMA extract plan with all data specification
-    :param output_dir: Local directory to save AnnData files
-    :param output_format: Output format - "zarr" or "h5ad" (default: "zarr")
-    :param max_workers: Maximum number of parallel workers
-    :param verbose: If False, suppress INFO level logging in parallel workers
+    :param curriculum_metadata: SOMA extract metadata with all data specification.
+    :param output_dir: Local directory to save AnnData files.
+    :param curriculum_partition_index: Index used for slicing ranges and output chunk indexes.
+        Needed for distributing extracting over multiple distributed VMs. Default is 0 (single VM execution).
+    :param curriculum_partition_total_num: Total number of partitions.
+    :param output_format: Output format - "zarr" or "h5ad" (default: "zarr").
+    :param max_workers: Maximum number of parallel workers.
+    :param verbose: If False, suppress INFO level logging in parallel workers.
 
     :raise SomaExtractError: If SOMA reads fail
     :raise IOError: If file operations fail
@@ -284,13 +290,28 @@ def extract_ranges(
     # Suppress ImplicitModificationWarning from anndata
     warnings.filterwarnings(action="ignore", category=ImplicitModificationWarning)
 
+    if curriculum_partition_index >= curriculum_partition_total_num:
+        raise SomaExtractError(
+            f"`curriculum_partition_index` can't be equal or larger than `curriculum_partition_total_num`. "
+            f"Got {curriculum_partition_index} and {curriculum_partition_total_num} respectively."
+        )
+
     if max_workers is None:
         max_workers = multiprocessing.cpu_count()
 
     # Ensure output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    logger.info(f"Extracting {len(plan.id_ranges)} ranges using {max_workers} workers (spawn mode)")
+    # Calculating current extract ranges and output ids
+    range_slice_start, range_slice_end = utils.get_partition_slice(
+        total_items=curriculum_metadata.num_ranges,
+        partition_index=curriculum_partition_index,
+        num_partitions=curriculum_partition_total_num,
+    )
+
+    ranges_to_process = curriculum_metadata.id_ranges[range_slice_start:range_slice_end]
+
+    logger.info(f"Extracting {len(ranges_to_process)} ranges using {max_workers} workers (spawn mode)")
 
     # Execute in parallel
     completed = 0
@@ -310,24 +331,24 @@ def extract_ranges(
     ) as executor:
         # Submit all extraction jobs
         futures = {}
-        for idx, joinid_range in enumerate(plan.id_ranges):
+        for idx, joinid_range in enumerate(ranges_to_process):
             output_path = output_dir / f"range_{idx:06d}{file_ext}"
             future = executor.submit(
                 _extract_range_worker,
                 idx,
-                plan.experiment_uri,
-                plan.value_filter,
+                curriculum_metadata.experiment_uri,
+                curriculum_metadata.value_filter,
                 joinid_range,
                 output_path,
-                plan.obs_columns,
-                plan.var_columns,
-                plan.x_layer,
+                curriculum_metadata.obs_columns,
+                curriculum_metadata.var_columns,
+                curriculum_metadata.x_layer,
                 output_format,
             )
             futures[future] = idx
 
         # Wait for completion
-        for future in tqdm(as_completed(futures), total=len(plan.id_ranges), desc="Extracting ranges"):
+        for future in tqdm(as_completed(futures), total=len(ranges_to_process), desc="Extracting ranges"):
             try:
                 idx, output_path = future.result()
                 completed += 1
@@ -341,7 +362,7 @@ def extract_ranges(
         logger.error(error_msg)
         raise SomaExtractError(error_msg)
 
-    logger.info(f"Successfully extracted all {len(plan.id_ranges)} ranges to {output_dir}")
+    logger.info(f"Successfully extracted all {len(ranges_to_process)} ranges to {output_dir}")
 
 
 def _write_shuffled_chunk(
@@ -361,14 +382,14 @@ def _write_shuffled_chunk(
     complete shuffling across all ranges while avoiding pickling issues.
     Feature filtering is applied here for better SOMA query performance.
 
-    :param chunk_idx: Internal index of the chunk being processed
-    :param output_chunk_idx: Pre-computed output index for the extract file name
-    :param chunk_indices: Array of cell indices for this chunk
-    :param input_files: List of all input file paths
-    :param input_format: Input format
-    :param output_dir: Output directory
-    :param output_format: Output format
-    :param var_joinids: Optional list of var soma_joinids to filter features by
+    :param chunk_idx: Internal index of the chunk being processed.
+    :param output_chunk_idx: Pre-computed output index for the extract file name.
+    :param chunk_indices: Array of cell indices for this chunk.
+    :param input_files: List of all input file paths.
+    :param input_format: Input format.
+    :param output_dir: Output directory.
+    :param output_format: Output format.
+    :param var_joinids: Optional list of var soma_joinids to filter features by.
 
     :return: Tuple of (chunk_idx, output_chunk_idx, output_path_str)
     """
@@ -414,13 +435,13 @@ def _write_shuffled_chunk(
 
 def shuffle_extracted_chunks(
     *,
+    curriculum_metadata: SomaCurriculumMetadata,
     input_dir: Path,
     output_dir: Path,
-    chunk_size: int,
-    output_chunk_indexes: list[int] | None = None,
+    curriculum_partition_index: int = 0,
+    curriculum_partition_total_num: int = 1,
     input_format: Literal["zarr", "h5ad"] = "zarr",
     output_format: Literal["zarr", "h5ad"] = "h5ad",
-    var_joinids: list[int] | None = None,
     max_workers: int | None = None,
     verbose: bool = True,
 ) -> None:
@@ -432,13 +453,14 @@ def shuffle_extracted_chunks(
     output in the specified format. Feature filtering is applied during
     this stage for better SOMA query performance.
 
+    :param curriculum_metadata: SOMA extract metadata with all data specification.
     :param input_dir: Directory with contiguous range files
     :param output_dir: Directory to write shuffled chunks
-    :param chunk_size: Number of cells per output chunk
-    :param output_chunk_indexes: Pre-computed output indexes for each chunk (shuffled)
+    :param curriculum_partition_index: Index used for slicing ranges and output chunk indexes.
+        Needed for distributing extracting over multiple distributed VMs. Default is 0 (single VM execution).
+    :param curriculum_partition_total_num: Total number of partitions.
     :param input_format: Input format - "zarr" or "h5ad" (default: "zarr")
     :param output_format: Output format - "zarr" or "h5ad" (default: "h5ad")
-    :param var_joinids: Optional list of var soma_joinids to filter features by
     :param max_workers: Maximum parallel workers for writing
     :param verbose: If False, suppress INFO level logging in parallel workers
 
@@ -448,9 +470,6 @@ def shuffle_extracted_chunks(
     # Suppress ImplicitModificationWarning from anndata
     warnings.filterwarnings(action="ignore", category=ImplicitModificationWarning)
 
-    if chunk_size <= 0:
-        raise ValueError(f"chunk_size must be positive, got {chunk_size}")
-
     if input_format not in ("zarr", "h5ad"):
         raise ValueError(f"input_format must be 'zarr' or 'h5ad', got {input_format}")
 
@@ -458,13 +477,14 @@ def shuffle_extracted_chunks(
         raise ValueError(f"output_format must be 'zarr' or 'h5ad', got {output_format}")
 
     if max_workers is None:
-        max_workers = multiprocessing.cpu_count()
+        max_workers = multiprocessing.cpu_count() // 2 + 1
 
     logger.info(f"Shuffling cells from {input_dir} ({input_format}) to {output_dir} ({output_format})")
 
     # Find all input files based on input format
     input_pattern = f"range_*.{input_format}" if input_format == "h5ad" else "range_*.zarr"
     input_files = sorted(input_dir.glob(input_pattern))
+
     if not input_files:
         raise ValueError(f"No range files found in {input_dir} with pattern {input_pattern}")
 
@@ -483,19 +503,28 @@ def shuffle_extracted_chunks(
     logger.info("Computing random permutation...")
     cell_permutation = np.random.permutation(total_cells)
 
+    chunk_size = curriculum_metadata.output_chunk_size
+    # Compute output_chunk_indexes
+    output_chunk_id_slice_start, output_chunk_id_slice_end = utils.get_partition_slice(
+        total_items=curriculum_metadata.num_output_chunks,
+        partition_index=curriculum_partition_index,
+        num_partitions=curriculum_partition_total_num,
+    )
+    output_chunk_indexes = curriculum_metadata.output_chunk_indexes[
+        output_chunk_id_slice_start:output_chunk_id_slice_end
+    ]
     # Compute output chunks
-    num_chunks = (total_cells + chunk_size - 1) // chunk_size
-    logger.info(f"Creating {num_chunks} output chunks")
+    _num_chunks_computed = (total_cells + chunk_size - 1) // chunk_size
+    num_chunks = len(output_chunk_indexes)
 
-    # Use pre-computed output indexes if provided, otherwise generate sequential
-    if output_chunk_indexes is not None:
-        if len(output_chunk_indexes) != num_chunks:
-            raise ValueError(
-                f"output_chunk_indexes length ({len(output_chunk_indexes)}) "
-                f"does not match num_chunks ({num_chunks})"
-            )
-    else:
-        output_chunk_indexes = list(range(num_chunks))
+    if _num_chunks_computed != num_chunks:
+        raise SomaExtractError(
+            f"Number of chunk indexes doesn't accommodate all cells within this worker. "
+            f"Required number of output chunks {_num_chunks_computed}, while"
+            f"number of indexes for naming {num_chunks}"
+        )
+
+    logger.info(f"Creating {num_chunks} output chunks")
 
     # Ensure output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -505,7 +534,6 @@ def shuffle_extracted_chunks(
 
     # Use spawn method for multiprocessing
     mp_context = multiprocessing.get_context("spawn")
-
     with ProcessPoolExecutor(
         max_workers=max_workers,
         mp_context=mp_context,
@@ -530,7 +558,7 @@ def shuffle_extracted_chunks(
                 input_format,
                 output_dir,
                 output_format,
-                var_joinids,
+                curriculum_metadata.var_joinids,
             )
             futures[future] = chunk_idx
 

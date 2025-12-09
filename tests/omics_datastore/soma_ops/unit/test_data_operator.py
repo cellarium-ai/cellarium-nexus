@@ -5,7 +5,7 @@ import pytest
 
 from cellarium.nexus.omics_datastore.soma_ops import SomaReadError
 from cellarium.nexus.omics_datastore.soma_ops import data_operator as data_operator_module
-from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, SomaExtractPlan
+from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, SomaCurriculumMetadata
 
 
 def test_init_valid_experiment_uri() -> None:
@@ -167,7 +167,7 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
         obs_columns: list[str] | None,
         var_columns: list[str] | None,
         x_layer: str,
-    ) -> SomaExtractPlan:
+    ) -> SomaCurriculumMetadata:
         plan_calls.append(
             {
                 "experiment_uri": experiment_uri,
@@ -182,7 +182,7 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
                 "x_layer": x_layer,
             }
         )
-        return SomaExtractPlan(
+        return SomaCurriculumMetadata(
             experiment_uri=experiment_uri,
             value_filter='tissue == "lung"',
             id_ranges=[IdContiguousRange(start=0, end=10)],
@@ -203,7 +203,7 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
 
     # Execute
     filters = {"tissue__eq": "lung"}
-    plan = operator.compute_extract_plan(
+    plan = operator.prepare_curriculum_metadata(
         filters=filters,
         range_size=100,
         output_chunk_size=100,
@@ -249,7 +249,7 @@ def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.Monk
     extract_calls = []
 
     def _fake_extract_ranges(
-        plan: SomaExtractPlan,
+        plan: SomaCurriculumMetadata,
         output_dir: Path,
         output_format: str,
         max_workers: int | None,
@@ -268,7 +268,7 @@ def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.Monk
     monkeypatch.setattr(data_operator_module, "extract_ranges", _fake_extract_ranges)
 
     # Execute
-    plan = SomaExtractPlan(
+    plan = SomaCurriculumMetadata(
         experiment_uri="gs://bucket/soma",
         value_filter='tissue == "lung"',
         id_ranges=[IdContiguousRange(start=0, end=10)],
@@ -331,7 +331,7 @@ def test_extract_ranges_shuffled_with_temp_dir(monkeypatch: pytest.MonkeyPatch, 
     monkeypatch.setattr(shutil, "rmtree", _fake_rmtree)
 
     # Execute
-    plan = SomaExtractPlan(
+    plan = SomaCurriculumMetadata(
         experiment_uri="gs://bucket/soma",
         value_filter="",
         id_ranges=[IdContiguousRange(start=0, end=10)],
@@ -348,7 +348,7 @@ def test_extract_ranges_shuffled_with_temp_dir(monkeypatch: pytest.MonkeyPatch, 
     output_dir = tmp_path / "output"
 
     operator.extract_ranges_shuffled(
-        plan=plan,
+        curriculum_metadata=plan,
         output_dir=output_dir,
         output_format="zarr",
         temp_dir=temp_dir,
@@ -418,7 +418,7 @@ def test_extract_ranges_shuffled_auto_temp_dir(monkeypatch: pytest.MonkeyPatch, 
     monkeypatch.setattr(shutil, "rmtree", _fake_rmtree)
 
     # Execute
-    plan = SomaExtractPlan(
+    plan = SomaCurriculumMetadata(
         experiment_uri="gs://bucket/soma",
         value_filter="",
         id_ranges=[IdContiguousRange(start=0, end=10)],
@@ -433,7 +433,7 @@ def test_extract_ranges_shuffled_auto_temp_dir(monkeypatch: pytest.MonkeyPatch, 
     output_dir = tmp_path / "output"
 
     operator.extract_ranges_shuffled(
-        plan=plan,
+        curriculum_metadata=plan,
         output_dir=output_dir,
         output_format="h5ad",
         temp_dir=None,
@@ -479,7 +479,7 @@ def test_extract_ranges_shuffled_no_cleanup(monkeypatch: pytest.MonkeyPatch, tmp
     monkeypatch.setattr(shutil, "rmtree", _fake_rmtree)
 
     # Execute
-    plan = SomaExtractPlan(
+    plan = SomaCurriculumMetadata(
         experiment_uri="gs://bucket/soma",
         value_filter="",
         id_ranges=[IdContiguousRange(start=0, end=10)],
@@ -496,7 +496,7 @@ def test_extract_ranges_shuffled_no_cleanup(monkeypatch: pytest.MonkeyPatch, tmp
     output_dir = tmp_path / "output"
 
     operator.extract_ranges_shuffled(
-        plan=plan,
+        curriculum_metadata=plan,
         output_dir=output_dir,
         temp_dir=temp_dir,
         cleanup_temp=False,

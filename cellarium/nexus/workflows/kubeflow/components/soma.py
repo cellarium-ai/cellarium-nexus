@@ -37,9 +37,9 @@ def soma_extract_job(config_path: str):
     )
     coordinator.run_soma_extract(
         extract_name=params.extract_name,
-        plan_path=params.plan_path,
+        curriculum_metadata_path=params.plan_path,
         extract_bucket_path=params.extract_bucket_path,
-        range_indices=params.range_indices,
+        range_indices=params.range_indices_slice,
         output_format=params.output_format,
         max_workers_extract=params.max_workers_extract,
         max_workers_shuffle=params.max_workers_shuffle,
@@ -77,6 +77,6 @@ def mark_soma_curriculum_as_finished_job(config_path: str):
     )
     coordinator.mark_soma_curriculum_as_finished(
         extract_name=params.extract_name,
-        plan_path=params.plan_path,
+        curriculum_metadata_path=params.plan_path,
         extract_bucket_path=params.extract_bucket_path,
     )

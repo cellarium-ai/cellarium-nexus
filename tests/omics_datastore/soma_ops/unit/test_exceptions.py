@@ -62,10 +62,10 @@ def test_soma_planning_error_inherits_from_operation_error() -> None:
     """
     Verify SomaPlanningError inherits from SomaOperationError.
     """
-    assert issubclass(soma_ops.SomaPlanningError, soma_ops.SomaOperationError)
+    assert issubclass(soma_ops.SomaPrepareCurriculumMetadataError, soma_ops.SomaOperationError)
 
-    with pytest.raises(soma_ops.SomaPlanningError, match="planning failed"):
-        raise soma_ops.SomaPlanningError("planning failed")
+    with pytest.raises(soma_ops.SomaPrepareCurriculumMetadataError, match="planning failed"):
+        raise soma_ops.SomaPrepareCurriculumMetadataError("planning failed")
 
 
 def test_all_exceptions_exported_in_init() -> None:

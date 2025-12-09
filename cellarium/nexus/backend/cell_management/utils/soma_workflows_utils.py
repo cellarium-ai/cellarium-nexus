@@ -7,10 +7,9 @@ import math
 from django.conf import settings
 
 from cellarium.nexus.backend.cell_management import models
-from cellarium.nexus.backend.cell_management.utils import exceptions
 from cellarium.nexus.coordinator import SomaDataOpsCoordinator
 from cellarium.nexus.omics_datastore.soma_ops import TileDBSOMADataOperator
-from cellarium.nexus.shared.schemas import component_configs
+from cellarium.nexus.shared.schemas import SomaCurriculumMetadata, component_configs
 from cellarium.nexus.shared.utils import workflows_configs
 
 
@@ -52,20 +51,18 @@ def _get_extract_paths(name: str) -> tuple[str, str]:
     return extract_bucket_path, plan_path
 
 
+def _slice_for_worker(i: int, max_per_worker: int, total: int) -> tuple[int, int]:
+    start = i * max_per_worker
+    end = min(start + max_per_worker, total)
+    return start, end
+
+
 def compose_soma_extract_configs(
     name: str,
-    creator_id: int,
     omics_dataset: models.OmicsDataset,
-    range_size: int,
-    output_chunk_size: int,
-    var_filter_column: str | None = None,
-    var_filter_values: list[str] | None = None,
-    feature_schema: models.FeatureSchema | None = None,
-    filters: dict | None = None,
-    shuffle_ranges: bool = True,
-    obs_columns: list[str] | None = None,
-    var_columns: list[str] | None = None,
-    x_layer: str = "raw",
+    curriculum_metadata: SomaCurriculumMetadata,
+    curriculum_metadata_path: str,
+    extract_bucket_path: str,
     output_format: str = "h5ad",
     max_workers_extract: int | None = None,
     max_workers_shuffle: int | None = None,
@@ -74,22 +71,13 @@ def compose_soma_extract_configs(
     Compose SOMA extract configs for the Kubeflow pipeline.
 
     :param name: Name for the extract curriculum
-    :param creator_id: ID of the user who initiated the extract
     :param omics_dataset: Omics dataset with TileDB SOMA backend
-    :param range_size: Target number of cells per range
-    :param output_chunk_size: Target cells per output chunk (for shuffling)
-    :param var_filter_column: Column to use for filtering the features
-    :param var_filter_values: Values to match in the feature filter column
-    :param feature_schema: Feature schema used to derive feature IDs for filtering
-    :param filters: Optional dictionary of filter statements to apply
-    :param shuffle_ranges: Whether to shuffle the joinid ranges
-    :param obs_columns: Optional obs columns to include in output files
-    :param var_columns: Optional var columns to include in output files
-    :param x_layer: Name of the SOMA X layer to read counts from
+    :param curriculum_metadata: Some extract plan
+    :param curriculum_metadata_path: Bucket path where worker can obtain the SomaExtractPlan
+    :param extract_bucket_path: Bucket path where to save output chunks
     :param output_format: Output format - "h5ad" or "zarr"
     :param max_workers_extract: Maximum parallel workers for extraction
     :param max_workers_shuffle: Maximum parallel workers for shuffling
-    :param prepare: Whether to run the coordinator prepare step (primarily for unit tests)
 
     :raise ValueError: If range_size <= 0 or output_chunk_size <= 0 or omics_dataset has no URI
     :raise exceptions.ZeroCellsReturnedError: If no cells match the filters
@@ -97,30 +85,25 @@ def compose_soma_extract_configs(
 
     :return: List of extract configs
     """
-    if range_size <= 0:
-        raise ValueError(f"Range size must be greater than 0. Received: {range_size}")
-    if output_chunk_size <= 0:
-        raise ValueError(f"Output chunk size must be greater than 0. Received: {output_chunk_size}")
-
     if not omics_dataset.uri:
         raise ValueError(f"TileDB SOMA dataset '{omics_dataset.name}' has no URI configured")
 
-    total_cells = get_total_cells_in_soma(omics_dataset=omics_dataset, filters=filters)
-
-    if total_cells == 0:
-        raise exceptions.ZeroCellsReturnedError("SOMA experiment contains no cells matching the filters.")
-
-    num_ranges = math.ceil(total_cells / range_size)
-    extract_bucket_path, plan_path = _get_extract_paths(name=name)
-
     extract_configs = []
-    ranges_per_worker = settings.TILEDB_SOMA_RANGES_PER_WORKER
-    for start_range in range(0, num_ranges, ranges_per_worker):
-        end_range = min(start_range + ranges_per_worker, num_ranges)
-        worker_range_indices = list(range(start_range, end_range))
 
-        if not worker_range_indices:
-            continue
+    num_ranges = len(curriculum_metadata.id_ranges)
+    num_output_chunks = curriculum_metadata.num_output_chunks
+    num_cells_in_range = settings.TILEDB_SOMA_EXTRACT_CONTIGUOUS_RANGE
+    max_ranges_per_worker = settings.TILEDB_SOMA_RANGES_PER_WORKER
+    max_output_chunks_per_worker = max_ranges_per_worker * num_cells_in_range / curriculum_metadata.output_chunk_size
+    num_workers = math.ceil(num_ranges / max_ranges_per_worker)
+
+    for i in range(num_workers):
+        start_range_slice, end_range_slice = _slice_for_worker(
+            i=i, max_per_worker=max_ranges_per_worker, total=num_ranges
+        )
+        start_output_ids_slice, end_output_ids_slice = _slice_for_worker(
+            i=i, max_per_worker=max_output_chunks_per_worker, total=num_output_chunks
+        )
 
         extract_configs.append(
             component_configs.SomaOpsExtract(
@@ -128,9 +111,10 @@ def compose_soma_extract_configs(
                 experiment_uri=omics_dataset.uri,
                 nexus_backend_api_url=settings.SITE_URL,
                 bucket_name=settings.BUCKET_NAME_PRIVATE,
-                plan_path=plan_path,
+                plan_path=curriculum_metadata_path,
                 extract_bucket_path=extract_bucket_path,
-                range_indices=worker_range_indices,
+                range_indices_slice=[start_range_slice, end_range_slice],
+                output_chunk_indices_slice=[start_output_ids_slice, end_output_ids_slice],
                 output_format=output_format,
                 max_workers_extract=max_workers_extract,
                 max_workers_shuffle=max_workers_shuffle,
@@ -187,46 +171,37 @@ def compose_and_dump_soma_configs(
 
     :return: List of extract config paths
     """
-
-    extract_configs = compose_soma_extract_configs(
-        name=name,
+    extract_bucket_path, curriculum_metadata_path = _get_extract_paths(name=name)
+    coordinator = SomaDataOpsCoordinator(
+        experiment_uri=omics_dataset.uri,
+        nexus_backend_api_url=settings.SITE_URL,
+        bucket_name=settings.BUCKET_NAME_PRIVATE,
+    )
+    curriculum_metadata = coordinator.prepare_soma_extract(
+        extract_name=name,
         creator_id=creator_id,
-        omics_dataset=omics_dataset,
+        curriculum_metadata_path=curriculum_metadata_path,
         range_size=range_size,
         output_chunk_size=output_chunk_size,
-        feature_schema=feature_schema,
-        var_filter_column=var_filter_column,
-        var_filter_values=var_filter_values,
         filters=filters,
         shuffle_ranges=shuffle_ranges,
+        var_filter_column=var_filter_column,
+        var_filter_values=var_filter_values,
         obs_columns=obs_columns,
         var_columns=var_columns,
         x_layer=x_layer,
+    )
+
+    extract_configs = compose_soma_extract_configs(
+        name=name,
+        omics_dataset=omics_dataset,
+        extract_bucket_path=extract_bucket_path,
+        curriculum_metadata=curriculum_metadata,
+        curriculum_metadata_path=curriculum_metadata_path,
         output_format=output_format,
         max_workers_extract=max_workers_extract,
         max_workers_shuffle=max_workers_shuffle,
     )
-
-    if prepare:
-        coordinator = SomaDataOpsCoordinator(
-            experiment_uri=extract_configs[0].experiment_uri,
-            nexus_backend_api_url=extract_configs[0].nexus_backend_api_url,
-            bucket_name=extract_configs[0].bucket_name,
-        )
-        coordinator.prepare_soma_extract(
-            extract_name=extract_configs[0].extract_name,
-            creator_id=creator_id,
-            plan_path=extract_configs[0].plan_path,
-            range_size=range_size,
-            output_chunk_size=output_chunk_size,
-            filters=filters,
-            shuffle_ranges=shuffle_ranges,
-            var_filter_column=var_filter_column,
-            var_filter_values=var_filter_values,
-            obs_columns=obs_columns,
-            var_columns=var_columns,
-            x_layer=x_layer,
-        )
 
     configs_stage_dir = f"gs://{settings.BUCKET_NAME_PRIVATE}/{settings.PIPELINE_CONFIGS_DIR}"
 
@@ -381,7 +356,7 @@ def run_soma_extract_pipeline_locally(
     coordinator.prepare_soma_extract(
         extract_name=name,
         creator_id=creator_id,
-        plan_path=plan_path,
+        curriculum_metadata_path=plan_path,
         range_size=range_size,
         output_chunk_size=output_chunk_size,
         filters=filters,
@@ -396,7 +371,7 @@ def run_soma_extract_pipeline_locally(
     # Step 2: Run extraction
     coordinator.run_soma_extract(
         extract_name=name,
-        plan_path=plan_path,
+        curriculum_metadata_path=plan_path,
         extract_bucket_path=extract_bucket_path,
         output_format=output_format,
         max_workers_extract=max_workers_extract,
@@ -406,6 +381,6 @@ def run_soma_extract_pipeline_locally(
     # Step 3: Mark curriculum as finished
     coordinator.mark_soma_curriculum_as_finished(
         extract_name=name,
-        plan_path=plan_path,
+        curriculum_metadata_path=plan_path,
         extract_bucket_path=extract_bucket_path,
     )

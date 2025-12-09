@@ -74,7 +74,8 @@ class SomaOpsExtract(BaseModel):
     bucket_name: str
     plan_path: str
     extract_bucket_path: str
-    range_indices: list[int] | None = None
+    range_indices_slice: list[int] | None = None
+    output_chunk_indices_slice: list[int] | None = None
     output_format: str = "h5ad"
     max_workers_extract: int | None = None
     max_workers_shuffle: int | None = None

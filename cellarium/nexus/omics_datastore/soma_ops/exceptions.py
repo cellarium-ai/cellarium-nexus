@@ -56,7 +56,7 @@ class SomaExtractError(SomaOperationError):
     pass
 
 
-class SomaPlanningError(SomaOperationError):
+class SomaPrepareCurriculumMetadataError(SomaOperationError):
     """
     SOMA extract planning failed.
 
