@@ -112,8 +112,6 @@ def compose_and_dump_soma_configs(
     range_size: int,
     output_chunk_size: int,
     feature_schema: models.FeatureSchema | None = None,
-    var_filter_column: str | None = None,
-    var_filter_values: list[str] | None = None,
     filters: dict | None = None,
     shuffle_ranges: bool = True,
     obs_columns: list[str] | None = None,
@@ -133,8 +131,6 @@ def compose_and_dump_soma_configs(
     :param range_size: Target number of cells per range
     :param output_chunk_size: Target cells per output chunk (for shuffling)
     :param feature_schema: Feature schema used to derive feature IDs for filtering
-    :param var_filter_column: Column to use for filtering the features
-    :param var_filter_values: Values to match in the feature filter column
     :param filters: Optional dictionary of filter statements to apply
     :param shuffle_ranges: Whether to shuffle the joinid ranges
     :param obs_columns: Optional obs columns to include in output files
@@ -152,6 +148,9 @@ def compose_and_dump_soma_configs(
 
     :return: List of extract config paths
     """
+    var_filter_values = [feature.ensemble_id for feature in feature_schema.features.all()] if feature_schema else None
+    var_filter_column = "feature_id" if var_filter_values is not None else None
+
     extract_bucket_path, extract_metadata_path = _get_extract_paths(name=name)
     coordinator = SomaDataOpsCoordinator(
         experiment_uri=omics_dataset.uri,
@@ -200,8 +199,6 @@ def submit_soma_extract_pipeline(
     range_size: int,
     output_chunk_size: int,
     feature_schema: models.FeatureSchema | None = None,
-    var_filter_column: str | None = None,
-    var_filter_values: list[str] | None = None,
     filters: dict | None = None,
     shuffle_ranges: bool = True,
     obs_columns: list[str] | None = None,
@@ -250,8 +247,6 @@ def submit_soma_extract_pipeline(
         range_size=range_size,
         output_chunk_size=output_chunk_size,
         feature_schema=feature_schema,
-        var_filter_column=var_filter_column,
-        var_filter_values=var_filter_values,
         filters=filters,
         shuffle_ranges=shuffle_ranges,
         obs_columns=obs_columns,

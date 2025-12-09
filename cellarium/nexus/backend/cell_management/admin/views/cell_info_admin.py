@@ -427,7 +427,6 @@ class ExtractCurriculumAdminView(generic.FormView):
                     output_chunk_size=cleaned["extract_bin_size"],
                     filters=cleaned.get("filters") or None,
                     shuffle_ranges=True,
-                    var_filter_column="feature_id",
                     feature_schema=cleaned.get("feature_schema"),
                     obs_columns=cleaned.get("obs_columns") or None,
                     var_columns=settings.TILEDB_SOMA_EXTRACT_VAR_COLUMNS,
