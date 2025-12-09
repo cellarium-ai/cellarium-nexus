@@ -34,34 +34,28 @@ def get_total_cells_in_soma(omics_dataset: models.OmicsDataset, filters: dict | 
 
 def _get_extract_paths(name: str) -> tuple[str, str]:
     """
-    Build extract bucket and plan paths for a SOMA extract.
+    Build extract bucket and extract_metadata paths for a SOMA extract.
 
     :param name: Name for the extract curriculum
 
     :raise ValueError: If name is empty
 
-    :return: Tuple of extract_bucket_path and plan_path
+    :return: Tuple of extract_bucket_path and extract_metadata_path
     """
     if not name:
         raise ValueError("Extract name must be provided")
 
     extract_bucket_path = f"{settings.BACKEND_PIPELINE_DIR}/{settings.PIPELINE_DATA_EXTRACTS_DIR}/{name}"
-    plan_path = f"{extract_bucket_path}/soma_extract_plan.json"
+    extract_metadata_path = f"{extract_bucket_path}/extract_metadata.json"
 
-    return extract_bucket_path, plan_path
-
-
-def _slice_for_worker(i: int, max_per_worker: int, total: int) -> tuple[int, int]:
-    start = i * max_per_worker
-    end = min(start + max_per_worker, total)
-    return start, end
+    return extract_bucket_path, extract_metadata_path
 
 
 def compose_soma_extract_configs(
     name: str,
     omics_dataset: models.OmicsDataset,
     curriculum_metadata: SomaCurriculumMetadata,
-    curriculum_metadata_path: str,
+    extract_metadata_path: str,
     extract_bucket_path: str,
     output_format: str = "h5ad",
     max_workers_extract: int | None = None,
@@ -70,58 +64,45 @@ def compose_soma_extract_configs(
     """
     Compose SOMA extract configs for the Kubeflow pipeline.
 
+    Create one config per worker, where number of workers is determined by
+    ranges per worker setting. Each worker gets a consecutive partition index.
+
     :param name: Name for the extract curriculum
     :param omics_dataset: Omics dataset with TileDB SOMA backend
-    :param curriculum_metadata: Some extract plan
-    :param curriculum_metadata_path: Bucket path where worker can obtain the SomaExtractPlan
+    :param curriculum_metadata: SOMA extract metadata
+    :param extract_metadata_path: Bucket path where worker can obtain the extract metadata
     :param extract_bucket_path: Bucket path where to save output chunks
     :param output_format: Output format - "h5ad" or "zarr"
     :param max_workers_extract: Maximum parallel workers for extraction
     :param max_workers_shuffle: Maximum parallel workers for shuffling
 
-    :raise ValueError: If range_size <= 0 or output_chunk_size <= 0 or omics_dataset has no URI
-    :raise exceptions.ZeroCellsReturnedError: If no cells match the filters
-    :raise SomaReadError: If SOMA read operation fails
+    :raise ValueError: If omics_dataset has no URI
 
     :return: List of extract configs
     """
     if not omics_dataset.uri:
         raise ValueError(f"TileDB SOMA dataset '{omics_dataset.name}' has no URI configured")
 
-    extract_configs = []
-
     num_ranges = len(curriculum_metadata.id_ranges)
-    num_output_chunks = curriculum_metadata.num_output_chunks
-    num_cells_in_range = settings.TILEDB_SOMA_EXTRACT_CONTIGUOUS_RANGE
     max_ranges_per_worker = settings.TILEDB_SOMA_RANGES_PER_WORKER
-    max_output_chunks_per_worker = max_ranges_per_worker * num_cells_in_range / curriculum_metadata.output_chunk_size
     num_workers = math.ceil(num_ranges / max_ranges_per_worker)
 
-    for i in range(num_workers):
-        start_range_slice, end_range_slice = _slice_for_worker(
-            i=i, max_per_worker=max_ranges_per_worker, total=num_ranges
+    return [
+        component_configs.SomaOpsExtract(
+            extract_name=name,
+            experiment_uri=omics_dataset.uri,
+            nexus_backend_api_url=settings.SITE_URL,
+            bucket_name=settings.BUCKET_NAME_PRIVATE,
+            extract_metadata_path=extract_metadata_path,
+            extract_bucket_path=extract_bucket_path,
+            curriculum_partition_index=i,
+            curriculum_partitions_num=num_workers,
+            output_format=output_format,
+            max_workers_extract=max_workers_extract,
+            max_workers_shuffle=max_workers_shuffle,
         )
-        start_output_ids_slice, end_output_ids_slice = _slice_for_worker(
-            i=i, max_per_worker=max_output_chunks_per_worker, total=num_output_chunks
-        )
-
-        extract_configs.append(
-            component_configs.SomaOpsExtract(
-                extract_name=name,
-                experiment_uri=omics_dataset.uri,
-                nexus_backend_api_url=settings.SITE_URL,
-                bucket_name=settings.BUCKET_NAME_PRIVATE,
-                plan_path=curriculum_metadata_path,
-                extract_bucket_path=extract_bucket_path,
-                range_indices_slice=[start_range_slice, end_range_slice],
-                output_chunk_indices_slice=[start_output_ids_slice, end_output_ids_slice],
-                output_format=output_format,
-                max_workers_extract=max_workers_extract,
-                max_workers_shuffle=max_workers_shuffle,
-            )
-        )
-
-    return extract_configs
+        for i in range(num_workers)
+    ]
 
 
 def compose_and_dump_soma_configs(
@@ -171,7 +152,7 @@ def compose_and_dump_soma_configs(
 
     :return: List of extract config paths
     """
-    extract_bucket_path, curriculum_metadata_path = _get_extract_paths(name=name)
+    extract_bucket_path, extract_metadata_path = _get_extract_paths(name=name)
     coordinator = SomaDataOpsCoordinator(
         experiment_uri=omics_dataset.uri,
         nexus_backend_api_url=settings.SITE_URL,
@@ -180,7 +161,7 @@ def compose_and_dump_soma_configs(
     curriculum_metadata = coordinator.prepare_soma_extract(
         extract_name=name,
         creator_id=creator_id,
-        curriculum_metadata_path=curriculum_metadata_path,
+        curriculum_metadata_path=extract_metadata_path,
         range_size=range_size,
         output_chunk_size=output_chunk_size,
         filters=filters,
@@ -197,7 +178,7 @@ def compose_and_dump_soma_configs(
         omics_dataset=omics_dataset,
         extract_bucket_path=extract_bucket_path,
         curriculum_metadata=curriculum_metadata,
-        curriculum_metadata_path=curriculum_metadata_path,
+        extract_metadata_path=extract_metadata_path,
         output_format=output_format,
         max_workers_extract=max_workers_extract,
         max_workers_shuffle=max_workers_shuffle,
@@ -343,7 +324,7 @@ def run_soma_extract_pipeline_locally(
         raise ValueError(f"TileDB SOMA dataset '{omics_dataset.name}' has no URI configured")
 
     extract_bucket_path = f"{settings.BACKEND_PIPELINE_DIR}/{settings.PIPELINE_DATA_EXTRACTS_DIR}/{name}"
-    plan_path = f"{extract_bucket_path}/soma_extract_plan.json"
+    extract_metadata_path = f"{extract_bucket_path}/extract_metadata.json"
 
     coordinator = SomaDataOpsCoordinator(
         experiment_uri=omics_dataset.uri,
@@ -351,12 +332,12 @@ def run_soma_extract_pipeline_locally(
         bucket_name=settings.BUCKET_NAME_PRIVATE,
     )
 
-    # Step 1: Prepare extract (compute plan, register curriculum)
+    # Step 1: Prepare extract (compute metadata, register curriculum)
     feature_ids = [feature.ensemble_id for idx, feature in enumerate(feature_schema.features.all())]
     coordinator.prepare_soma_extract(
         extract_name=name,
         creator_id=creator_id,
-        curriculum_metadata_path=plan_path,
+        curriculum_metadata_path=extract_metadata_path,
         range_size=range_size,
         output_chunk_size=output_chunk_size,
         filters=filters,
@@ -371,7 +352,7 @@ def run_soma_extract_pipeline_locally(
     # Step 2: Run extraction
     coordinator.run_soma_extract(
         extract_name=name,
-        curriculum_metadata_path=plan_path,
+        curriculum_metadata_path=extract_metadata_path,
         extract_bucket_path=extract_bucket_path,
         output_format=output_format,
         max_workers_extract=max_workers_extract,
@@ -381,6 +362,6 @@ def run_soma_extract_pipeline_locally(
     # Step 3: Mark curriculum as finished
     coordinator.mark_soma_curriculum_as_finished(
         extract_name=name,
-        curriculum_metadata_path=plan_path,
+        curriculum_metadata_path=extract_metadata_path,
         extract_bucket_path=extract_bucket_path,
     )

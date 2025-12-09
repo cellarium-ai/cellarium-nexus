@@ -210,8 +210,10 @@ def test_extract_ranges_happy_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         ],
         total_cells=20,
         range_size=10,
+        num_ranges=2,
         output_chunk_size=10,
         num_output_chunks=2,
+        last_chunk_size=10,
         output_chunk_indexes=[0, 1],
         filters={"tissue__eq": "lung"},
         obs_columns=["cell_type"],
@@ -284,8 +286,10 @@ def test_extract_ranges_failure_handling(monkeypatch: pytest.MonkeyPatch, tmp_pa
         ],
         total_cells=20,
         range_size=10,
+        num_ranges=2,
         output_chunk_size=10,
         num_output_chunks=2,
+        last_chunk_size=10,
         output_chunk_indexes=[0, 1],
         filters=None,
     )
@@ -321,27 +325,27 @@ def test_extract_ranges_failure_handling(monkeypatch: pytest.MonkeyPatch, tmp_pa
         )
 
 
-def test_shuffle_extracted_chunks_invalid_chunk_size(tmp_path: Path) -> None:
-    """
-    Verify invalid chunk_size raises ValueError.
-    """
-    with pytest.raises(ValueError):
-        extract.shuffle_extracted_chunks(
-            input_dir=tmp_path,
-            output_dir=tmp_path,
-            chunk_size=0,
-        )
-
-
 def test_shuffle_extracted_chunks_invalid_output_format(tmp_path: Path) -> None:
     """
     Verify invalid output_format raises ValueError.
     """
+    curriculum_metadata = SomaCurriculumMetadata(
+        experiment_uri="gs://bucket/soma",
+        value_filter="",
+        id_ranges=[IdContiguousRange(start=0, end=10)],
+        total_cells=10,
+        range_size=10,
+        num_ranges=1,
+        output_chunk_size=10,
+        num_output_chunks=1,
+        last_chunk_size=10,
+        output_chunk_indexes=[0],
+    )
     with pytest.raises(ValueError):
         extract.shuffle_extracted_chunks(
+            curriculum_metadata=curriculum_metadata,
             input_dir=tmp_path,
             output_dir=tmp_path,
-            chunk_size=10,
             output_format="invalid",
         )
 
@@ -354,11 +358,23 @@ def test_shuffle_extracted_chunks_no_input_files(tmp_path: Path) -> None:
     input_dir.mkdir()
     output_dir = tmp_path / "output"
 
+    curriculum_metadata = SomaCurriculumMetadata(
+        experiment_uri="gs://bucket/soma",
+        value_filter="",
+        id_ranges=[IdContiguousRange(start=0, end=10)],
+        total_cells=10,
+        range_size=10,
+        num_ranges=1,
+        output_chunk_size=10,
+        num_output_chunks=1,
+        last_chunk_size=10,
+        output_chunk_indexes=[0],
+    )
     with pytest.raises(ValueError):
         extract.shuffle_extracted_chunks(
+            curriculum_metadata=curriculum_metadata,
             input_dir=input_dir,
             output_dir=output_dir,
-            chunk_size=10,
         )
 
 
@@ -421,11 +437,25 @@ def test_shuffle_extracted_chunks_happy_path(monkeypatch: pytest.MonkeyPatch, tm
 
     monkeypatch.setattr(extract, "as_completed", fake_as_completed)
 
+    # 6 total cells, chunk_size=4 -> 2 output chunks
+    curriculum_metadata = SomaCurriculumMetadata(
+        experiment_uri="gs://bucket/soma",
+        value_filter="",
+        id_ranges=[IdContiguousRange(start=0, end=10)],
+        total_cells=6,
+        range_size=10,
+        num_ranges=1,
+        output_chunk_size=4,
+        num_output_chunks=2,
+        last_chunk_size=2,
+        output_chunk_indexes=[0, 1],
+    )
+
     # Execute
     extract.shuffle_extracted_chunks(
+        curriculum_metadata=curriculum_metadata,
         input_dir=input_dir,
         output_dir=output_dir,
-        chunk_size=4,
         input_format="h5ad",
         output_format="h5ad",
         max_workers=1,

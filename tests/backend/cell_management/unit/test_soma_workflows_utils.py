@@ -7,8 +7,9 @@ from unittest import mock
 import pytest
 
 from cellarium.nexus.backend.cell_management import models
-from cellarium.nexus.backend.cell_management.utils import exceptions, soma_workflows_utils
+from cellarium.nexus.backend.cell_management.utils import soma_workflows_utils
 from cellarium.nexus.shared.schemas import component_configs
+from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, SomaCurriculumMetadata
 
 
 @pytest.fixture
@@ -88,42 +89,27 @@ def test_get_total_cells_in_soma_raises_without_uri(soma_dataset: models.OmicsDa
         soma_workflows_utils.get_total_cells_in_soma(omics_dataset=soma_dataset)
 
 
-def test_compose_soma_extract_configs_invalid_range_size(soma_dataset: models.OmicsDataset) -> None:
-    with pytest.raises(ValueError, match="Range size must be greater than 0"):
-        soma_workflows_utils.compose_soma_extract_configs(
-            name="test_extract",
-            creator_id=1,
-            omics_dataset=soma_dataset,
-            range_size=0,
-            output_chunk_size=1000,
-        )
-
-
 def test_compose_soma_extract_configs_no_uri(soma_dataset: models.OmicsDataset) -> None:
     soma_dataset.uri = None
+    curriculum_metadata = SomaCurriculumMetadata(
+        experiment_uri="gs://bucket/soma_experiment",
+        value_filter="",
+        total_cells=5000,
+        id_ranges=[IdContiguousRange(start=0, end=1000)],
+        range_size=1000,
+        num_ranges=1,
+        num_output_chunks=5,
+        output_chunk_size=1000,
+        last_chunk_size=1000,
+    )
 
     with pytest.raises(ValueError, match="has no URI configured"):
         soma_workflows_utils.compose_soma_extract_configs(
             name="test_extract",
-            creator_id=1,
             omics_dataset=soma_dataset,
-            range_size=1000,
-            output_chunk_size=1000,
-        )
-
-
-def test_compose_soma_extract_configs_zero_cells(
-    monkeypatch: pytest.MonkeyPatch, soma_dataset: models.OmicsDataset
-) -> None:
-    monkeypatch.setattr(soma_workflows_utils, "get_total_cells_in_soma", lambda **kwargs: 0, raising=True)
-
-    with pytest.raises(exceptions.ZeroCellsReturnedError):
-        soma_workflows_utils.compose_soma_extract_configs(
-            name="test_extract",
-            creator_id=1,
-            omics_dataset=soma_dataset,
-            range_size=1000,
-            output_chunk_size=1000,
+            curriculum_metadata=curriculum_metadata,
+            extract_metadata_path="path/to/metadata.json",
+            extract_bucket_path="path/to/extract",
         )
 
 
@@ -132,45 +118,68 @@ def test_compose_soma_extract_configs_happy_path(
 ) -> None:
     settings = _make_settings()
     monkeypatch.setattr(soma_workflows_utils, "settings", settings, raising=False)
-    monkeypatch.setattr(soma_workflows_utils, "get_total_cells_in_soma", lambda **kwargs: 5000, raising=True)
+
+    # 5 ranges, 32 ranges per worker -> 1 worker
+    curriculum_metadata = SomaCurriculumMetadata(
+        experiment_uri="gs://bucket/soma_experiment",
+        value_filter="cell_type == 'T cell'",
+        total_cells=5000,
+        id_ranges=[IdContiguousRange(start=i * 1000, end=(i + 1) * 1000) for i in range(5)],
+        range_size=1000,
+        num_ranges=5,
+        num_output_chunks=5,
+        output_chunk_size=1000,
+        last_chunk_size=1000,
+    )
 
     extract_configs = soma_workflows_utils.compose_soma_extract_configs(
         name="test_extract",
-        creator_id=42,
         omics_dataset=soma_dataset,
-        range_size=1000,
-        output_chunk_size=1000,
-        filters={"cell_type__eq": "T cell"},
+        curriculum_metadata=curriculum_metadata,
+        extract_metadata_path="backend/extracts/test_extract/extract_metadata.json",
+        extract_bucket_path="backend/extracts/test_extract",
     )
 
     assert len(extract_configs) == 1
     cfg = extract_configs[0]
     assert isinstance(cfg, component_configs.SomaOpsExtract)
     assert cfg.extract_name == "test_extract"
-    assert cfg.plan_path == "backend/extracts/test_extract/soma_extract_plan.json"
-    assert cfg.range_indices_slice == [0, 1, 2, 3, 4]
+    assert cfg.extract_metadata_path == "backend/extracts/test_extract/extract_metadata.json"
+    assert cfg.curriculum_partition_index == 0
+    assert cfg.curriculum_partitions_num == 1
 
 
-def test_compose_soma_extract_configs_multiple_batches(
+def test_compose_soma_extract_configs_multiple_workers(
     monkeypatch: pytest.MonkeyPatch, soma_dataset: models.OmicsDataset
 ) -> None:
     settings = _make_settings()
     monkeypatch.setattr(soma_workflows_utils, "settings", settings, raising=False)
-    monkeypatch.setattr(soma_workflows_utils, "get_total_cells_in_soma", lambda **kwargs: 100_000, raising=True)
+
+    # 100 ranges, 32 ranges per worker -> 4 workers
+    curriculum_metadata = SomaCurriculumMetadata(
+        experiment_uri="gs://bucket/soma_experiment",
+        value_filter="",
+        total_cells=100_000,
+        id_ranges=[IdContiguousRange(start=i * 1000, end=(i + 1) * 1000) for i in range(100)],
+        range_size=1000,
+        num_ranges=100,
+        num_output_chunks=100,
+        output_chunk_size=1000,
+        last_chunk_size=1000,
+    )
 
     extract_configs = soma_workflows_utils.compose_soma_extract_configs(
         name="test_extract",
-        creator_id=1,
         omics_dataset=soma_dataset,
-        range_size=1000,  # 100 ranges
-        output_chunk_size=1000,
+        curriculum_metadata=curriculum_metadata,
+        extract_metadata_path="path/to/metadata.json",
+        extract_bucket_path="path/to/extract",
     )
 
     assert len(extract_configs) == 4
-    assert extract_configs[0].range_indices_slice == list(range(0, 32))
-    assert extract_configs[1].range_indices_slice == list(range(32, 64))
-    assert extract_configs[2].range_indices_slice == list(range(64, 96))
-    assert extract_configs[3].range_indices_slice == list(range(96, 100))
+    for i, cfg in enumerate(extract_configs):
+        assert cfg.curriculum_partition_index == i
+        assert cfg.curriculum_partitions_num == 4
 
 
 def test_compose_and_dump_soma_configs(monkeypatch: pytest.MonkeyPatch, soma_dataset: models.OmicsDataset) -> None:
@@ -182,14 +191,14 @@ def test_compose_and_dump_soma_configs(monkeypatch: pytest.MonkeyPatch, soma_dat
             experiment_uri="gs://exp",
             nexus_backend_api_url="https://site",
             bucket_name="private-bucket",
-            plan_path="plan1",
+            extract_metadata_path="metadata1",
             extract_name="test_extract",
         ),
         mock.Mock(
             experiment_uri="gs://exp",
             nexus_backend_api_url="https://site",
             bucket_name="private-bucket",
-            plan_path="plan2",
+            extract_metadata_path="metadata2",
             extract_name="test_extract",
         ),
     ]
@@ -200,7 +209,19 @@ def test_compose_and_dump_soma_configs(monkeypatch: pytest.MonkeyPatch, soma_dat
         raising=True,
     )
 
+    curriculum_metadata = SomaCurriculumMetadata(
+        experiment_uri="gs://bucket/soma_experiment",
+        value_filter="",
+        total_cells=5000,
+        id_ranges=[IdContiguousRange(start=0, end=1000)],
+        range_size=1000,
+        num_ranges=1,
+        num_output_chunks=5,
+        output_chunk_size=1000,
+        last_chunk_size=1000,
+    )
     coordinator = mock.Mock()
+    coordinator.prepare_soma_extract.return_value = curriculum_metadata
     monkeypatch.setattr(soma_workflows_utils, "SomaDataOpsCoordinator", lambda **kwargs: coordinator, raising=True)
 
     monkeypatch.setattr(
@@ -216,11 +237,10 @@ def test_compose_and_dump_soma_configs(monkeypatch: pytest.MonkeyPatch, soma_dat
         omics_dataset=soma_dataset,
         range_size=1000,
         output_chunk_size=1000,
-        prepare=False,
     )
 
     assert paths == ["gs://bucket/extract_0.yaml", "gs://bucket/extract_1.yaml"]
-    coordinator.prepare_soma_extract.assert_not_called()
+    coordinator.prepare_soma_extract.assert_called_once()
 
 
 def test_submit_soma_extract_pipeline(monkeypatch: pytest.MonkeyPatch, soma_dataset: models.OmicsDataset) -> None:

@@ -58,9 +58,9 @@ def test_soma_extract_error_inherits_from_operation_error() -> None:
         raise soma_ops.SomaExtractError("extract failed")
 
 
-def test_soma_planning_error_inherits_from_operation_error() -> None:
+def test_soma_prepare_curriculum_metadata_error_inherits_from_operation_error() -> None:
     """
-    Verify SomaPlanningError inherits from SomaOperationError.
+    Verify SomaPrepareCurriculumMetadataError inherits from SomaOperationError.
     """
     assert issubclass(soma_ops.SomaPrepareCurriculumMetadataError, soma_ops.SomaOperationError)
 
@@ -77,7 +77,7 @@ def test_all_exceptions_exported_in_init() -> None:
     assert hasattr(soma_ops, "SomaWriteError")
     assert hasattr(soma_ops, "SomaFilterError")
     assert hasattr(soma_ops, "SomaExtractError")
-    assert hasattr(soma_ops, "SomaPlanningError")
+    assert hasattr(soma_ops, "SomaPrepareCurriculumMetadataError")
 
 
 def test_main_exports_in_init() -> None:
@@ -86,7 +86,7 @@ def test_main_exports_in_init() -> None:
     """
     assert hasattr(soma_ops, "TileDBSOMADataOperator")
     assert hasattr(soma_ops, "build_soma_value_filter")
-    assert hasattr(soma_ops, "plan_soma_extract")
+    assert hasattr(soma_ops, "prepare_extract_curriculum")
     assert hasattr(soma_ops, "shuffle_extracted_chunks")
 
 
@@ -97,14 +97,14 @@ def test_all_list_contains_expected_names() -> None:
     expected_names = {
         "TileDBSOMADataOperator",
         "build_soma_value_filter",
-        "plan_soma_extract",
+        "prepare_extract_curriculum",
         "shuffle_extracted_chunks",
         "SomaOperationError",
         "SomaReadError",
         "SomaWriteError",
         "SomaFilterError",
         "SomaExtractError",
-        "SomaPlanningError",
+        "SomaPrepareCurriculumMetadataError",
     }
 
     assert hasattr(soma_ops, "__all__")

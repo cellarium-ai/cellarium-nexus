@@ -188,8 +188,10 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
             id_ranges=[IdContiguousRange(start=0, end=10)],
             total_cells=10,
             range_size=range_size,
+            num_ranges=1,
             output_chunk_size=output_chunk_size,
             num_output_chunks=1,
+            last_chunk_size=10,
             output_chunk_indexes=[0],
             filters=filters,
             var_filter_column=var_filter_column,
@@ -199,7 +201,7 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
             x_layer=x_layer,
         )
 
-    monkeypatch.setattr(data_operator_module, "plan_soma_extract", _fake_plan_soma_extract)
+    monkeypatch.setattr(data_operator_module, "prepare_extract_curriculum", _fake_plan_soma_extract)
 
     # Execute
     filters = {"tissue__eq": "lung"}
@@ -275,8 +277,10 @@ def test_extract_ranges_shuffled_with_temp_dir(monkeypatch: pytest.MonkeyPatch, 
         id_ranges=[IdContiguousRange(start=0, end=10)],
         total_cells=10,
         range_size=10,
+        num_ranges=1,
         output_chunk_size=10,
         num_output_chunks=1,
+        last_chunk_size=10,
         output_chunk_indexes=[0],
         filters=None,
     )
@@ -298,14 +302,14 @@ def test_extract_ranges_shuffled_with_temp_dir(monkeypatch: pytest.MonkeyPatch, 
     # Verify extract_ranges was called with temp_dir
     assert len(extract_calls) == 1
     assert extract_calls[0]["output_dir"] == temp_dir
-    assert extract_calls[0]["plan"] == plan
+    assert extract_calls[0]["curriculum_metadata"] == plan
     assert extract_calls[0]["max_workers"] == 2
 
     # Verify shuffle was called
     assert len(shuffle_calls) == 1
     assert shuffle_calls[0]["input_dir"] == temp_dir
     assert shuffle_calls[0]["output_dir"] == output_dir
-    assert shuffle_calls[0]["chunk_size"] == 10
+    assert shuffle_calls[0]["curriculum_metadata"] == plan
     assert shuffle_calls[0]["output_format"] == "zarr"
     assert shuffle_calls[0]["max_workers"] == 4
 
@@ -362,8 +366,10 @@ def test_extract_ranges_shuffled_auto_temp_dir(monkeypatch: pytest.MonkeyPatch, 
         id_ranges=[IdContiguousRange(start=0, end=10)],
         total_cells=10,
         range_size=10,
+        num_ranges=1,
         output_chunk_size=10,
         num_output_chunks=1,
+        last_chunk_size=10,
         output_chunk_indexes=[0],
         filters=None,
     )
@@ -423,8 +429,10 @@ def test_extract_ranges_shuffled_no_cleanup(monkeypatch: pytest.MonkeyPatch, tmp
         id_ranges=[IdContiguousRange(start=0, end=10)],
         total_cells=10,
         range_size=10,
+        num_ranges=1,
         output_chunk_size=10,
         num_output_chunks=1,
+        last_chunk_size=10,
         output_chunk_indexes=[0],
         filters=None,
     )

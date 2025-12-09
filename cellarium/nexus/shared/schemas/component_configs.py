@@ -72,10 +72,10 @@ class SomaOpsExtract(BaseModel):
     experiment_uri: str
     nexus_backend_api_url: str
     bucket_name: str
-    plan_path: str
+    extract_metadata_path: str
     extract_bucket_path: str
-    range_indices_slice: list[int] | None = None
-    output_chunk_indices_slice: list[int] | None = None
+    curriculum_partition_index: int = 0
+    curriculum_partitions_num: int = 1
     output_format: str = "h5ad"
     max_workers_extract: int | None = None
     max_workers_shuffle: int | None = None
