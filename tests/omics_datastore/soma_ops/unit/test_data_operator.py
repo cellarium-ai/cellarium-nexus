@@ -239,68 +239,6 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
     assert plan.x_layer == "raw"
 
 
-def test_extract_ranges_to_anndata_delegates_to_extract(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """
-    Verify extract_ranges_to_anndata delegates to extract_ranges.
-    """
-    operator = data_operator_module.TileDBSOMADataOperator(experiment_uri="gs://bucket/soma")
-
-    # Mock extract_ranges at the data_operator module level
-    extract_calls = []
-
-    def _fake_extract_ranges(
-        plan: SomaCurriculumMetadata,
-        output_dir: Path,
-        output_format: str,
-        max_workers: int | None,
-        verbose: bool,
-    ) -> None:
-        extract_calls.append(
-            {
-                "plan": plan,
-                "output_dir": output_dir,
-                "output_format": output_format,
-                "max_workers": max_workers,
-                "verbose": verbose,
-            }
-        )
-
-    monkeypatch.setattr(data_operator_module, "extract_ranges", _fake_extract_ranges)
-
-    # Execute
-    plan = SomaCurriculumMetadata(
-        experiment_uri="gs://bucket/soma",
-        value_filter='tissue == "lung"',
-        id_ranges=[IdContiguousRange(start=0, end=10)],
-        total_cells=10,
-        range_size=10,
-        output_chunk_size=10,
-        num_output_chunks=1,
-        output_chunk_indexes=[0],
-        filters={"tissue__eq": "lung"},
-        var_joinids=[1, 2, 3],
-        obs_columns=["cell_type"],
-        var_columns=["symbol"],
-        x_layer="raw",
-    )
-
-    output_dir = tmp_path / "output"
-
-    operator.extract_ranges_to_anndata(
-        plan=plan,
-        output_dir=output_dir,
-        max_workers=4,
-    )
-
-    # Verify delegation
-    assert len(extract_calls) == 1
-    call = extract_calls[0]
-    assert call["plan"] == plan
-    assert call["output_dir"] == output_dir
-    assert call["max_workers"] == 4
-    assert call["verbose"] is False
-
-
 def test_extract_ranges_shuffled_with_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """
     Verify extract_ranges_shuffled uses provided temp_dir.

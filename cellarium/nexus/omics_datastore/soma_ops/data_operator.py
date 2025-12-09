@@ -225,43 +225,6 @@ class TileDBSOMADataOperator:
             x_layer=x_layer,
         )
 
-    def extract_ranges_to_anndata(
-        self,
-        *,
-        plan: SomaCurriculumMetadata,
-        output_dir: Path,
-        output_format: Literal["zarr", "h5ad"] = "h5ad",
-        max_workers: int | None = None,
-        verbose: bool = False,
-    ) -> None:
-        """
-        Extract SOMA data for the given joinid ranges into AnnData files.
-
-        Delegate to the extract module to perform parallel extraction.
-        All data specification (obs_columns, var_columns, var_joinids, x_layer)
-        is taken from the plan.
-
-        :param plan: SOMA extract plan with all data specification.
-        :param output_dir: Local directory to save AnnData files.
-        :param output_format: Output format - "zarr" or "h5ad" (default: "h5ad").
-        :param max_workers: Maximum number of parallel workers.
-        :param verbose: If False, suppress INFO level logging in parallel workers.
-
-        :raise SomaExtractError: If SOMA reads fail
-        :raise IOError: If file operations fail
-        """
-        logger.info(f"Extracting {len(plan.id_ranges)} ranges to {output_dir} (format: {output_format})")
-
-        extract_ranges(
-            curriculum_metadata=plan,
-            output_dir=output_dir,
-            output_format=output_format,
-            max_workers=max_workers,
-            verbose=verbose,
-        )
-
-        logger.info("Extract operation completed successfully")
-
     def extract_ranges_shuffled(
         self,
         *,
@@ -320,6 +283,8 @@ class TileDBSOMADataOperator:
             extract_ranges(
                 curriculum_metadata=curriculum_metadata,
                 output_dir=temp_dir,
+                curriculum_partition_index=curriculum_partition_index,
+                curriculum_partition_total_num=curriculum_partition_total_num,
                 output_format="h5ad",
                 max_workers=max_workers_extract,
                 verbose=verbose,
