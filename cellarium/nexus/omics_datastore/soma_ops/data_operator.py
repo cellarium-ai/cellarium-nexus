@@ -266,11 +266,6 @@ class TileDBSOMADataOperator:
         :raise IOError: If file operations fail
         :raise ValueError: If output_format is invalid
         """
-        logger.info(
-            f"Extracting and shuffling {len(curriculum_metadata.id_ranges)} ranges to {output_dir} "
-            f"(output_chunk_size: {curriculum_metadata.output_chunk_size}, format: {output_format})"
-        )
-
         # Stage 1: Extract contiguous ranges to temp directory
         if temp_dir is None:
             temp_dir = Path(tempfile.mkdtemp(prefix="soma_extract_temp_"))

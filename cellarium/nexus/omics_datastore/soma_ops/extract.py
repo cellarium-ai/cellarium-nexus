@@ -17,6 +17,7 @@ import tiledbsoma
 from anndata._core.aligned_df import ImplicitModificationWarning
 from anndata.experimental import AnnCollection
 from scipy.sparse import coo_matrix
+from tenacity import before_log, retry, stop_after_attempt, wait_exponential
 from tqdm import tqdm
 
 from cellarium.nexus.omics_datastore.soma_ops import utils
@@ -46,6 +47,12 @@ def child_init(log_level: str, verbose: bool = True) -> None:
     )
 
 
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    before=before_log(logger, logging.INFO),
+    reraise=True,
+)
 def extract_range_to_anndata(
     *,
     experiment_uri: str,
@@ -229,15 +236,15 @@ def _extract_range_worker(
     """
     Worker function for parallel extraction.
 
-    :param idx: Index of the range being processed
-    :param experiment_uri: URI of the SOMA experiment
-    :param value_filter: SOMA value filter string for obs
-    :param joinid_range: Range of soma_joinids to extract
-    :param output_path: Path to write the output file
-    :param obs_columns: Optional list of obs columns to include
-    :param var_columns: Optional list of var columns to include
-    :param x_layer: Name of the X layer to read
-    :param output_format: Output format, either "zarr" or "h5ad"
+    :param idx: Index of the range being processed.
+    :param experiment_uri: URI of the SOMA experiment.
+    :param value_filter: SOMA value filter string for obs.
+    :param joinid_range: Range of soma_joinids to extract.
+    :param output_path: Path to write the output file.
+    :param obs_columns: Optional list of obs columns to include.
+    :param var_columns: Optional list of var columns to include.
+    :param x_layer: Name of the X layer to read.
+    :param output_format: Output format, either "zarr" or "h5ad".
 
     :raise SomaExtractError: If extraction fails
 
@@ -362,35 +369,38 @@ def extract_ranges(
     logger.info(f"Successfully extracted all {len(ranges_to_process)} ranges to {output_dir}")
 
 
-def _write_shuffled_chunk(
-    chunk_idx: int,
-    output_chunk_idx: int,
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=10),
+    before=before_log(logger, logging.INFO),
+    reraise=True,
+)
+def shuffle_chunk_to_anndata(
+    *,
     chunk_indices: np.ndarray,
     input_files: list[Path],
     input_format: Literal["zarr", "h5ad"],
-    output_dir: Path,
+    output_path: Path,
     output_format: Literal["zarr", "h5ad"],
-    var_joinids: list[int] | None,
-) -> tuple[int, int, str]:
+    var_joinids: list[int] | None = None,
+) -> None:
     """
-    Worker function to write a single shuffled chunk.
+    Shuffle and write a single chunk of cells to an AnnData file.
 
-    Each worker creates its own AnnCollection from all input files to enable
-    complete shuffling across all ranges while avoiding pickling issues.
-    Feature filtering is applied here for better SOMA query performance.
+    Create an AnnCollection from all input files, extract cells at the specified
+    indices, optionally filter features, and write to the output path.
 
-    :param chunk_idx: Internal index of the chunk being processed.
-    :param output_chunk_idx: Pre-computed output index for the extract file name.
-    :param chunk_indices: Array of cell indices for this chunk.
+    :param chunk_indices: Array of cell indices to extract for this chunk.
     :param input_files: List of all input file paths.
-    :param input_format: Input format.
-    :param output_dir: Output directory.
-    :param output_format: Output format.
+    :param input_format: Input format - "zarr" or "h5ad".
+    :param output_path: Path to write the output file.
+    :param output_format: Output format - "zarr" or "h5ad".
     :param var_joinids: Optional list of var soma_joinids to filter features by.
 
-    :return: Tuple of (chunk_idx, output_chunk_idx, output_path_str)
+    :raise IOError: If file operations fail
+    :raise ValueError: If output_format is invalid
     """
-    logger.info(f"Processing chunk {chunk_idx} -> extract_{output_chunk_idx:06d} ({len(chunk_indices)} cells)...")
+    logger.info(f"Processing {len(chunk_indices)} cells to {output_path}")
 
     # Each worker creates its own AnnCollection with ALL files (backed mode)
     if input_format == "zarr":
@@ -417,17 +427,56 @@ def _write_shuffled_chunk(
         chunk_adata = chunk_adata[:, var_joinids].copy()
         logger.info(f"Filtered to {chunk_adata.n_vars} features")
 
-    # Write output with pre-computed output index
+    # Ensure output directory exists
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Write output
     if output_format == "zarr":
-        output_path = output_dir / f"extract_{output_chunk_idx:06d}.zarr"
         chunk_adata.write_zarr(output_path)
-    else:  # h5ad
-        output_path = output_dir / f"extract_{output_chunk_idx:06d}.h5ad"
+    elif output_format == "h5ad":
         chunk_adata.write_h5ad(output_path, compression="gzip")
+    else:
+        raise ValueError(f"output_format must be 'zarr' or 'h5ad', got {output_format}")
 
-    logger.info(f"Successfully wrote extract_{output_chunk_idx:06d} with {len(chunk_indices)} cells to {output_path}")
+    logger.info(f"Successfully wrote {len(chunk_indices)} cells to {output_path}")
 
-    return chunk_idx, output_chunk_idx, str(output_path)
+
+def _shuffle_chunk_worker(
+    idx: int,
+    output_chunk_idx: int,
+    chunk_indices: np.ndarray,
+    input_files: list[Path],
+    input_format: Literal["zarr", "h5ad"],
+    output_path: Path,
+    output_format: Literal["zarr", "h5ad"],
+    var_joinids: list[int] | None,
+) -> tuple[int, int, str]:
+    """
+    Worker function for parallel shuffle chunk writing.
+
+    :param idx: Internal index of the chunk being processed.
+    :param output_chunk_idx: Pre-computed output index for the extract file name.
+    :param chunk_indices: Array of cell indices for this chunk.
+    :param input_files: List of all input file paths.
+    :param input_format: Input format.
+    :param output_path: Path to write the output file.
+    :param output_format: Output format.
+    :param var_joinids: Optional list of var soma_joinids to filter features by.
+
+    :raise IOError: If file operations fail
+
+    :return: Tuple of (idx, output_chunk_idx, output_path_str)
+    """
+    shuffle_chunk_to_anndata(
+        chunk_indices=chunk_indices,
+        input_files=input_files,
+        input_format=input_format,
+        output_path=output_path,
+        output_format=output_format,
+        var_joinids=var_joinids,
+    )
+
+    return idx, output_chunk_idx, str(output_path)
 
 
 def shuffle_extracted_chunks(
@@ -547,16 +596,20 @@ def shuffle_extracted_chunks(
             chunk_indices = cell_permutation[start_idx:end_idx]
             output_chunk_idx = output_chunk_indexes[chunk_idx]
 
+            # Determine output path
+            file_ext = ".zarr" if output_format == "zarr" else ".h5ad"
+            output_path = output_dir / f"extract_{output_chunk_idx:06d}{file_ext}"
+
             # Submit chunk processing job
             # Each worker will create its own AnnCollection with all files
             future = executor.submit(
-                _write_shuffled_chunk,
+                _shuffle_chunk_worker,
                 chunk_idx,
                 output_chunk_idx,
                 chunk_indices,
                 input_files,
                 input_format,
-                output_dir,
+                output_path,
                 output_format,
                 curriculum_metadata.var_joinids,
             )
