@@ -230,8 +230,8 @@ class TileDBSOMADataOperator:
         *,
         curriculum_metadata: SomaCurriculumMetadata,
         output_dir: Path,
-        curriculum_partition_index: int = 0,
-        curriculum_partition_total_num: int = 1,
+        partition_index: int = 0,
+        max_ranges_per_partition: int | None = None,
         output_format: Literal["zarr", "h5ad"] = "h5ad",
         temp_dir: Path | None = None,
         max_workers_extract: int | None = None,
@@ -252,9 +252,9 @@ class TileDBSOMADataOperator:
 
         :param curriculum_metadata: SOMA curriculum metadata with all data specification.
         :param output_dir: Final output directory for shuffled chunks.
-        :param curriculum_partition_index: Index used for slicing ranges and output chunk indexes.
+        :param partition_index: Index used for slicing ranges and output chunk indexes.
             Needed for distributing extracting over multiple distributed VMs. Default is 0 (single VM execution).
-        :param curriculum_partition_total_num: Total number of partitions.
+        :param max_ranges_per_partition: Partition block size. Default is None, this means it will use all ranges
         :param output_format: Output format - "zarr" or "h5ad" (default: "h5ad").
         :param temp_dir: Temporary directory for contiguous extracts (auto-created if None).
         :param max_workers_extract: Maximum parallel workers for extraction (network I/O intensive).
@@ -283,8 +283,8 @@ class TileDBSOMADataOperator:
             extract_ranges(
                 curriculum_metadata=curriculum_metadata,
                 output_dir=temp_dir,
-                curriculum_partition_index=curriculum_partition_index,
-                curriculum_partition_total_num=curriculum_partition_total_num,
+                partition_index=partition_index,
+                max_ranges_per_partition=max_ranges_per_partition,
                 output_format="h5ad",
                 max_workers=max_workers_extract,
                 verbose=verbose,
@@ -292,12 +292,17 @@ class TileDBSOMADataOperator:
 
             # Stage 2: Shuffle cells across extracts (feature filtering applied here)
             logger.info("Stage 2: Shuffling cells across extracts...")
+            max_output_chunks_per_partition = (
+                int(max_ranges_per_partition * curriculum_metadata.range_size / curriculum_metadata.output_chunk_size)
+                if max_ranges_per_partition is not None
+                else None
+            )
             shuffle_extracted_chunks(
                 curriculum_metadata=curriculum_metadata,
                 input_dir=temp_dir,
                 output_dir=output_dir,
-                curriculum_partition_index=curriculum_partition_index,
-                curriculum_partition_total_num=curriculum_partition_total_num,
+                partition_index=partition_index,
+                max_output_chunks_per_partition=max_output_chunks_per_partition,
                 input_format="h5ad",  # Read from H5AD temp files
                 output_format=output_format,  # Write in requested format
                 max_workers=max_workers_shuffle,

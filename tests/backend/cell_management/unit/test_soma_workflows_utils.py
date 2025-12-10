@@ -145,8 +145,8 @@ def test_compose_soma_extract_configs_happy_path(
     assert isinstance(cfg, component_configs.SomaOpsExtract)
     assert cfg.extract_name == "test_extract"
     assert cfg.extract_metadata_path == "backend/extracts/test_extract/extract_metadata.json"
-    assert cfg.curriculum_partition_index == 0
-    assert cfg.curriculum_partitions_num == 1
+    assert cfg.partition_index == 0
+    assert cfg.max_ranges_per_partition == 32  # From settings.TILEDB_SOMA_RANGES_PER_WORKER
 
 
 def test_compose_soma_extract_configs_multiple_workers(
@@ -178,8 +178,8 @@ def test_compose_soma_extract_configs_multiple_workers(
 
     assert len(extract_configs) == 4
     for i, cfg in enumerate(extract_configs):
-        assert cfg.curriculum_partition_index == i
-        assert cfg.curriculum_partitions_num == 4
+        assert cfg.partition_index == i
+        assert cfg.max_ranges_per_partition == 32  # From settings.TILEDB_SOMA_RANGES_PER_WORKER
 
 
 def test_compose_and_dump_soma_configs(monkeypatch: pytest.MonkeyPatch, soma_dataset: models.OmicsDataset) -> None:

@@ -74,8 +74,8 @@ class SomaOpsExtract(BaseModel):
     bucket_name: str
     extract_metadata_path: str
     extract_bucket_path: str
-    curriculum_partition_index: int = 0
-    curriculum_partitions_num: int = 1
+    partition_index: int = 0
+    max_ranges_per_partition: int | None = 1
     output_format: str = "h5ad"
     max_workers_extract: int | None = None
     max_workers_shuffle: int | None = None

@@ -95,8 +95,8 @@ def compose_soma_extract_configs(
             bucket_name=settings.BUCKET_NAME_PRIVATE,
             extract_metadata_path=extract_metadata_path,
             extract_bucket_path=extract_bucket_path,
-            curriculum_partition_index=i,
-            curriculum_partitions_num=num_workers,
+            partition_index=i,
+            max_ranges_per_partition=max_ranges_per_worker,
             output_format=output_format,
             max_workers_extract=max_workers_extract,
             max_workers_shuffle=max_workers_shuffle,
@@ -120,25 +120,24 @@ def compose_and_dump_soma_configs(
     output_format: str = "h5ad",
     max_workers_extract: int | None = None,
     max_workers_shuffle: int | None = None,
-    prepare: bool = True,
 ) -> list[str]:
     """
     Compose SOMA extract configs, create the extract plan, and dump configs to GCS bucket.
 
-    :param name: Name for the extract curriculum
-    :param creator_id: ID of the user who initiated the extract
-    :param omics_dataset: Omics dataset with TileDB SOMA backend
-    :param range_size: Target number of cells per range
-    :param output_chunk_size: Target cells per output chunk (for shuffling)
-    :param feature_schema: Feature schema used to derive feature IDs for filtering
-    :param filters: Optional dictionary of filter statements to apply
-    :param shuffle_ranges: Whether to shuffle the joinid ranges
-    :param obs_columns: Optional obs columns to include in output files
-    :param var_columns: Optional var columns to include in output files
-    :param x_layer: Name of the SOMA X layer to read counts from
-    :param output_format: Output format - "h5ad" or "zarr"
-    :param max_workers_extract: Maximum parallel workers for extraction
-    :param max_workers_shuffle: Maximum parallel workers for shuffling
+    :param name: Name for the extract curriculum.
+    :param creator_id: ID of the user who initiated the extract.
+    :param omics_dataset: Omics dataset with TileDB SOMA backend.
+    :param range_size: Target number of cells per range.
+    :param output_chunk_size: Target cells per output chunk (for shuffling).
+    :param feature_schema: Feature schema used to derive feature IDs for filtering.
+    :param filters: Optional dictionary of filter statements to apply.
+    :param shuffle_ranges: Whether to shuffle the joinid ranges.
+    :param obs_columns: Optional obs columns to include in output files.
+    :param var_columns: Optional var columns to include in output files.
+    :param x_layer: Name of the SOMA X layer to read counts from.
+    :param output_format: Output format - "h5ad" or "zarr".
+    :param max_workers_extract: Maximum parallel workers for extraction.
+    :param max_workers_shuffle: Maximum parallel workers for shuffling.
 
     :raise ValueError: If range_size <= 0 or output_chunk_size <= 0 or omics_dataset has no URI
     :raise exceptions.ZeroCellsReturnedError: If no cells match the filters

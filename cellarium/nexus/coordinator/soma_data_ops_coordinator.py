@@ -172,8 +172,8 @@ class SomaDataOpsCoordinator:
         extract_name: str,
         curriculum_metadata_path: str,
         extract_bucket_path: str,
-        curriculum_partition_index: int = 0,
-        curriculum_partition_total_num: int = 1,
+        partition_index: int = 0,
+        max_ranges_per_partition: int | None = None,
         output_format: Literal["h5ad", "zarr"] = "h5ad",
         max_workers_extract: int | None = None,
         max_workers_shuffle: int | None = None,
@@ -188,11 +188,9 @@ class SomaDataOpsCoordinator:
         :param extract_name: Name of the extract/curriculum (for error reporting)
         :param curriculum_metadata_path: Path to the extract curriculum_metadata JSON within the bucket
         :param extract_bucket_path: Path within bucket for output files
-        :param curriculum_partition_index: Zero-based index of the worker/partition. Determines which slice of
+        :param partition_index: Zero-based index of the worker/partition. Determines which slice of
             ranges and output chunk IDs this worker will process. Default is 0 for processing all in once.
-        :param curriculum_partition_total_num: Total number of partitions (workers). Used together with
-            curriculum_partition_index to split the ranges and output chunk IDs into non-overlapping slices.
-            Default is set to 1 for or processing all in once.
+        :param max_ranges_per_partition: Partition block size. Default is None, this means it will use all ranges
         :param output_format: Output format - "h5ad" or "zarr"
         :param max_workers_extract: Maximum parallel workers for extraction
         :param max_workers_shuffle: Maximum parallel workers for shuffling
@@ -205,7 +203,7 @@ class SomaDataOpsCoordinator:
         try:
             # Step 1: Load curriculum_metadata from cloud storage
             curriculum_metadata = self._load_metadata_from_bucket(curriculum_metadata_path=curriculum_metadata_path)
-            logger.info(f"Loaded extract curriculum_metadata. Extracting partition index {curriculum_partition_index}")
+            logger.info(f"Loaded extract curriculum_metadata. Extracting partition index {partition_index}")
 
             # Step 2: Extract data using workspace for file management
             output_path = f"{extract_bucket_path}/extract_files"
@@ -219,8 +217,8 @@ class SomaDataOpsCoordinator:
                 self.soma_operator.extract_ranges_shuffled(
                     curriculum_metadata=curriculum_metadata,
                     output_dir=output_dir,
-                    curriculum_partition_index=curriculum_partition_index,
-                    curriculum_partition_total_num=curriculum_partition_total_num,
+                    partition_index=partition_index,
+                    max_ranges_per_partition=max_ranges_per_partition,
                     output_format=output_format,
                     temp_dir=temp_dir,
                     max_workers_extract=max_workers_extract,

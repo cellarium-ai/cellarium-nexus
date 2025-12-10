@@ -261,8 +261,8 @@ def extract_ranges(
     *,
     curriculum_metadata: SomaCurriculumMetadata,
     output_dir: Path,
-    curriculum_partition_index: int = 0,
-    curriculum_partition_total_num: int = 1,
+    partition_index: int = 0,
+    max_ranges_per_partition: int | None = None,
     output_format: Literal["zarr", "h5ad"] = "zarr",
     max_workers: int | None = None,
     verbose: bool = True,
@@ -276,9 +276,9 @@ def extract_ranges(
 
     :param curriculum_metadata: SOMA extract metadata with all data specification.
     :param output_dir: Local directory to save AnnData files.
-    :param curriculum_partition_index: Index used for slicing ranges and output chunk indexes.
+    :param partition_index: Index used for slicing ranges and output chunk indexes.
         Needed for distributing extracting over multiple distributed VMs. Default is 0 (single VM execution).
-    :param curriculum_partition_total_num: Total number of partitions.
+    :param max_ranges_per_partition: Partition block size. Default is None, this means it will use all ranges
     :param output_format: Output format - "zarr" or "h5ad" (default: "zarr").
     :param max_workers: Maximum number of parallel workers.
     :param verbose: If False, suppress INFO level logging in parallel workers.
@@ -290,11 +290,8 @@ def extract_ranges(
     # Suppress ImplicitModificationWarning from anndata
     warnings.filterwarnings(action="ignore", category=ImplicitModificationWarning)
 
-    if curriculum_partition_index >= curriculum_partition_total_num:
-        raise SomaExtractError(
-            f"`curriculum_partition_index` can't be equal or larger than `curriculum_partition_total_num`. "
-            f"Got {curriculum_partition_index} and {curriculum_partition_total_num} respectively."
-        )
+    if max_ranges_per_partition is None:
+        max_ranges_per_partition = curriculum_metadata.num_ranges
 
     if max_workers is None:
         max_workers = multiprocessing.cpu_count()
@@ -303,10 +300,10 @@ def extract_ranges(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Calculating current extract ranges and output ids
-    range_slice_start, range_slice_end = utils.get_partition_slice(
+    range_slice_start, range_slice_end = utils.get_block_slice(
         total_items=curriculum_metadata.num_ranges,
-        partition_index=curriculum_partition_index,
-        num_partitions=curriculum_partition_total_num,
+        partition_index=partition_index,
+        block_size=max_ranges_per_partition,
     )
 
     ranges_to_process = curriculum_metadata.id_ranges[range_slice_start:range_slice_end]
@@ -438,8 +435,8 @@ def shuffle_extracted_chunks(
     curriculum_metadata: SomaCurriculumMetadata,
     input_dir: Path,
     output_dir: Path,
-    curriculum_partition_index: int = 0,
-    curriculum_partition_total_num: int = 1,
+    partition_index: int = 0,
+    max_output_chunks_per_partition: int | None = None,
     input_format: Literal["zarr", "h5ad"] = "zarr",
     output_format: Literal["zarr", "h5ad"] = "h5ad",
     max_workers: int | None = None,
@@ -456,9 +453,9 @@ def shuffle_extracted_chunks(
     :param curriculum_metadata: SOMA extract metadata with all data specification.
     :param input_dir: Directory with contiguous range files
     :param output_dir: Directory to write shuffled chunks
-    :param curriculum_partition_index: Index used for slicing ranges and output chunk indexes.
+    :param partition_index: Index used for slicing ranges and output chunk indexes.
         Needed for distributing extracting over multiple distributed VMs. Default is 0 (single VM execution).
-    :param curriculum_partition_total_num: Total number of partitions.
+    :param max_output_chunks_per_partition: Partition block size. Default is None, this means it will use all ranges
     :param input_format: Input format - "zarr" or "h5ad" (default: "zarr")
     :param output_format: Output format - "zarr" or "h5ad" (default: "h5ad")
     :param max_workers: Maximum parallel workers for writing
@@ -478,6 +475,9 @@ def shuffle_extracted_chunks(
 
     if max_workers is None:
         max_workers = multiprocessing.cpu_count() // 2 + 1
+
+    if max_output_chunks_per_partition is None:
+        max_output_chunks_per_partition = curriculum_metadata.num_output_chunks
 
     logger.info(f"Shuffling cells from {input_dir} ({input_format}) to {output_dir} ({output_format})")
 
@@ -505,10 +505,10 @@ def shuffle_extracted_chunks(
 
     chunk_size = curriculum_metadata.output_chunk_size
     # Compute output_chunk_indexes
-    output_chunk_id_slice_start, output_chunk_id_slice_end = utils.get_partition_slice(
+    output_chunk_id_slice_start, output_chunk_id_slice_end = utils.get_block_slice(
         total_items=curriculum_metadata.num_output_chunks,
-        partition_index=curriculum_partition_index,
-        num_partitions=curriculum_partition_total_num,
+        partition_index=partition_index,
+        block_size=max_output_chunks_per_partition,
     )
     output_chunk_indexes = curriculum_metadata.output_chunk_indexes[
         output_chunk_id_slice_start:output_chunk_id_slice_end

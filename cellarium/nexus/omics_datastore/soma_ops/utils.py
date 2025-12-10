@@ -1,35 +1,30 @@
-def get_partition_slice(
+def get_block_slice(
     total_items: int,
     partition_index: int,
-    num_partitions: int,
+    block_size: int,
 ) -> tuple[int, int]:
     """
-    Calculate [start, end) slice for this partition.
-    Distributes the remainder over the first `remainder` partitions.
+    Calculate [start, end) slice for a fixed-size block.
+    Each partition gets at most `block_size` items.
+    All full blocks are size `block_size`, the last block gets the remainder.
 
     :param total_items: Total number of items in the sequence
-    :param partition_index: Index for which slice has to be calculated
-    :param num_partitions: Total number of partitions
+    :param partition_index: Zero-based partition index
+    :param block_size: Target number of items per partition (e.g. 500)
 
-    :return: Tuple with start end slice indexes for current partition
+    :return: (start, end) slice indexes for this partition
     """
-    if not (0 <= partition_index < num_partitions):
-        raise ValueError(f"partition_index {partition_index} must be in [0, {num_partitions})")
-    if num_partitions <= 0:
-        raise ValueError(f"num_partitions must be positive, got {num_partitions}")
+    if block_size <= 0:
+        raise ValueError(f"block_size must be positive, got {block_size}")
     if total_items < 0:
         raise ValueError(f"total_items must be non-negative, got {total_items}")
+    if partition_index < 0:
+        raise ValueError(f"partition_index must be non-negative, got {partition_index}")
 
-    base = total_items // num_partitions
-    rem = total_items % num_partitions
+    start = partition_index * block_size
+    if start >= total_items:
+        # No work for this partition
+        return total_items, total_items
 
-    if partition_index < rem:
-        # Partitions [0, rem) get base + 1 items
-        start = partition_index * (base + 1)
-        end = start + (base + 1)
-    else:
-        # Remaining partitions get base items
-        start = rem * (base + 1) + (partition_index - rem) * base
-        end = start + base
-
-    return start, min(end, total_items)
+    end = min(start + block_size, total_items)
+    return start, end
