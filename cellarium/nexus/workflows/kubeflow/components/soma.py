@@ -7,7 +7,7 @@ SOMA_EXTRACT_LABELS = {**conf.LABELS, "method": "soma_extract"}
 
 
 @job.dsl_component_job(
-    machine_type="e2-highmem-16",
+    machine_type="e2-highmem-8",
     display_name="soma_extract",
     base_image=conf.BASE_IMAGE,
     service_account=conf.SERVICE_ACCOUNT,

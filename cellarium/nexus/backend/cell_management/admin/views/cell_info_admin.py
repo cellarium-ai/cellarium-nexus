@@ -432,8 +432,8 @@ class ExtractCurriculumAdminView(generic.FormView):
                     var_columns=settings.TILEDB_SOMA_EXTRACT_VAR_COLUMNS,
                     x_layer=settings.TILEDB_SOMA_EXTRACT_X_LAYER,
                     output_format=settings.TILEDB_SOMA_EXTRACT_OUTPUT_FORMAT,
-                    max_workers_extract=16,
-                    max_workers_shuffle=6,
+                    max_workers_extract=8,
+                    max_workers_shuffle=3,
                 )
             else:
                 # Submit BigQuery extract pipeline

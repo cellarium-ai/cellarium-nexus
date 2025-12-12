@@ -215,30 +215,30 @@ def prepare_extract_curriculum(
         f"var_filter_values_count={len(var_filter_values) if var_filter_values else 0}"
     )
 
-    # Compute var_joinids if feature filtering is requested
-    var_joinids: list[int] | None = None
+    # Compute var_ids if feature filtering is requested
+    var_ids: list[int] | None = None
     if var_filter_column and var_filter_values:
-        var_joinids = read_var_joinids(
+        var_ids = read_var_joinids(
             experiment_uri=experiment_uri,
             var_filter_column=var_filter_column,
             var_filter_values=var_filter_values,
         )
-        logger.info(f"Found {len(var_joinids)} var joinids for feature filter")
+        logger.info(f"Found {len(var_ids)} var obs_ids for feature filter")
 
-    # Read and sort filtered joinids
-    joinids = read_filtered_joinids(
+    # Read and sort filtered obs_ids
+    obs_ids = read_filtered_joinids(
         experiment_uri=experiment_uri,
         value_filter=value_filter,
     )
 
-    total_cells = len(joinids)
+    total_cells = len(obs_ids)
     logger.info(f"Found {total_cells} cells to extract")
 
     if total_cells == 0:
         raise exceptions.SomaPrepareCurriculumMetadataError(f"No cells found matching the filter: {value_filter}")
 
     # Compute contiguous id ranges
-    id_ranges = compute_contiguous_ranges(values=joinids, chunk_size=range_size, shuffle=shuffle_ranges)
+    id_ranges = compute_contiguous_ranges(values=obs_ids, chunk_size=range_size, shuffle=shuffle_ranges)
     output_ids = compute_output_ids(n_values=total_cells, chunk_size=output_chunk_size, shuffle=shuffle_output_ids)
     logger.info(f"Computed {len(id_ranges)} ranges. Output chunk n: {output_ids}")
 
@@ -258,7 +258,7 @@ def prepare_extract_curriculum(
         last_chunk_size=last_chunk_size,
         output_chunk_indexes=output_ids,
         filters=filters,
-        var_joinids=var_joinids,
+        var_joinids=var_ids,
         var_filter_column=var_filter_column,
         var_filter_values=var_filter_values,
         obs_columns=obs_columns,
