@@ -207,6 +207,38 @@ def select(column_names: list[str]) -> str:
     return f"select {', '.join(processed_columns)}" if processed_columns else "*"
 
 
+def group_by(column_names: list[str]) -> str:
+    """
+    Construct a SQL group by body from the provided list of columns.
+
+    :param column_names: A list of column names to be included in the group by clause. If the list is empty, all columns
+        are selected.
+    :raises ValueError: If any column name contains more than one period or is an empty string.
+
+    :return: A string with comma-separated values of columns for subsequent use in an SQL query.
+
+    **Example**
+
+    Using in Mako template::
+        <%!
+            from casp.datastore_manager.bq_sql import mako_helpers
+        %>
+        ...
+        ${mako_helpers.group_by(["cell_type", "suspension_type"])}
+        ...
+
+    Results in::
+        ...
+        group by cell_type, suspension_type
+        ...
+    """
+    if len(column_names) < 1:
+        raise ValueError("One or more columns have to be provided. None were.")
+
+    processed_columns = _process_column_names(column_names=column_names)
+    return f"group by {', '.join(processed_columns)}"
+
+
 def build_concat_expression(columns: list[str], alias: str, delim: str = "##") -> str:
     """
     Construct an SQL expression that concatenates a list of columns with a specified delimiter and assigns

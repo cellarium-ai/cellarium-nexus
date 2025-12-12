@@ -140,3 +140,43 @@ def test_select_invalid_column_raises() -> None:
     """
     with pytest.raises(ValueError):
         mako_helpers.select(column_names=["a.b.c"])  # too many periods
+
+
+def test_group_by_basic() -> None:
+    """
+    Render a select distinct clause with multiple columns.
+    """
+    stmt = mako_helpers.group_by(column_names=["cell_type", "suspension_type"])
+    assert stmt == "group by cell_type, suspension_type"
+
+
+def test_group_by_with_alias() -> None:
+    """
+    Render a select distinct clause preserving table aliases.
+    """
+    stmt = mako_helpers.group_by(column_names=["c.cell_type", "c.organism"])
+    assert stmt == "group by c.cell_type, c.organism"
+
+
+def test_group_by_single_column() -> None:
+    """
+    Render a select distinct clause with a single column.
+    """
+    stmt = mako_helpers.group_by(column_names=["organism"])
+    assert stmt == "group by organism"
+
+
+def test_group_by_empty_raises() -> None:
+    """
+    Raise an error when no columns are provided to select_distinct().
+    """
+    with pytest.raises(ValueError):
+        mako_helpers.group_by(column_names=[])
+
+
+def test_group_by_invalid_column_raises() -> None:
+    """
+    Raise an error when a column name contains more than one period.
+    """
+    with pytest.raises(ValueError):
+        mako_helpers.group_by(column_names=["a.b.c"])

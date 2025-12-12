@@ -282,6 +282,36 @@ class BigQueryDataOperator:
         logger.info(f"Found {count} matching cells.")
         return count
 
+    def count_groups_with_bins(
+        self,
+        *,
+        group_columns: list[str],
+        extract_bin_size: int,
+        filter_statements: dict[str, Any] | None = None,
+        dataset: str | None = None,
+    ):
+        target_dataset = dataset if dataset else self.dataset
+        template_path = (
+            Path(__file__).parent.parent / "sql_templates" / "general" / "count_groups_with_maximum_size.sql.mako"
+        )
+        template_data = bq_sql.TemplateData(
+            project=self.project,
+            dataset=target_dataset,
+            table_name=constants.BQ_CELL_INFO_TABLE_NAME,
+            group_columns=group_columns,
+            extract_bin_size=extract_bin_size,
+            filter_statements=filter_statements,
+        )
+        sql = bq_sql.render(str(template_path), template_data)
+        query_job = self.client.query(sql)
+        results = query_job.result()
+
+        row = next(iter(results))
+        count = row.total_groups
+
+        logger.info(f"Found {count} groups by selected filters.")
+        return count
+
     def get_distinct_count(self, *, table_name: str, column_name: str, dataset: str | None = None) -> int:
         """
         Count distinct values for a column in a base table.

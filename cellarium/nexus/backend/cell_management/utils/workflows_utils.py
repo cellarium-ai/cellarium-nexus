@@ -31,6 +31,63 @@ def get_total_cell_in_bq_number(bigquery_dataset: models.BigQueryDataset, filter
     return bq_data_operator.count_cells(filter_statements=filters)
 
 
+def get_total_number_of_groups(
+    bigquery_dataset: models.BigQueryDataset,
+    group_columns: list[str],
+    extract_bin_size: int,
+    filters: dict | None = None,
+) -> int:
+    """
+    Get total number of groups groups assigned by provided group columns and using selected filters
+
+    :param bigquery_dataset: Bigquery dataset to extract from
+    :param group_columns: Columns to group by
+    :param extract_bin_size: Number of cells per extract bin
+    :param filters: Optional dictionary of filter statements to apply
+
+    :return: Int indicating number of group
+    """
+    bq_client = bigquery.Client(project=settings.GCP_PROJECT_ID)
+    bq_data_operator = BigQueryDataOperator(
+        client=bq_client, project=settings.GCP_PROJECT_ID, dataset=bigquery_dataset.name
+    )
+    return bq_data_operator.count_groups_with_bins(
+        group_columns=group_columns, filter_statements=filters, extract_bin_size=extract_bin_size
+    )
+
+
+def get_total_number_of_cells_and_bins(
+    bigquery_dataset: models.BigQueryDataset,
+    extract_bin_size: int,
+    filters: dict | None = None,
+    extract_bin_keys: list[str] | None = None,
+) -> tuple[int, int]:
+    """
+    Calculate total number of cells and bins based on the extract strategy: whether the extract is done fully randomly or by
+    using `extract_bin_keys`
+
+    :param bigquery_dataset: Bigquery dataset to extract from
+    :param extract_bin_size: Number of cells per extract bin
+    :param filters: Optional dictionary of filter statements to apply
+    :param extract_bin_keys: Optional list of keys to use for binning the extract. If not provided, the keys will be
+        assigned randomly.
+
+    :return: Number indicating total number of the bins
+    """
+    total_cells = get_total_cell_in_bq_number(bigquery_dataset=bigquery_dataset, filters=filters)
+    if extract_bin_keys:
+        num_bins = get_total_number_of_groups(
+            bigquery_dataset=bigquery_dataset,
+            group_columns=extract_bin_keys,
+            extract_bin_size=extract_bin_size,
+            filters=filters,
+        )
+    else:
+        num_bins = math.ceil(total_cells / extract_bin_size)
+
+    return total_cells, num_bins
+
+
 def compose_extract_curriculum_configs(
     name: str,
     creator_id: int,
@@ -68,8 +125,12 @@ def compose_extract_curriculum_configs(
     if extract_bin_size <= 0:
         raise ValueError(f"Extract bin size must be greater than 0. Received: {extract_bin_size}")
 
-    total_cells = get_total_cell_in_bq_number(bigquery_dataset=bigquery_dataset, filters=filters)
-    num_bins = math.ceil(total_cells / extract_bin_size)
+    total_cells, num_bins = get_total_number_of_cells_and_bins(
+        bigquery_dataset=bigquery_dataset,
+        extract_bin_size=extract_bin_size,
+        filters=filters,
+        extract_bin_keys=extract_bin_keys,
+    )
     features = [
         schemas.FeatureSchema(id=idx, symbol=feature.symbol, ensemble_id=feature.ensemble_id)
         for idx, feature in enumerate(feature_schema.features.all())

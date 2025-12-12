@@ -306,7 +306,7 @@ def child_init(log_level: str) -> None:
 
 
 @retry(
-    stop=stop_after_attempt(3),
+    stop=stop_after_attempt(10),
     wait=wait_exponential(multiplier=1, min=1, max=10),
     before=before_log(logger, logging.INFO),
 )

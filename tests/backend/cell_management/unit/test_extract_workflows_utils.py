@@ -73,7 +73,7 @@ def test_compose_extract_curriculum_configs_zero_cells(
     Raise ZeroCellsReturnedError when total cell count is zero.
     """
     fs = _make_feature_schema()
-    monkeypatch.setattr(workflows_utils, "get_total_cell_in_bq_number", lambda **_: 0, raising=True)
+    monkeypatch.setattr(workflows_utils, "get_total_number_of_cells_and_bins", lambda **_: (0, 0), raising=True)
 
     with pytest.raises(workflows_utils.exceptions.ZeroCellsReturnedError):
         workflows_utils.compose_extract_curriculum_configs(
@@ -95,7 +95,7 @@ def test_compose_extract_curriculum_configs_happy_path(
     """
     fs = _make_feature_schema(symbols=[("E1", "S1"), ("E2", "S2"), ("E3", "S3")])
     # total_cells=5, bin_size=2 => 3 bins
-    monkeypatch.setattr(workflows_utils, "get_total_cell_in_bq_number", lambda **_: 5, raising=True)
+    monkeypatch.setattr(workflows_utils, "get_total_number_of_cells_and_bins", lambda **_: (5, 3), raising=True)
 
     prepare_cfg, extract_cfgs = workflows_utils.compose_extract_curriculum_configs(
         name="extract-1",
@@ -118,6 +118,34 @@ def test_compose_extract_curriculum_configs_happy_path(
     assert "extra1" in cfg.obs_columns
 
 
+def test_compose_extract_curriculum_configs_with_extract_bin_keys(
+    monkeypatch: pytest.MonkeyPatch, default_dataset: models.BigQueryDataset
+) -> None:
+    """
+    Compose configs with extract_bin_keys passed through to prepare config.
+    """
+    fs = _make_feature_schema(symbols=[("E1", "S1")])
+    # 10 cells, 5 bins (from group count)
+    monkeypatch.setattr(workflows_utils, "get_total_number_of_cells_and_bins", lambda **_: (10, 5), raising=True)
+
+    prepare_cfg, extract_cfgs = workflows_utils.compose_extract_curriculum_configs(
+        name="extract-keys",
+        creator_id=1,
+        feature_schema=fs,
+        bigquery_dataset=default_dataset,
+        extract_bin_size=100,
+        categorical_column_count_limit=2000,
+        obs_columns=["organism"],
+        extract_bin_keys=["cell_type", "suspension_type"],
+    )
+
+    # extract_bin_keys should be passed to prepare config
+    assert prepare_cfg.extract_bin_keys == ["cell_type", "suspension_type"]
+    # 5 bins in one worker config
+    assert len(extract_cfgs) == 1
+    assert extract_cfgs[0].bins == [0, 1, 2, 3, 4]
+
+
 def test_compose_and_dump_configs_delegates_and_returns_paths(
     monkeypatch: pytest.MonkeyPatch, default_dataset: models.BigQueryDataset
 ) -> None:
@@ -125,7 +153,7 @@ def test_compose_and_dump_configs_delegates_and_returns_paths(
     Ensure compose_and_dump_configs dumps both prepare and extract configs and returns their paths.
     """
     fs = _make_feature_schema()
-    monkeypatch.setattr(workflows_utils, "get_total_cell_in_bq_number", lambda **_: 10, raising=True)
+    monkeypatch.setattr(workflows_utils, "get_total_number_of_cells_and_bins", lambda **_: (10, 2), raising=True)
 
     captured: dict[str, Any] = {"calls": []}
 
