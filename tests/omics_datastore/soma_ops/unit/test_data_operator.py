@@ -241,9 +241,9 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
     assert plan.x_layer == "raw"
 
 
-def test_extract_ranges_shuffled_with_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_extract_randomized_with_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """
-    Verify extract_ranges_shuffled uses provided temp_dir.
+    Verify extract_randomized uses provided temp_dir.
     """
     operator = data_operator_module.TileDBSOMADataOperator(experiment_uri="gs://bucket/soma")
 
@@ -289,7 +289,7 @@ def test_extract_ranges_shuffled_with_temp_dir(monkeypatch: pytest.MonkeyPatch, 
     temp_dir.mkdir()
     output_dir = tmp_path / "output"
 
-    operator.extract_ranges_shuffled(
+    operator.extract_randomized(
         curriculum_metadata=plan,
         output_dir=output_dir,
         output_format="zarr",
@@ -321,9 +321,9 @@ def test_extract_ranges_shuffled_with_temp_dir(monkeypatch: pytest.MonkeyPatch, 
     assert rmtree_calls == [temp_dir]
 
 
-def test_extract_ranges_shuffled_auto_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_extract_randomized_auto_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """
-    Verify extract_ranges_shuffled creates temp_dir when None.
+    Verify extract_randomized creates temp_dir when None.
     """
     operator = data_operator_module.TileDBSOMADataOperator(experiment_uri="gs://bucket/soma")
 
@@ -380,7 +380,7 @@ def test_extract_ranges_shuffled_auto_temp_dir(monkeypatch: pytest.MonkeyPatch, 
 
     output_dir = tmp_path / "output"
 
-    operator.extract_ranges_shuffled(
+    operator.extract_randomized(
         curriculum_metadata=plan,
         output_dir=output_dir,
         output_format="h5ad",
@@ -400,9 +400,9 @@ def test_extract_ranges_shuffled_auto_temp_dir(monkeypatch: pytest.MonkeyPatch, 
     assert len(rmtree_calls) == 1
 
 
-def test_extract_ranges_shuffled_no_cleanup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_extract_randomized_no_cleanup(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """
-    Verify extract_ranges_shuffled skips cleanup when cleanup_temp=False.
+    Verify extract_randomized skips cleanup when cleanup_temp=False.
     """
     operator = data_operator_module.TileDBSOMADataOperator(experiment_uri="gs://bucket/soma")
 
@@ -445,7 +445,7 @@ def test_extract_ranges_shuffled_no_cleanup(monkeypatch: pytest.MonkeyPatch, tmp
     temp_dir.mkdir()
     output_dir = tmp_path / "output"
 
-    operator.extract_ranges_shuffled(
+    operator.extract_randomized(
         curriculum_metadata=plan,
         output_dir=output_dir,
         temp_dir=temp_dir,

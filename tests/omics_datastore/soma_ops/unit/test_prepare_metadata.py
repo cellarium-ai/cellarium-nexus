@@ -6,8 +6,8 @@ from cellarium.nexus.omics_datastore.soma_ops import (
     SomaFilterError,
     SomaPrepareCurriculumMetadataError,
     SomaReadError,
-    curriculum_metadata,
 )
+from cellarium.nexus.omics_datastore.soma_ops import curriculum_randomized as curriculum_metadata
 from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange
 from tests.omics_datastore.soma_ops.conftest import FakeSomaExperiment
 

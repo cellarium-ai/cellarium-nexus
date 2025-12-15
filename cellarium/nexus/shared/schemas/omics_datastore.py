@@ -41,17 +41,20 @@ class IdContiguousRange(BaseModel):
     end: int
 
 
+class GroupedBin(BaseModel):
+    """A bin containing cells from a specific group combination."""
+
+    group_key: str
+    group_filter: str
+    joinid_min: int
+    joinid_max: int
+    cell_count: int
+
+
 class SomaCurriculumMetadata(BaseModel):
     experiment_uri: str
     value_filter: str
     total_cells: int
-    id_ranges: list[IdContiguousRange]
-    range_size: int
-    num_ranges: int
-    num_output_chunks: int
-    output_chunk_size: int
-    last_chunk_size: int
-    output_chunk_indexes: list[int] | None = None
     filters: dict[str, Any] | None = None
     var_joinids: list[int] | None = None
     var_filter_column: str | None = None
@@ -59,3 +62,17 @@ class SomaCurriculumMetadata(BaseModel):
     obs_columns: list[str] | None = None
     var_columns: list[str] | None = None
     x_layer: str = "X"
+
+    # For randomized extraction (contiguous ranges)
+    id_ranges: list[IdContiguousRange] | None = None
+    range_size: int | None = None
+    num_ranges: int | None = None
+    num_output_chunks: int | None = None
+    output_chunk_size: int | None = None
+    last_chunk_size: int | None = None
+    output_chunk_indexes: list[int] | None = None
+
+    # For grouped extraction
+    extract_bin_keys: list[str] | None = None
+    grouped_bins: list[GroupedBin] | None = None
+    num_grouped_bins: int | None = None

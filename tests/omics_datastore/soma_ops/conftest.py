@@ -122,12 +122,13 @@ class FakeSomaObs:
         column_names: list[str] | None = None,
         value_filter: str | None = None
     ) -> FakeSomaQuery:
-        # Validate column_names if provided
-        if column_names is not None:
-            assert column_names == ["soma_joinid"]
         # Validate expected_filter if set
         if self.expected_filter is not None:
             assert value_filter == self.expected_filter or value_filter is None
+        # Filter columns if specified
+        if column_names is not None:
+            available_cols = [c for c in column_names if c in self.data.columns]
+            return FakeSomaQuery(self.data[available_cols])
         return FakeSomaQuery(self.data)
 
 

@@ -13,9 +13,11 @@ from typing import Any, Literal
 import pyarrow as pa
 import tiledbsoma
 
-from cellarium.nexus.omics_datastore.soma_ops.curriculum_metadata import prepare_extract_curriculum
+from cellarium.nexus.omics_datastore.soma_ops.curriculum_grouped import prepare_grouped_curriculum
+from cellarium.nexus.omics_datastore.soma_ops.curriculum_randomized import prepare_extract_curriculum
 from cellarium.nexus.omics_datastore.soma_ops.exceptions import SomaReadError
-from cellarium.nexus.omics_datastore.soma_ops.extract import extract_ranges, shuffle_extracted_chunks
+from cellarium.nexus.omics_datastore.soma_ops.extract_grouped import extract_grouped_bins
+from cellarium.nexus.omics_datastore.soma_ops.extract_randomized import extract_ranges, shuffle_extracted_chunks
 from cellarium.nexus.omics_datastore.soma_ops.filters import build_soma_value_filter
 from cellarium.nexus.shared.schemas.omics_datastore import SomaCurriculumMetadata
 
@@ -182,50 +184,77 @@ class TileDBSOMADataOperator:
         self,
         *,
         filters: dict[str, object] | None,
-        range_size: int,
-        output_chunk_size: int,
+        range_size: int | None = None,
+        output_chunk_size: int | None = None,
         shuffle_ranges: bool = True,
         var_filter_column: str | None = None,
         var_filter_values: list[str] | None = None,
         obs_columns: list[str] | None = None,
         var_columns: list[str] | None = None,
         x_layer: str = "X",
+        extract_bin_keys: list[str] | None = None,
+        bin_size: int | None = None,
     ) -> SomaCurriculumMetadata:
         """
         Compute a SOMA extract plan from filter dict.
 
-        Delegate to the planning module to compute contiguous joinid ranges.
+        If extract_bin_keys is provided, compute grouped bins where cells from the same
+        group stay together. Otherwise, compute contiguous joinid ranges for randomized
+        extraction.
 
         :param filters: Dict of filter conditions using the Nexus format.
-        :param range_size: Target number of cells per range (for extraction).
-        :param output_chunk_size: Target number of cells per output chunk (for shuffling).
-        :param shuffle_ranges: Whether to shuffle the resulting joinid ranges.
+        :param range_size: Target number of cells per range (for randomized extraction).
+        :param output_chunk_size: Target number of cells per output chunk (for randomized shuffling).
+        :param shuffle_ranges: Whether to shuffle the resulting joinid ranges (randomized only).
         :param var_filter_column: Name of the var column to filter features by.
         :param var_filter_values: List of values to match in the var filter column.
         :param obs_columns: List of obs columns to include in extraction.
         :param var_columns: List of var columns to include in extraction.
         :param x_layer: Name of the SOMA X layer to read counts from.
+        :param extract_bin_keys: List of obs column names to group by (for grouped extraction).
+        :param bin_size: Maximum number of cells per bin (for grouped extraction).
 
         :raise SomaPlanningError: If SOMA reads fail
         :raise SomaReadError: If SOMA reads fail
-        :raise ValueError: If range_size or output_chunk_size is not positive
+        :raise ValueError: If required parameters are missing or invalid
 
-        :return: SomaExtractPlan with joinid ranges and total cell count
+        :return: SomaCurriculumMetadata with either id_ranges or grouped_bins
         """
-        return prepare_extract_curriculum(
-            experiment_uri=self.experiment_uri,
-            filters=filters,
-            range_size=range_size,
-            output_chunk_size=output_chunk_size,
-            shuffle_ranges=shuffle_ranges,
-            var_filter_column=var_filter_column,
-            var_filter_values=var_filter_values,
-            obs_columns=obs_columns,
-            var_columns=var_columns,
-            x_layer=x_layer,
-        )
+        if extract_bin_keys:
+            # Grouped extraction mode
+            if bin_size is None:
+                raise ValueError("bin_size is required for grouped extraction")
+            return prepare_grouped_curriculum(
+                experiment_uri=self.experiment_uri,
+                filters=filters,
+                extract_bin_keys=extract_bin_keys,
+                bin_size=bin_size,
+                var_filter_column=var_filter_column,
+                var_filter_values=var_filter_values,
+                obs_columns=obs_columns,
+                var_columns=var_columns,
+                x_layer=x_layer,
+            )
+        else:
+            # Randomized extraction mode
+            if range_size is None:
+                raise ValueError("range_size is required for randomized extraction")
+            if output_chunk_size is None:
+                raise ValueError("output_chunk_size is required for randomized extraction")
+            return prepare_extract_curriculum(
+                experiment_uri=self.experiment_uri,
+                filters=filters,
+                range_size=range_size,
+                output_chunk_size=output_chunk_size,
+                shuffle_ranges=shuffle_ranges,
+                var_filter_column=var_filter_column,
+                var_filter_values=var_filter_values,
+                obs_columns=obs_columns,
+                var_columns=var_columns,
+                x_layer=x_layer,
+            )
 
-    def extract_ranges_shuffled(
+    def extract_randomized(
         self,
         *,
         curriculum_metadata: SomaCurriculumMetadata,
@@ -311,3 +340,42 @@ class TileDBSOMADataOperator:
             if cleanup_temp and temp_dir.exists():
                 logger.info(f"Cleaning up temporary directory: {temp_dir}")
                 shutil.rmtree(temp_dir)
+
+    def extract_grouped(
+        self,
+        *,
+        curriculum_metadata: SomaCurriculumMetadata,
+        output_dir: Path,
+        partition_index: int = 0,
+        max_bins_per_partition: int | None = None,
+        output_format: Literal["zarr", "h5ad"] = "h5ad",
+        max_workers: int | None = None,
+        verbose: bool = False,
+    ) -> None:
+        """
+        Extract grouped bins directly to output files.
+
+        Support distributed execution via partition_index and max_bins_per_partition.
+        No shuffle stage — cells from the same group stay together.
+
+        :param curriculum_metadata: Metadata with grouped_bins
+        :param output_dir: Output directory for extract files
+        :param partition_index: Zero-based partition index for distributed workers
+        :param max_bins_per_partition: Number of bins per partition (for distribution)
+        :param output_format: Output format - "zarr" or "h5ad"
+        :param max_workers: Parallel workers within this partition
+        :param verbose: Enable verbose logging in workers
+
+        :raise SomaExtractError: If SOMA reads fail
+        :raise IOError: If file operations fail
+        :raise ValueError: If output_format is invalid or grouped_bins is None
+        """
+        extract_grouped_bins(
+            curriculum_metadata=curriculum_metadata,
+            output_dir=output_dir,
+            partition_index=partition_index,
+            max_bins_per_partition=max_bins_per_partition,
+            output_format=output_format,
+            max_workers=max_workers,
+            verbose=verbose,
+        )

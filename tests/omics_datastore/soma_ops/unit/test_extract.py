@@ -5,7 +5,8 @@ import pandas as pd
 import pytest
 import scipy.sparse as sp
 
-from cellarium.nexus.omics_datastore.soma_ops import SomaExtractError, extract
+from cellarium.nexus.omics_datastore.soma_ops import SomaExtractError
+from cellarium.nexus.omics_datastore.soma_ops import extract_randomized as extract
 from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, SomaCurriculumMetadata
 from tests.omics_datastore.soma_ops.conftest import FakeAnnData, FakeExecutor, FakeFuture, FakeSomaExperiment
 

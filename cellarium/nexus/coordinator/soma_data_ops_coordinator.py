@@ -213,8 +213,8 @@ class SomaDataOpsCoordinator:
                 temp_dir = paths["root"] / "temp_extract"
                 temp_dir.mkdir(exist_ok=True)
 
-                # Run extraction with shuffle pipeline
-                self.soma_operator.extract_ranges_shuffled(
+                # Run randomized extraction pipeline
+                self.soma_operator.extract_randomized(
                     curriculum_metadata=curriculum_metadata,
                     output_dir=output_dir,
                     partition_index=partition_index,
