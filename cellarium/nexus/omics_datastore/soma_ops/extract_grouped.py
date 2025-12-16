@@ -22,7 +22,7 @@ from tqdm import tqdm
 
 from cellarium.nexus.omics_datastore.soma_ops import utils
 from cellarium.nexus.omics_datastore.soma_ops.exceptions import SomaExtractError
-from cellarium.nexus.shared.schemas.omics_datastore import GroupedBin, SomaCurriculumMetadata
+from cellarium.nexus.shared.schemas.omics_datastore import GroupedBin, GroupedCurriculumMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +56,7 @@ def extract_grouped_bin_to_anndata(
     experiment_uri: str,
     grouped_bin: GroupedBin,
     output_path: Path,
+    value_filter: str | None = None,
     obs_columns: list[str] | None = None,
     var_columns: list[str] | None = None,
     var_joinids: list[int] | None = None,
@@ -65,12 +66,12 @@ def extract_grouped_bin_to_anndata(
     """
     Extract a single grouped bin to an AnnData file.
 
-    Query by joinid range + group filter for efficiency. The group filter ensures
-    only cells from the specific group are included.
+    Query by joinid range + combined filter (user filter AND group filter) for efficiency.
 
     :param experiment_uri: URI of the SOMA experiment
     :param grouped_bin: GroupedBin with group filter and joinid bounds
     :param output_path: Local path to save AnnData file
+    :param value_filter: Optional user-provided filter to combine with group filter
     :param obs_columns: Optional obs columns to include
     :param var_columns: Optional var columns to include
     :param var_joinids: Optional list of var soma_joinids to filter features by
@@ -88,12 +89,17 @@ def extract_grouped_bin_to_anndata(
         )
 
         with tiledbsoma.open(experiment_uri, mode="r") as exp:
-            # Query with both range and group filter
-            logger.info(f"Reading obs data with filter: {grouped_bin.group_filter}")
+            # Combine user filter with group filter
+            if value_filter:
+                combined_filter = f"({value_filter}) and ({grouped_bin.group_filter})"
+            else:
+                combined_filter = grouped_bin.group_filter
+
+            logger.info(f"Reading obs data with filter: {combined_filter}")
 
             obs_query = exp.obs.read(
                 coords=(slice(grouped_bin.joinid_min, grouped_bin.joinid_max),),
-                value_filter=grouped_bin.group_filter,
+                value_filter=combined_filter,
             )
 
             obs_df = obs_query.concat().to_pandas()
@@ -216,6 +222,7 @@ def _extract_grouped_bin_worker(
     experiment_uri: str,
     grouped_bin: GroupedBin,
     output_path: Path,
+    value_filter: str | None,
     obs_columns: list[str] | None,
     var_columns: list[str] | None,
     var_joinids: list[int] | None,
@@ -230,6 +237,7 @@ def _extract_grouped_bin_worker(
     :param experiment_uri: URI of the SOMA experiment
     :param grouped_bin: GroupedBin to extract
     :param output_path: Path to write the output file
+    :param value_filter: Optional user-provided filter to combine with group filter
     :param obs_columns: Optional list of obs columns to include
     :param var_columns: Optional list of var columns to include
     :param var_joinids: Optional list of var soma_joinids to filter features by
@@ -244,6 +252,7 @@ def _extract_grouped_bin_worker(
         experiment_uri=experiment_uri,
         grouped_bin=grouped_bin,
         output_path=output_path,
+        value_filter=value_filter,
         obs_columns=obs_columns,
         var_columns=var_columns,
         var_joinids=var_joinids,
@@ -256,7 +265,7 @@ def _extract_grouped_bin_worker(
 
 def extract_grouped_bins(
     *,
-    curriculum_metadata: SomaCurriculumMetadata,
+    curriculum_metadata: GroupedCurriculumMetadata,
     output_dir: Path,
     partition_index: int = 0,
     max_bins_per_partition: int | None = None,
@@ -342,6 +351,7 @@ def extract_grouped_bins(
                 curriculum_metadata.experiment_uri,
                 grouped_bin,
                 output_path,
+                curriculum_metadata.value_filter,
                 curriculum_metadata.obs_columns,
                 curriculum_metadata.var_columns,
                 curriculum_metadata.var_joinids,

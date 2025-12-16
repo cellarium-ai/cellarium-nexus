@@ -9,7 +9,7 @@ from django.conf import settings
 from cellarium.nexus.backend.cell_management import models
 from cellarium.nexus.coordinator import SomaDataOpsCoordinator
 from cellarium.nexus.omics_datastore.soma_ops import TileDBSOMADataOperator
-from cellarium.nexus.shared.schemas import SomaCurriculumMetadata, component_configs
+from cellarium.nexus.shared.schemas import RandomizedCurriculumMetadata, component_configs
 from cellarium.nexus.shared.utils import workflows_configs
 
 
@@ -54,7 +54,7 @@ def _get_extract_paths(name: str) -> tuple[str, str]:
 def compose_soma_extract_configs(
     name: str,
     omics_dataset: models.OmicsDataset,
-    curriculum_metadata: SomaCurriculumMetadata,
+    curriculum_metadata: RandomizedCurriculumMetadata,
     extract_metadata_path: str,
     extract_bucket_path: str,
     output_format: str = "h5ad",
@@ -110,7 +110,7 @@ def compose_and_dump_soma_configs(
     creator_id: int,
     omics_dataset: models.OmicsDataset,
     range_size: int,
-    output_chunk_size: int,
+    extract_bin_size: int,
     feature_schema: models.FeatureSchema | None = None,
     filters: dict | None = None,
     shuffle_ranges: bool = True,
@@ -128,7 +128,7 @@ def compose_and_dump_soma_configs(
     :param creator_id: ID of the user who initiated the extract.
     :param omics_dataset: Omics dataset with TileDB SOMA backend.
     :param range_size: Target number of cells per range.
-    :param output_chunk_size: Target cells per output chunk (for shuffling).
+    :param extract_bin_size: Target cells per extract bin (for shuffling).
     :param feature_schema: Feature schema used to derive feature IDs for filtering.
     :param filters: Optional dictionary of filter statements to apply.
     :param shuffle_ranges: Whether to shuffle the joinid ranges.
@@ -139,7 +139,7 @@ def compose_and_dump_soma_configs(
     :param max_workers_extract: Maximum parallel workers for extraction.
     :param max_workers_shuffle: Maximum parallel workers for shuffling.
 
-    :raise ValueError: If range_size <= 0 or output_chunk_size <= 0 or omics_dataset has no URI
+    :raise ValueError: If range_size <= 0 or extract_bin_size <= 0 or omics_dataset has no URI
     :raise exceptions.ZeroCellsReturnedError: If no cells match the filters
     :raise IOError: If there's an error writing configs to GCS
     :raise exceptions.SomaExtractError: If planning fails
@@ -161,7 +161,7 @@ def compose_and_dump_soma_configs(
         creator_id=creator_id,
         curriculum_metadata_path=extract_metadata_path,
         range_size=range_size,
-        output_chunk_size=output_chunk_size,
+        extract_bin_size=extract_bin_size,
         filters=filters,
         shuffle_ranges=shuffle_ranges,
         var_filter_column=var_filter_column,
@@ -196,7 +196,7 @@ def submit_soma_extract_pipeline(
     creator_id: int,
     omics_dataset: models.OmicsDataset,
     range_size: int,
-    output_chunk_size: int,
+    extract_bin_size: int,
     feature_schema: models.FeatureSchema | None = None,
     filters: dict | None = None,
     shuffle_ranges: bool = True,
@@ -216,7 +216,7 @@ def submit_soma_extract_pipeline(
     :param creator_id: ID of the user who initiated the extract
     :param omics_dataset: Omics dataset with TileDB SOMA backend
     :param range_size: Target number of cells per range
-    :param output_chunk_size: Target cells per output chunk (for shuffling)
+    :param extract_bin_size: Target cells per extract bin (for shuffling)
     :param feature_schema: Feature schema used to derive feature IDs for filtering
     :param var_filter_column: Column to use for filtering the features
     :param var_filter_values: Values to match in the feature filter column
@@ -229,7 +229,7 @@ def submit_soma_extract_pipeline(
     :param max_workers_extract: Maximum parallel workers for extraction
     :param max_workers_shuffle: Maximum parallel workers for shuffling
 
-    :raise ValueError: If range_size <= 0 or output_chunk_size <= 0 or omics_dataset has no URI
+    :raise ValueError: If range_size <= 0 or extract_bin_size <= 0 or omics_dataset has no URI
     :raise exceptions.ZeroCellsReturnedError: If no cells match the filters
     :raise IOError: If there's an error writing configs to GCS
     :raise google.api_core.exceptions.GoogleAPIError: If pipeline submission fails
@@ -244,7 +244,7 @@ def submit_soma_extract_pipeline(
         creator_id=creator_id,
         omics_dataset=omics_dataset,
         range_size=range_size,
-        output_chunk_size=output_chunk_size,
+        extract_bin_size=extract_bin_size,
         feature_schema=feature_schema,
         filters=filters,
         shuffle_ranges=shuffle_ranges,
@@ -275,7 +275,7 @@ def run_soma_extract_pipeline_locally(
     creator_id: int,
     omics_dataset: models.OmicsDataset,
     range_size: int,
-    output_chunk_size: int,
+    extract_bin_size: int,
     var_filter_column: str,
     feature_schema: models.FeatureSchema,
     filters: dict | None = None,
@@ -299,7 +299,7 @@ def run_soma_extract_pipeline_locally(
     :param range_size: Target number of cells per range
     :param var_filter_column: Column to use for filtering the features (used with `var_filter_values`)
     :param feature_schema: Object of feature schema
-    :param output_chunk_size: Target cells per output chunk (for shuffling)
+    :param extract_bin_size: Target cells per extract bin (for shuffling)
     :param filters: Optional dictionary of filter statements to apply
     :param shuffle_ranges: Whether to shuffle the joinid ranges
     :param obs_columns: Optional obs columns to include in output files
@@ -309,7 +309,7 @@ def run_soma_extract_pipeline_locally(
     :param max_workers_extract: Maximum parallel workers for extraction
     :param max_workers_shuffle: Maximum parallel workers for shuffling
 
-    :raise ValueError: If range_size <= 0 or output_chunk_size <= 0 or omics_dataset has no URI
+    :raise ValueError: If range_size <= 0 or extract_bin_size <= 0 or omics_dataset has no URI
     :raise exceptions.ZeroCellsReturnedError: If no cells match the filters
     :raise SomaExtractError: If extraction fails
     """
@@ -333,7 +333,7 @@ def run_soma_extract_pipeline_locally(
         creator_id=creator_id,
         curriculum_metadata_path=extract_metadata_path,
         range_size=range_size,
-        output_chunk_size=output_chunk_size,
+        extract_bin_size=extract_bin_size,
         filters=filters,
         shuffle_ranges=shuffle_ranges,
         var_filter_column=var_filter_column,

@@ -424,7 +424,7 @@ class ExtractCurriculumAdminView(generic.FormView):
                     creator_id=self.request.user.id,
                     omics_dataset=omics_dataset,
                     range_size=settings.TILEDB_SOMA_EXTRACT_CONTIGUOUS_RANGE,
-                    output_chunk_size=cleaned["extract_bin_size"],
+                    extract_bin_size=cleaned["extract_bin_size"],
                     filters=cleaned.get("filters") or None,
                     shuffle_ranges=True,
                     feature_schema=cleaned.get("feature_schema"),

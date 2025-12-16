@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from cellarium.nexus.clients import NexusBackendAPIClient
 from cellarium.nexus.omics_datastore.soma_ops import TileDBSOMADataOperator
-from cellarium.nexus.shared.schemas.omics_datastore import SomaCurriculumMetadata
+from cellarium.nexus.shared.schemas.omics_datastore import RandomizedCurriculumMetadata
 from cellarium.nexus.shared.utils.workspace_file_manager import WorkspaceFileManager
 
 logger = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ class SomaDataOpsCoordinator:
 
         logger.info(f"Initialized SomaDataOpsCoordinator for {experiment_uri}")
 
-    def _load_metadata_from_bucket(self, *, curriculum_metadata_path: str) -> SomaCurriculumMetadata:
+    def _load_metadata_from_bucket(self, *, curriculum_metadata_path: str) -> RandomizedCurriculumMetadata:
         """
         Load a SOMA extract metadata from cloud storage.
 
@@ -52,10 +52,10 @@ class SomaDataOpsCoordinator:
         :raise IOError: If file cannot be read
         :raise ValueError: If file is not valid JSON or metadata schema
 
-        :return: Loaded SomaCurriculumMetadata
+        :return: Loaded RandomizedCurriculumMetadata
         """
         curriculum_metadata_json = self.workspace.load_json_from_bucket(remote_path=curriculum_metadata_path)
-        return SomaCurriculumMetadata.model_validate(obj=curriculum_metadata_json)
+        return RandomizedCurriculumMetadata.model_validate(obj=curriculum_metadata_json)
 
     def _update_curriculum_with_error(
         self,
@@ -82,7 +82,7 @@ class SomaDataOpsCoordinator:
         creator_id: int,
         curriculum_metadata_path: str,
         range_size: int,
-        output_chunk_size: int,
+        extract_bin_size: int,
         filters: dict[str, Any] | None = None,
         shuffle_ranges: bool = True,
         var_filter_column: str | None = None,
@@ -90,7 +90,7 @@ class SomaDataOpsCoordinator:
         obs_columns: list[str] | None = None,
         var_columns: list[str] | None = None,
         x_layer: str = "X",
-    ) -> SomaCurriculumMetadata:
+    ) -> RandomizedCurriculumMetadata:
         """
         Prepare a SOMA extract by computing the plan and registering the curriculum.
 
@@ -101,7 +101,7 @@ class SomaDataOpsCoordinator:
         :param creator_id: ID of the user creating the extract.
         :param curriculum_metadata_path: Path within bucket where the plan will be saved.
         :param range_size: Target number of cells per range.
-        :param output_chunk_size: Target cells per output chunk (for shuffling).
+        :param extract_bin_size: Target cells per extract bin (for shuffling).
         :param filters: Optional filter conditions in Nexus format.
         :param shuffle_ranges: Whether to shuffle the joinid ranges.
         :param var_filter_column: Name of the var column to filter features by.
@@ -123,7 +123,7 @@ class SomaDataOpsCoordinator:
             plan = self.soma_operator.prepare_curriculum_metadata(
                 filters=filters,
                 range_size=range_size,
-                output_chunk_size=output_chunk_size,
+                extract_bin_size=extract_bin_size,
                 shuffle_ranges=shuffle_ranges,
                 var_filter_column=var_filter_column,
                 var_filter_values=var_filter_values,
@@ -275,7 +275,7 @@ class SomaDataOpsCoordinator:
                 name=extract_name,
                 status="SUCCEEDED",
                 cell_count=curriculum_metadata.total_cells,
-                extract_bin_count=len(curriculum_metadata.id_ranges),
+                extract_bin_count=curriculum_metadata.num_bins,
                 extract_files_path=extract_files_path,
                 metadata_file_path=metadata_file_path,
             )

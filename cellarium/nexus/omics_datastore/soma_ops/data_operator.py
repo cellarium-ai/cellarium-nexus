@@ -19,7 +19,10 @@ from cellarium.nexus.omics_datastore.soma_ops.exceptions import SomaReadError
 from cellarium.nexus.omics_datastore.soma_ops.extract_grouped import extract_grouped_bins
 from cellarium.nexus.omics_datastore.soma_ops.extract_randomized import extract_ranges, shuffle_extracted_chunks
 from cellarium.nexus.omics_datastore.soma_ops.filters import build_soma_value_filter
-from cellarium.nexus.shared.schemas.omics_datastore import SomaCurriculumMetadata
+from cellarium.nexus.shared.schemas.omics_datastore import (
+    GroupedCurriculumMetadata,
+    RandomizedCurriculumMetadata,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +188,7 @@ class TileDBSOMADataOperator:
         *,
         filters: dict[str, object] | None,
         range_size: int | None = None,
-        output_chunk_size: int | None = None,
+        extract_bin_size: int | None = None,
         shuffle_ranges: bool = True,
         var_filter_column: str | None = None,
         var_filter_values: list[str] | None = None,
@@ -194,7 +197,7 @@ class TileDBSOMADataOperator:
         x_layer: str = "X",
         extract_bin_keys: list[str] | None = None,
         bin_size: int | None = None,
-    ) -> SomaCurriculumMetadata:
+    ) -> RandomizedCurriculumMetadata | GroupedCurriculumMetadata:
         """
         Compute a SOMA extract plan from filter dict.
 
@@ -204,7 +207,7 @@ class TileDBSOMADataOperator:
 
         :param filters: Dict of filter conditions using the Nexus format.
         :param range_size: Target number of cells per range (for randomized extraction).
-        :param output_chunk_size: Target number of cells per output chunk (for randomized shuffling).
+        :param extract_bin_size: Target number of cells per extract bin (for randomized shuffling).
         :param shuffle_ranges: Whether to shuffle the resulting joinid ranges (randomized only).
         :param var_filter_column: Name of the var column to filter features by.
         :param var_filter_values: List of values to match in the var filter column.
@@ -218,7 +221,7 @@ class TileDBSOMADataOperator:
         :raise SomaReadError: If SOMA reads fail
         :raise ValueError: If required parameters are missing or invalid
 
-        :return: SomaCurriculumMetadata with either id_ranges or grouped_bins
+        :return: RandomizedCurriculumMetadata or GroupedCurriculumMetadata
         """
         if extract_bin_keys:
             # Grouped extraction mode
@@ -239,13 +242,13 @@ class TileDBSOMADataOperator:
             # Randomized extraction mode
             if range_size is None:
                 raise ValueError("range_size is required for randomized extraction")
-            if output_chunk_size is None:
-                raise ValueError("output_chunk_size is required for randomized extraction")
+            if extract_bin_size is None:
+                raise ValueError("extract_bin_size is required for randomized extraction")
             return prepare_extract_curriculum(
                 experiment_uri=self.experiment_uri,
                 filters=filters,
                 range_size=range_size,
-                output_chunk_size=output_chunk_size,
+                extract_bin_size=extract_bin_size,
                 shuffle_ranges=shuffle_ranges,
                 var_filter_column=var_filter_column,
                 var_filter_values=var_filter_values,
@@ -257,7 +260,7 @@ class TileDBSOMADataOperator:
     def extract_randomized(
         self,
         *,
-        curriculum_metadata: SomaCurriculumMetadata,
+        curriculum_metadata: RandomizedCurriculumMetadata,
         output_dir: Path,
         partition_index: int = 0,
         max_ranges_per_partition: int | None = None,
@@ -317,7 +320,7 @@ class TileDBSOMADataOperator:
             # Stage 2: Shuffle cells across extracts (feature filtering applied here)
             logger.info("Stage 2: Shuffling cells across extracts...")
             max_output_chunks_per_partition = (
-                int(max_ranges_per_partition * curriculum_metadata.range_size / curriculum_metadata.output_chunk_size)
+                int(max_ranges_per_partition * curriculum_metadata.range_size / curriculum_metadata.extract_bin_size)
                 if max_ranges_per_partition is not None
                 else None
             )
@@ -344,7 +347,7 @@ class TileDBSOMADataOperator:
     def extract_grouped(
         self,
         *,
-        curriculum_metadata: SomaCurriculumMetadata,
+        curriculum_metadata: GroupedCurriculumMetadata,
         output_dir: Path,
         partition_index: int = 0,
         max_bins_per_partition: int | None = None,

@@ -150,7 +150,7 @@ def test_plan_soma_extract_invalid_range_size(range_size: int) -> None:
             experiment_uri="gs://bucket/soma",
             filters=None,
             range_size=range_size,
-            output_chunk_size=100,
+            extract_bin_size=100,
         )
 
 
@@ -172,7 +172,7 @@ def test_plan_soma_extract_no_cells(monkeypatch: pytest.MonkeyPatch) -> None:
             experiment_uri=experiment_uri,
             filters=filters,
             range_size=100,
-            output_chunk_size=100,
+            extract_bin_size=100,
             shuffle_ranges=False,
         )
 
@@ -195,7 +195,7 @@ def test_plan_soma_extract_normal_flow(monkeypatch: pytest.MonkeyPatch) -> None:
         experiment_uri=experiment_uri,
         filters=filters,
         range_size=2,
-        output_chunk_size=2,
+        extract_bin_size=2,
         shuffle_ranges=False,
     )
 
@@ -203,12 +203,12 @@ def test_plan_soma_extract_normal_flow(monkeypatch: pytest.MonkeyPatch) -> None:
     assert plan.value_filter == '(tissue == "lung")', "value_filter should be translated correctly"
     assert plan.total_cells == 4, "Expected 4 total cells"
     assert plan.range_size == 2, "range_size should match input"
-    assert plan.output_chunk_size == 2, "output_chunk_size should match input"
+    assert plan.extract_bin_size == 2, "extract_bin_size should match input"
     assert plan.filters == filters, "filters should match input"
     assert len(plan.id_ranges) == 2, "Expected 2 id_ranges"
     assert plan.id_ranges[0] == IdContiguousRange(start=5, end=10), "First range should be (5, 10)"
     assert plan.id_ranges[1] == IdContiguousRange(start=15, end=20), "Second range should be (15, 20)"
-    assert plan.output_chunk_indexes == [0, 1], "Output chunk indexes should be sequential when not shuffled"
+    assert plan.extract_bin_indexes == [0, 1], "Extract bin indexes should be sequential when not shuffled"
 
 
 def test_plan_soma_extract_with_shuffle(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -241,14 +241,14 @@ def test_plan_soma_extract_with_shuffle(monkeypatch: pytest.MonkeyPatch) -> None
         experiment_uri=experiment_uri,
         filters=filters,
         range_size=2,
-        output_chunk_size=2,
+        extract_bin_size=2,
         shuffle_ranges=True,
-        shuffle_output_ids=True,
+        shuffle_extract_bin_indexes=True,
     )
 
     assert (
         len(shuffle_called) == 2
-    ), "`random.sample` should be called 2 times (one for ranges, one for shuffling output IDs"
+    ), "`random.sample` should be called 2 times (one for ranges, one for shuffling extract bin indexes"
     assert plan.total_cells == 6, "Expected 6 total cells"
 
     assert len(plan.id_ranges) == 3, "Expected 3 id_ranges"
@@ -256,11 +256,11 @@ def test_plan_soma_extract_with_shuffle(monkeypatch: pytest.MonkeyPatch) -> None
     assert plan.id_ranges[1] == IdContiguousRange(start=1, end=2), "Second range should be (1, 2) after shuffle"
     assert plan.id_ranges[2] == IdContiguousRange(start=5, end=6), "Last range should stay (5, 6)"
 
-    assert plan.output_chunk_indexes != [
+    assert plan.extract_bin_indexes != [
         0,
         1,
         2,
-    ], "Output chunk indexes should not be sequential when shuffle_output_ids=False"
+    ], "Extract bin indexes should not be sequential when shuffle_extract_bin_indexes=True"
 
 
 def test_plan_soma_extract_filter_error_propagation(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -273,7 +273,7 @@ def test_plan_soma_extract_filter_error_propagation(monkeypatch: pytest.MonkeyPa
             experiment_uri="gs://bucket/soma",
             filters={"bad__unsupported_op": "value"},
             range_size=100,
-            output_chunk_size=100,
+            extract_bin_size=100,
         )
 
 
@@ -295,5 +295,5 @@ def test_plan_soma_extract_read_error_propagation(monkeypatch: pytest.MonkeyPatc
             experiment_uri="gs://bucket/soma",
             filters=None,
             range_size=100,
-            output_chunk_size=100,
+            extract_bin_size=100,
         )

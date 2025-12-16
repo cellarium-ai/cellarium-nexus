@@ -51,10 +51,15 @@ class GroupedBin(BaseModel):
     cell_count: int
 
 
-class SomaCurriculumMetadata(BaseModel):
+class BaseCurriculumMetadata(BaseModel):
+    """Base class for SOMA curriculum metadata."""
+
     experiment_uri: str
     value_filter: str
     total_cells: int
+    num_bins: int
+    extract_bin_size: int
+    last_bin_size: int
     filters: dict[str, Any] | None = None
     var_joinids: list[int] | None = None
     var_filter_column: str | None = None
@@ -63,16 +68,18 @@ class SomaCurriculumMetadata(BaseModel):
     var_columns: list[str] | None = None
     x_layer: str = "X"
 
-    # For randomized extraction (contiguous ranges)
-    id_ranges: list[IdContiguousRange] | None = None
-    range_size: int | None = None
-    num_ranges: int | None = None
-    num_output_chunks: int | None = None
-    output_chunk_size: int | None = None
-    last_chunk_size: int | None = None
-    output_chunk_indexes: list[int] | None = None
 
-    # For grouped extraction
-    extract_bin_keys: list[str] | None = None
-    grouped_bins: list[GroupedBin] | None = None
-    num_grouped_bins: int | None = None
+class RandomizedCurriculumMetadata(BaseCurriculumMetadata):
+    """Curriculum metadata for randomized extraction with contiguous ranges."""
+
+    id_ranges: list[IdContiguousRange]
+    range_size: int
+    num_ranges: int
+    extract_bin_indexes: list[int]
+
+
+class GroupedCurriculumMetadata(BaseCurriculumMetadata):
+    """Curriculum metadata for grouped extraction."""
+
+    extract_bin_keys: list[str]
+    grouped_bins: list[GroupedBin]

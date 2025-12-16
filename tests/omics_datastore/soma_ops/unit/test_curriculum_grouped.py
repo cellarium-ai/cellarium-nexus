@@ -122,7 +122,7 @@ def test_prepare_grouped_curriculum_single_group_single_bin(monkeypatch: pytest.
         bin_size=10,
     )
 
-    assert result.num_grouped_bins == 1
+    assert result.num_bins == 1
     assert result.total_cells == 5
     assert result.grouped_bins[0].group_key == "lung"
     assert result.grouped_bins[0].cell_count == 5
@@ -149,7 +149,7 @@ def test_prepare_grouped_curriculum_single_group_multiple_bins(monkeypatch: pyte
         bin_size=3,
     )
 
-    assert result.num_grouped_bins == 3
+    assert result.num_bins == 3
     assert result.total_cells == 7
 
     # First bin: joinids 1, 2, 3
@@ -187,7 +187,7 @@ def test_prepare_grouped_curriculum_multiple_groups(monkeypatch: pytest.MonkeyPa
         bin_size=10,
     )
 
-    assert result.num_grouped_bins == 2
+    assert result.num_bins == 2
     assert result.total_cells == 6
 
     # Groups are sorted alphabetically: heart, lung
@@ -219,7 +219,7 @@ def test_prepare_grouped_curriculum_multiple_grouping_columns(monkeypatch: pytes
     )
 
     # 4 unique combinations: heart/D1, heart/D2, lung/D1, lung/D2
-    assert result.num_grouped_bins == 4
+    assert result.num_bins == 4
     assert result.total_cells == 6
 
     # Verify group keys are composite
@@ -283,9 +283,4 @@ def test_prepare_grouped_curriculum_metadata_fields(monkeypatch: pytest.MonkeyPa
     assert result.var_columns == ["symbol"]
     assert result.x_layer == "raw"
     assert result.grouped_bins is not None
-    assert result.num_grouped_bins == 1
-
-    # Randomized extraction fields should be None
-    assert result.id_ranges is None
-    assert result.range_size is None
-    assert result.num_ranges is None
+    assert result.num_bins == 1

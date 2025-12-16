@@ -22,7 +22,7 @@ from tqdm import tqdm
 
 from cellarium.nexus.omics_datastore.soma_ops import utils
 from cellarium.nexus.omics_datastore.soma_ops.exceptions import SomaExtractError
-from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, SomaCurriculumMetadata
+from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, RandomizedCurriculumMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -266,7 +266,7 @@ def _extract_range_worker(
 
 def extract_ranges(
     *,
-    curriculum_metadata: SomaCurriculumMetadata,
+    curriculum_metadata: RandomizedCurriculumMetadata,
     output_dir: Path,
     partition_index: int = 0,
     max_ranges_per_partition: int | None = None,
@@ -481,7 +481,7 @@ def _shuffle_chunk_worker(
 
 def shuffle_extracted_chunks(
     *,
-    curriculum_metadata: SomaCurriculumMetadata,
+    curriculum_metadata: RandomizedCurriculumMetadata,
     input_dir: Path,
     output_dir: Path,
     partition_index: int = 0,
@@ -526,7 +526,7 @@ def shuffle_extracted_chunks(
         max_workers = multiprocessing.cpu_count() // 2 + 1
 
     if max_output_chunks_per_partition is None:
-        max_output_chunks_per_partition = curriculum_metadata.num_output_chunks
+        max_output_chunks_per_partition = curriculum_metadata.num_bins
 
     logger.info(f"Shuffling cells from {input_dir} ({input_format}) to {output_dir} ({output_format})")
 
@@ -552,28 +552,28 @@ def shuffle_extracted_chunks(
     logger.info("Computing random permutation...")
     cell_permutation = np.random.permutation(total_cells)
 
-    chunk_size = curriculum_metadata.output_chunk_size
-    # Compute output_chunk_indexes
-    output_chunk_id_slice_start, output_chunk_id_slice_end = utils.get_block_slice(
-        total_items=curriculum_metadata.num_output_chunks,
+    chunk_size = curriculum_metadata.extract_bin_size
+    # Compute extract_bin_indexes
+    extract_bin_id_slice_start, extract_bin_id_slice_end = utils.get_block_slice(
+        total_items=curriculum_metadata.num_bins,
         partition_index=partition_index,
         block_size=max_output_chunks_per_partition,
     )
-    output_chunk_indexes = curriculum_metadata.output_chunk_indexes[
-        output_chunk_id_slice_start:output_chunk_id_slice_end
+    extract_bin_indexes = curriculum_metadata.extract_bin_indexes[
+        extract_bin_id_slice_start:extract_bin_id_slice_end
     ]
-    # Compute output chunks
-    _num_chunks_computed = (total_cells + chunk_size - 1) // chunk_size
-    num_chunks = len(output_chunk_indexes)
+    # Compute extract bins
+    _num_bins_computed = (total_cells + chunk_size - 1) // chunk_size
+    num_bins = len(extract_bin_indexes)
 
-    if _num_chunks_computed != num_chunks:
+    if _num_bins_computed != num_bins:
         raise SomaExtractError(
-            f"Number of chunk indexes doesn't accommodate all cells within this worker. "
-            f"Required number of output chunks {_num_chunks_computed}, while"
-            f"number of indexes for naming {num_chunks}"
+            f"Number of extract bin indexes doesn't accommodate all cells within this worker. "
+            f"Required number of extract bins {_num_bins_computed}, while"
+            f"number of indexes for naming {num_bins}"
         )
 
-    logger.info(f"Creating {num_chunks} output chunks")
+    logger.info(f"Creating {num_bins} extract bins")
 
     # Ensure output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -590,22 +590,22 @@ def shuffle_extracted_chunks(
         initargs=(logging.getLevelName(logger.level), verbose),
     ) as executor:
         futures = {}
-        for chunk_idx in range(num_chunks):
-            start_idx = chunk_idx * chunk_size
+        for bin_idx in range(num_bins):
+            start_idx = bin_idx * chunk_size
             end_idx = min(start_idx + chunk_size, total_cells)
             chunk_indices = cell_permutation[start_idx:end_idx]
-            output_chunk_idx = output_chunk_indexes[chunk_idx]
+            extract_bin_idx = extract_bin_indexes[bin_idx]
 
             # Determine output path
             file_ext = ".zarr" if output_format == "zarr" else ".h5ad"
-            output_path = output_dir / f"extract_{output_chunk_idx:06d}{file_ext}"
+            output_path = output_dir / f"extract_{extract_bin_idx:06d}{file_ext}"
 
             # Submit chunk processing job
             # Each worker will create its own AnnCollection with all files
             future = executor.submit(
                 _shuffle_chunk_worker,
-                chunk_idx,
-                output_chunk_idx,
+                bin_idx,
+                extract_bin_idx,
                 chunk_indices,
                 input_files,
                 input_format,
@@ -613,17 +613,17 @@ def shuffle_extracted_chunks(
                 output_format,
                 curriculum_metadata.var_joinids,
             )
-            futures[future] = chunk_idx
+            futures[future] = bin_idx
 
         # Wait for completion and track progress
         completed = 0
-        for future in tqdm(as_completed(futures), total=num_chunks, desc="Shuffling extracts"):
+        for future in tqdm(as_completed(futures), total=num_bins, desc="Shuffling extracts"):
             try:
-                chunk_idx, output_chunk_idx, output_path = future.result()
+                bin_idx, extract_bin_idx, output_path = future.result()
                 completed += 1
             except Exception as e:
-                chunk_idx = futures[future]
-                logger.error(f"Failed to write extract {chunk_idx}: {e}")
+                bin_idx = futures[future]
+                logger.error(f"Failed to write extract {bin_idx}: {e}")
                 raise
 
-    logger.info(f"Successfully shuffled {total_cells} cells into {num_chunks} extracts")
+    logger.info(f"Successfully shuffled {total_cells} cells into {num_bins} extracts")

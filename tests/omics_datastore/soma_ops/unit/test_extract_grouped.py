@@ -9,7 +9,7 @@ import pytest
 import scipy.sparse as sp
 
 from cellarium.nexus.omics_datastore.soma_ops import SomaExtractError, extract_grouped
-from cellarium.nexus.shared.schemas.omics_datastore import GroupedBin, SomaCurriculumMetadata
+from cellarium.nexus.shared.schemas.omics_datastore import GroupedBin, GroupedCurriculumMetadata
 from tests.omics_datastore.soma_ops.conftest import FakeAnnData, FakeExecutor, FakeFuture, FakeSomaExperiment
 
 
@@ -165,6 +165,7 @@ def test_extract_grouped_bin_worker(monkeypatch: pytest.MonkeyPatch, tmp_path: P
         experiment_uri=experiment_uri,
         grouped_bin=grouped_bin,
         output_path=output_path,
+        value_filter='organism == "Homo sapiens"',
         obs_columns=["cell_type"],
         var_columns=["symbol"],
         var_joinids=[0, 1, 2],
@@ -177,6 +178,7 @@ def test_extract_grouped_bin_worker(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     assert call_kwargs["experiment_uri"] == experiment_uri
     assert call_kwargs["grouped_bin"] == grouped_bin
     assert call_kwargs["output_path"] == output_path
+    assert call_kwargs["value_filter"] == 'organism == "Homo sapiens"'
     assert call_kwargs["obs_columns"] == ["cell_type"]
     assert call_kwargs["var_columns"] == ["symbol"]
     assert call_kwargs["var_joinids"] == [0, 1, 2]
@@ -185,16 +187,22 @@ def test_extract_grouped_bin_worker(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     assert result == (bin_idx, global_bin_idx, str(output_path))
 
 
-def test_extract_grouped_bins_no_grouped_bins_raises_error(tmp_path: Path) -> None:
-    """Verify extract_grouped_bins raises ValueError when grouped_bins is None."""
-    curriculum_metadata = SomaCurriculumMetadata(
+def test_extract_grouped_bins_empty_grouped_bins_raises_error(tmp_path: Path) -> None:
+    """Verify extract_grouped_bins raises ValueError when grouped_bins is empty."""
+    # Note: With the new schema, grouped_bins is required, so we test with empty list
+    curriculum_metadata = GroupedCurriculumMetadata(
         experiment_uri="gs://bucket/soma",
         value_filter="",
-        total_cells=10,
-        grouped_bins=None,
+        total_cells=0,
+        num_bins=0,
+        extract_bin_size=10,
+        last_bin_size=0,
+        extract_bin_keys=["tissue"],
+        grouped_bins=[],
     )
 
-    with pytest.raises(ValueError, match="grouped_bins cannot be None"):
+    # With empty grouped_bins, the function raises ValueError due to block_size=0
+    with pytest.raises(ValueError, match="block_size must be positive"):
         extract_grouped.extract_grouped_bins(
             curriculum_metadata=curriculum_metadata,
             output_dir=tmp_path,
@@ -208,13 +216,15 @@ def test_extract_grouped_bins_happy_path(monkeypatch: pytest.MonkeyPatch, tmp_pa
         GroupedBin(group_key="heart", group_filter='tissue == "heart"', joinid_min=11, joinid_max=20, cell_count=10),
     ]
 
-    curriculum_metadata = SomaCurriculumMetadata(
+    curriculum_metadata = GroupedCurriculumMetadata(
         experiment_uri="gs://bucket/soma",
         value_filter='tissue in ["lung", "heart"]',
         total_cells=20,
+        num_bins=2,
+        extract_bin_size=10,
+        last_bin_size=10,
         extract_bin_keys=["tissue"],
         grouped_bins=grouped_bins,
-        num_grouped_bins=2,
         obs_columns=["cell_type"],
         var_columns=["symbol"],
         x_layer="X",
@@ -228,6 +238,7 @@ def test_extract_grouped_bins_happy_path(monkeypatch: pytest.MonkeyPatch, tmp_pa
         experiment_uri: str,
         grouped_bin: GroupedBin,
         output_path: Path,
+        value_filter: str | None,
         obs_columns: list[str] | None,
         var_columns: list[str] | None,
         var_joinids: list[int] | None,
@@ -267,13 +278,15 @@ def test_extract_grouped_bins_with_partition_index(monkeypatch: pytest.MonkeyPat
         for i in range(10)
     ]
 
-    curriculum_metadata = SomaCurriculumMetadata(
+    curriculum_metadata = GroupedCurriculumMetadata(
         experiment_uri="gs://bucket/soma",
         value_filter="",
         total_cells=100,
+        num_bins=10,
+        extract_bin_size=10,
+        last_bin_size=10,
         extract_bin_keys=["id"],
         grouped_bins=grouped_bins,
-        num_grouped_bins=10,
     )
 
     output_dir = tmp_path / "output"
@@ -284,6 +297,7 @@ def test_extract_grouped_bins_with_partition_index(monkeypatch: pytest.MonkeyPat
         experiment_uri: str,
         grouped_bin: GroupedBin,
         output_path: Path,
+        value_filter: str | None,
         obs_columns: list[str] | None,
         var_columns: list[str] | None,
         var_joinids: list[int] | None,
@@ -330,13 +344,15 @@ def test_extract_grouped_bins_failure_handling(monkeypatch: pytest.MonkeyPatch, 
         GroupedBin(group_key="heart", group_filter='tissue == "heart"', joinid_min=11, joinid_max=20, cell_count=10),
     ]
 
-    curriculum_metadata = SomaCurriculumMetadata(
+    curriculum_metadata = GroupedCurriculumMetadata(
         experiment_uri="gs://bucket/soma",
         value_filter="",
         total_cells=20,
+        num_bins=2,
+        extract_bin_size=10,
+        last_bin_size=10,
         extract_bin_keys=["tissue"],
         grouped_bins=grouped_bins,
-        num_grouped_bins=2,
     )
 
     output_dir = tmp_path / "output"
@@ -372,13 +388,15 @@ def test_extract_grouped_bins_empty_partition(monkeypatch: pytest.MonkeyPatch, t
         GroupedBin(group_key="lung", group_filter='tissue == "lung"', joinid_min=0, joinid_max=10, cell_count=10),
     ]
 
-    curriculum_metadata = SomaCurriculumMetadata(
+    curriculum_metadata = GroupedCurriculumMetadata(
         experiment_uri="gs://bucket/soma",
         value_filter="",
         total_cells=10,
+        num_bins=1,
+        extract_bin_size=10,
+        last_bin_size=10,
         extract_bin_keys=["tissue"],
         grouped_bins=grouped_bins,
-        num_grouped_bins=1,
     )
 
     output_dir = tmp_path / "output"

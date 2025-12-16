@@ -12,7 +12,7 @@ import tiledbsoma
 from cellarium.nexus.omics_datastore.soma_ops import exceptions
 from cellarium.nexus.omics_datastore.soma_ops.curriculum_randomized import read_var_joinids
 from cellarium.nexus.omics_datastore.soma_ops.filters import build_soma_value_filter
-from cellarium.nexus.shared.schemas.omics_datastore import GroupedBin, SomaCurriculumMetadata
+from cellarium.nexus.shared.schemas.omics_datastore import GroupedBin, GroupedCurriculumMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ def prepare_grouped_curriculum(
     obs_columns: list[str] | None = None,
     var_columns: list[str] | None = None,
     x_layer: str = "X",
-) -> SomaCurriculumMetadata:
+) -> GroupedCurriculumMetadata:
     """
     Prepare curriculum metadata for grouped extraction.
 
@@ -70,7 +70,7 @@ def prepare_grouped_curriculum(
     :raise SomaFilterError: If filter translation fails
     :raise ValueError: If bin_size is not positive or extract_bin_keys is empty
 
-    :return: SomaCurriculumMetadata with grouped_bins
+    :return: GroupedCurriculumMetadata with grouped_bins
     """
     if bin_size <= 0:
         raise ValueError(f"bin_size must be positive, got {bin_size}")
@@ -140,13 +140,17 @@ def prepare_grouped_curriculum(
                 )
             )
 
-    num_grouped_bins = len(grouped_bins)
-    logger.info(f"Created {num_grouped_bins} grouped bins")
+    num_bins = len(grouped_bins)
+    last_bin_size = grouped_bins[-1].cell_count if grouped_bins else 0
+    logger.info(f"Created {num_bins} grouped bins")
 
-    metadata = SomaCurriculumMetadata(
+    metadata = GroupedCurriculumMetadata(
         experiment_uri=experiment_uri,
         value_filter=value_filter,
         total_cells=total_cells,
+        num_bins=num_bins,
+        extract_bin_size=bin_size,
+        last_bin_size=last_bin_size,
         filters=filters,
         var_joinids=var_ids,
         var_filter_column=var_filter_column,
@@ -156,11 +160,8 @@ def prepare_grouped_curriculum(
         x_layer=x_layer,
         extract_bin_keys=extract_bin_keys,
         grouped_bins=grouped_bins,
-        num_grouped_bins=num_grouped_bins,
     )
 
-    logger.info(
-        f"Grouped curriculum metadata created: {metadata.total_cells} cells " f"in {metadata.num_grouped_bins} bins"
-    )
+    logger.info(f"Grouped curriculum metadata created: {metadata.total_cells} cells in {metadata.num_bins} bins")
 
     return metadata

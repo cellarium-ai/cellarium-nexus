@@ -14,7 +14,7 @@ import tiledbsoma
 
 from cellarium.nexus.omics_datastore.soma_ops import exceptions
 from cellarium.nexus.omics_datastore.soma_ops.filters import build_soma_value_filter
-from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, SomaCurriculumMetadata
+from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, RandomizedCurriculumMetadata
 
 logger = logging.getLogger(__name__)
 
@@ -167,15 +167,15 @@ def prepare_extract_curriculum(
     experiment_uri: str,
     filters: dict[str, object] | None,
     range_size: int,
-    output_chunk_size: int,
+    extract_bin_size: int,
     shuffle_ranges: bool = True,
-    shuffle_output_ids: bool = True,
+    shuffle_extract_bin_indexes: bool = True,
     var_filter_column: str | None = None,
     var_filter_values: list[str] | None = None,
     obs_columns: list[str] | None = None,
     var_columns: list[str] | None = None,
     x_layer: str = "X",
-) -> SomaCurriculumMetadata:
+) -> RandomizedCurriculumMetadata:
     """
     Plan a SOMA extract by computing soma_joinid ranges for a given filter.
 
@@ -186,9 +186,9 @@ def prepare_extract_curriculum(
     :param experiment_uri: URI of the SOMA experiment.
     :param filters: Dict of filter conditions using the Nexus format.
     :param range_size: Target number of cells per range (for extraction).
-    :param output_chunk_size: Target number of cells per output chunk (for shuffling).
+    :param extract_bin_size: Target number of cells per extract bin (for shuffling).
     :param shuffle_ranges: Whether to shuffle id ranges.
-    :param shuffle_output_ids: Whether to shuffle output chunk ids.
+    :param shuffle_extract_bin_indexes: Whether to shuffle extract bin indexes.
     :param var_filter_column: Name of the var column to filter features by.
     :param var_filter_values: List of values to match in the var filter column.
     :param obs_columns: List of obs columns to include in extraction.
@@ -197,14 +197,14 @@ def prepare_extract_curriculum(
 
     :raise SomaReadError: If SOMA reads fail
     :raise SomaFilterError: If filter translation fails
-    :raise ValueError: If range_size or output_chunk_size is not positive
+    :raise ValueError: If range_size or extract_bin_size is not positive
 
-    :return: SomaCurriculumMetadata object
+    :return: RandomizedCurriculumMetadata object
     """
     if range_size <= 0:
         raise ValueError(f"range_size must be positive, got {range_size}")
-    if output_chunk_size <= 0:
-        raise ValueError(f"output_chunk_size must be positive, got {output_chunk_size}")
+    if extract_bin_size <= 0:
+        raise ValueError(f"extract_bin_size must be positive, got {extract_bin_size}")
 
     value_filter = build_soma_value_filter(filters=filters)
 
@@ -239,24 +239,24 @@ def prepare_extract_curriculum(
 
     # Compute contiguous id ranges
     id_ranges = compute_contiguous_ranges(values=obs_ids, chunk_size=range_size, shuffle=shuffle_ranges)
-    output_ids = compute_output_ids(n_values=total_cells, chunk_size=output_chunk_size, shuffle=shuffle_output_ids)
-    logger.info(f"Computed {len(id_ranges)} ranges. Output chunk n: {output_ids}")
+    extract_bin_indexes = compute_output_ids(n_values=total_cells, chunk_size=extract_bin_size, shuffle=shuffle_extract_bin_indexes)
+    logger.info(f"Computed {len(id_ranges)} ranges. Extract bin indexes: {extract_bin_indexes}")
 
-    num_output_chunks = len(output_ids)
+    num_bins = len(extract_bin_indexes)
     num_ranges = len(id_ranges)
-    last_chunk_size = total_cells % output_chunk_size
+    last_bin_size = total_cells % extract_bin_size
 
-    metadata = SomaCurriculumMetadata(
+    metadata = RandomizedCurriculumMetadata(
         experiment_uri=experiment_uri,
         value_filter=value_filter,
         id_ranges=id_ranges,
         total_cells=total_cells,
         range_size=range_size,
         num_ranges=num_ranges,
-        output_chunk_size=output_chunk_size,
-        num_output_chunks=num_output_chunks,
-        last_chunk_size=last_chunk_size,
-        output_chunk_indexes=output_ids,
+        extract_bin_size=extract_bin_size,
+        num_bins=num_bins,
+        last_bin_size=last_bin_size,
+        extract_bin_indexes=extract_bin_indexes,
         filters=filters,
         var_joinids=var_ids,
         var_filter_column=var_filter_column,
@@ -265,7 +265,5 @@ def prepare_extract_curriculum(
         var_columns=var_columns,
         x_layer=x_layer,
     )
-
-    logger.info(f"Extract metadata created: {metadata.total_cells} cells in {len(metadata.id_ranges)} ranges")
 
     return metadata

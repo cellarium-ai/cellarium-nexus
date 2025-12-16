@@ -5,7 +5,7 @@ import pytest
 
 from cellarium.nexus.omics_datastore.soma_ops import SomaReadError
 from cellarium.nexus.omics_datastore.soma_ops import data_operator as data_operator_module
-from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, SomaCurriculumMetadata
+from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, RandomizedCurriculumMetadata
 
 
 def test_init_valid_experiment_uri() -> None:
@@ -160,20 +160,20 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
         experiment_uri: str,
         filters: object,
         range_size: int,
-        output_chunk_size: int,
+        extract_bin_size: int,
         shuffle_ranges: bool,
         var_filter_column: str | None,
         var_filter_values: list[str] | None,
         obs_columns: list[str] | None,
         var_columns: list[str] | None,
         x_layer: str,
-    ) -> SomaCurriculumMetadata:
+    ) -> RandomizedCurriculumMetadata:
         plan_calls.append(
             {
                 "experiment_uri": experiment_uri,
                 "filters": filters,
                 "range_size": range_size,
-                "output_chunk_size": output_chunk_size,
+                "extract_bin_size": extract_bin_size,
                 "shuffle_ranges": shuffle_ranges,
                 "var_filter_column": var_filter_column,
                 "var_filter_values": var_filter_values,
@@ -182,17 +182,17 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
                 "x_layer": x_layer,
             }
         )
-        return SomaCurriculumMetadata(
+        return RandomizedCurriculumMetadata(
             experiment_uri=experiment_uri,
             value_filter='tissue == "lung"',
             id_ranges=[IdContiguousRange(start=0, end=10)],
             total_cells=10,
             range_size=range_size,
             num_ranges=1,
-            output_chunk_size=output_chunk_size,
-            num_output_chunks=1,
-            last_chunk_size=10,
-            output_chunk_indexes=[0],
+            extract_bin_size=extract_bin_size,
+            num_bins=1,
+            last_bin_size=10,
+            extract_bin_indexes=[0],
             filters=filters,
             var_filter_column=var_filter_column,
             var_filter_values=var_filter_values,
@@ -208,7 +208,7 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
     plan = operator.prepare_curriculum_metadata(
         filters=filters,
         range_size=100,
-        output_chunk_size=100,
+        extract_bin_size=100,
         shuffle_ranges=False,
         var_filter_column="gene_symbol",
         var_filter_values=["ACTB", "GAPDH"],
@@ -271,17 +271,17 @@ def test_extract_randomized_with_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_p
     monkeypatch.setattr(shutil, "rmtree", _fake_rmtree)
 
     # Execute
-    plan = SomaCurriculumMetadata(
+    plan = RandomizedCurriculumMetadata(
         experiment_uri="gs://bucket/soma",
         value_filter="",
         id_ranges=[IdContiguousRange(start=0, end=10)],
         total_cells=10,
         range_size=10,
         num_ranges=1,
-        output_chunk_size=10,
-        num_output_chunks=1,
-        last_chunk_size=10,
-        output_chunk_indexes=[0],
+        extract_bin_size=10,
+        num_bins=1,
+        last_bin_size=10,
+        extract_bin_indexes=[0],
         filters=None,
     )
 
@@ -364,17 +364,17 @@ def test_extract_randomized_auto_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_p
     monkeypatch.setattr(shutil, "rmtree", _fake_rmtree)
 
     # Execute
-    plan = SomaCurriculumMetadata(
+    plan = RandomizedCurriculumMetadata(
         experiment_uri="gs://bucket/soma",
         value_filter="",
         id_ranges=[IdContiguousRange(start=0, end=10)],
         total_cells=10,
         range_size=10,
         num_ranges=1,
-        output_chunk_size=10,
-        num_output_chunks=1,
-        last_chunk_size=10,
-        output_chunk_indexes=[0],
+        extract_bin_size=10,
+        num_bins=1,
+        last_bin_size=10,
+        extract_bin_indexes=[0],
         filters=None,
     )
 
@@ -427,17 +427,17 @@ def test_extract_randomized_no_cleanup(monkeypatch: pytest.MonkeyPatch, tmp_path
     monkeypatch.setattr(shutil, "rmtree", _fake_rmtree)
 
     # Execute
-    plan = SomaCurriculumMetadata(
+    plan = RandomizedCurriculumMetadata(
         experiment_uri="gs://bucket/soma",
         value_filter="",
         id_ranges=[IdContiguousRange(start=0, end=10)],
         total_cells=10,
         range_size=10,
         num_ranges=1,
-        output_chunk_size=10,
-        num_output_chunks=1,
-        last_chunk_size=10,
-        output_chunk_indexes=[0],
+        extract_bin_size=10,
+        num_bins=1,
+        last_bin_size=10,
+        extract_bin_indexes=[0],
         filters=None,
     )
 
