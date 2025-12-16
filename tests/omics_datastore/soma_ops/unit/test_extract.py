@@ -332,13 +332,9 @@ def test_consolidate_zarr_extracts_no_files(tmp_path: Path) -> None:
     """
     input_dir = tmp_path / "input"
     input_dir.mkdir()
-    output_path = tmp_path / "consolidated.zarr"
 
     with pytest.raises(ValueError):
-        extract.consolidate_zarr_extracts(
-            input_dir=input_dir,
-            output_path=output_path,
-        )
+        extract.consolidate_zarr_extracts(input_dir=input_dir)
 
 
 def test_shuffle_extracted_chunks_no_input_files(tmp_path: Path) -> None:

@@ -4,6 +4,7 @@ TileDB SOMA data operator for Nexus omics datastore.
 This module provides the main operator class for interacting with SOMA experiments.
 """
 
+import gc
 import logging
 import shutil
 import tempfile
@@ -316,6 +317,9 @@ class TileDBSOMADataOperator:
                 max_workers=max_workers_extract,
                 verbose=verbose,
             )
+
+            # Force garbage collection to release memory before shuffle stage
+            gc.collect()
 
             # Stage 2: Shuffle cells across extracts (feature filtering applied here)
             logger.info("Stage 2: Shuffling cells across extracts...")

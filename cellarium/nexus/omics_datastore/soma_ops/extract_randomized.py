@@ -371,58 +371,36 @@ def extract_ranges(
 def consolidate_zarr_extracts(
     *,
     input_dir: Path,
-    output_path: Path,
-    batch_size: int = 50,
-) -> int:
+) -> anndata.AnnData:
     """
-    Consolidate multiple Zarr range files into a single Zarr file.
+    Consolidate multiple Zarr range files into a single AnnData object.
 
     Read all range_*.zarr files from input directory and concatenate them
-    into a single consolidated Zarr file for efficient random access during shuffling.
+    into a single AnnData object for efficient random access during shuffling.
 
     :param input_dir: Directory containing range_*.zarr files
-    :param output_path: Path to write the consolidated Zarr file
-    :param batch_size: Number of files to concatenate per batch to manage memory
 
     :raise ValueError: If no input files found
-    :raise IOError: If file operations fail
 
-    :return: Total number of cells in the consolidated file
+    :return: Consolidated AnnData object
     """
     zarr_files = sorted(input_dir.glob("range_*.zarr"))
 
     if not zarr_files:
         raise ValueError(f"No range_*.zarr files found in {input_dir}")
 
-    logger.info(f"Consolidating {len(zarr_files)} Zarr files into {output_path}")
+    logger.info(f"Consolidating {len(zarr_files)} Zarr files...")
 
-    # Concatenate in batches to manage memory
-    consolidated = None
+    # Load all files and concatenate in single operation
+    adatas = [anndata.read_zarr(str(f)) for f in zarr_files]
+    consolidated = anndata.concat(adatas, join="outer")
 
-    for i in range(0, len(zarr_files), batch_size):
-        batch_files = zarr_files[i : i + batch_size]
-        batch_adatas = [anndata.read_zarr(str(f)) for f in batch_files]
-        batch_concat = anndata.concat(batch_adatas, join="outer")
+    # Free memory from individual adatas
+    del adatas
 
-        if consolidated is None:
-            consolidated = batch_concat
-        else:
-            consolidated = anndata.concat([consolidated, batch_concat], join="outer")
+    logger.info(f"Consolidated {consolidated.n_obs} cells from {len(zarr_files)} files")
 
-        logger.info(f"Processed {min(i + batch_size, len(zarr_files))}/{len(zarr_files)} files")
-
-        # Free memory
-        del batch_adatas
-        del batch_concat
-
-    # Write consolidated file
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    consolidated.write_zarr(output_path)
-
-    total_cells = consolidated.n_obs
-    logger.info(f"Consolidated {total_cells} cells into {output_path}")
-
-    return total_cells
+    return consolidated
 
 
 def _write_shuffle_chunk(
@@ -463,7 +441,6 @@ def shuffle_extracted_chunks(
     partition_index: int = 0,
     max_output_chunks_per_partition: int | None = None,
     max_workers: int | None = None,
-    consolidate_batch_size: int = 50,
 ) -> None:
     """
     Shuffle cells across extracted AnnData chunks.
@@ -479,7 +456,6 @@ def shuffle_extracted_chunks(
         Needed for distributing across multiple distributed VMs. Default is 0.
     :param max_output_chunks_per_partition: Partition block size. Default is None (all chunks)
     :param max_workers: Maximum parallel workers for writing shuffled chunks
-    :param consolidate_batch_size: Batch size for consolidation step
 
     :raise IOError: If file operations fail
     :raise ValueError: If no input files found
@@ -493,18 +469,13 @@ def shuffle_extracted_chunks(
     if max_output_chunks_per_partition is None:
         max_output_chunks_per_partition = curriculum_metadata.num_bins
 
-    # Stage 1: Consolidate Zarr files into single file
+    # Stage 1: Consolidate Zarr files into single AnnData
     logger.info("Stage 1: Consolidating Zarr files...")
-    consolidated_path = input_dir / "_consolidated.zarr"
-    total_cells = consolidate_zarr_extracts(
-        input_dir=input_dir,
-        output_path=consolidated_path,
-        batch_size=consolidate_batch_size,
-    )
+    consolidated = consolidate_zarr_extracts(input_dir=input_dir)
+    total_cells = consolidated.n_obs
 
-    # Stage 2: Load consolidated file and prepare shuffle
-    logger.info("Stage 2: Loading consolidated data and preparing shuffle...")
-    consolidated = anndata.read_zarr(str(consolidated_path))
+    # Stage 2: Prepare shuffle
+    logger.info("Stage 2: Preparing shuffle...")
 
     chunk_size = curriculum_metadata.extract_bin_size
     extract_bin_id_slice_start, extract_bin_id_slice_end = utils.get_block_slice(
