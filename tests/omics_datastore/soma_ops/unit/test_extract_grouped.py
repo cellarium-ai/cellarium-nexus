@@ -25,16 +25,20 @@ def test_extract_grouped_bin_to_anndata_happy_path(monkeypatch: pytest.MonkeyPat
     )
     output_path = tmp_path / "output.h5ad"
 
-    obs_df = pd.DataFrame({
-        "soma_joinid": [10, 15, 20],
-        "cell_type": ["T", "B", "T"],
-        "tissue": ["lung", "lung", "lung"],
-    })
+    obs_df = pd.DataFrame(
+        {
+            "soma_joinid": [10, 15, 20],
+            "cell_type": ["T", "B", "T"],
+            "tissue": ["lung", "lung", "lung"],
+        }
+    )
 
-    var_df = pd.DataFrame({
-        "soma_joinid": [0, 1, 2],
-        "symbol": ["GeneA", "GeneB", "GeneC"],
-    })
+    var_df = pd.DataFrame(
+        {
+            "soma_joinid": [0, 1, 2],
+            "symbol": ["GeneA", "GeneB", "GeneC"],
+        }
+    )
 
     x_coo = sp.coo_matrix(
         ([1, 2, 3, 1, 1, 1], ([10, 10, 15, 20, 20, 20], [0, 2, 1, 0, 1, 2])),
@@ -274,7 +278,9 @@ def test_extract_grouped_bins_happy_path(monkeypatch: pytest.MonkeyPatch, tmp_pa
 def test_extract_grouped_bins_with_partition_index(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Verify extract_grouped_bins respects partition_index for distributed execution."""
     grouped_bins = [
-        GroupedBin(group_key=f"group_{i}", group_filter=f'id == {i}', joinid_min=i * 10, joinid_max=i * 10 + 9, cell_count=10)
+        GroupedBin(
+            group_key=f"group_{i}", group_filter=f"id == {i}", joinid_min=i * 10, joinid_max=i * 10 + 9, cell_count=10
+        )
         for i in range(10)
     ]
 

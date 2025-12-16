@@ -105,10 +105,12 @@ def test_prepare_grouped_curriculum_soma_read_error(monkeypatch: pytest.MonkeyPa
 
 def test_prepare_grouped_curriculum_single_group_single_bin(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify single group smaller than bin_size creates one bin."""
-    obs_df = pd.DataFrame({
-        "soma_joinid": [1, 2, 3, 4, 5],
-        "tissue": ["lung", "lung", "lung", "lung", "lung"],
-    })
+    obs_df = pd.DataFrame(
+        {
+            "soma_joinid": [1, 2, 3, 4, 5],
+            "tissue": ["lung", "lung", "lung", "lung", "lung"],
+        }
+    )
 
     def fake_open(uri: str, mode: str) -> FakeSomaExperiment:
         return FakeSomaExperiment(obs_data=obs_df)
@@ -132,10 +134,12 @@ def test_prepare_grouped_curriculum_single_group_single_bin(monkeypatch: pytest.
 
 def test_prepare_grouped_curriculum_single_group_multiple_bins(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify large group is split into multiple bins."""
-    obs_df = pd.DataFrame({
-        "soma_joinid": [1, 2, 3, 4, 5, 6, 7],
-        "tissue": ["lung"] * 7,
-    })
+    obs_df = pd.DataFrame(
+        {
+            "soma_joinid": [1, 2, 3, 4, 5, 6, 7],
+            "tissue": ["lung"] * 7,
+        }
+    )
 
     def fake_open(uri: str, mode: str) -> FakeSomaExperiment:
         return FakeSomaExperiment(obs_data=obs_df)
@@ -170,10 +174,12 @@ def test_prepare_grouped_curriculum_single_group_multiple_bins(monkeypatch: pyte
 
 def test_prepare_grouped_curriculum_multiple_groups(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify multiple groups create separate bins."""
-    obs_df = pd.DataFrame({
-        "soma_joinid": [1, 2, 3, 10, 11, 12],
-        "tissue": ["lung", "lung", "lung", "heart", "heart", "heart"],
-    })
+    obs_df = pd.DataFrame(
+        {
+            "soma_joinid": [1, 2, 3, 10, 11, 12],
+            "tissue": ["lung", "lung", "lung", "heart", "heart", "heart"],
+        }
+    )
 
     def fake_open(uri: str, mode: str) -> FakeSomaExperiment:
         return FakeSomaExperiment(obs_data=obs_df)
@@ -200,11 +206,13 @@ def test_prepare_grouped_curriculum_multiple_groups(monkeypatch: pytest.MonkeyPa
 
 def test_prepare_grouped_curriculum_multiple_grouping_columns(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify grouping by multiple columns creates composite group keys."""
-    obs_df = pd.DataFrame({
-        "soma_joinid": [1, 2, 3, 4, 5, 6],
-        "tissue": ["lung", "lung", "lung", "heart", "heart", "heart"],
-        "donor": ["D1", "D1", "D2", "D1", "D1", "D2"],
-    })
+    obs_df = pd.DataFrame(
+        {
+            "soma_joinid": [1, 2, 3, 4, 5, 6],
+            "tissue": ["lung", "lung", "lung", "heart", "heart", "heart"],
+            "donor": ["D1", "D1", "D2", "D1", "D1", "D2"],
+        }
+    )
 
     def fake_open(uri: str, mode: str) -> FakeSomaExperiment:
         return FakeSomaExperiment(obs_data=obs_df)
@@ -232,10 +240,12 @@ def test_prepare_grouped_curriculum_multiple_grouping_columns(monkeypatch: pytes
 
 def test_prepare_grouped_curriculum_group_filter_format(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify group_filter is correctly formatted for SOMA queries."""
-    obs_df = pd.DataFrame({
-        "soma_joinid": [1, 2],
-        "tissue": ["lung", "heart"],
-    })
+    obs_df = pd.DataFrame(
+        {
+            "soma_joinid": [1, 2],
+            "tissue": ["lung", "heart"],
+        }
+    )
 
     def fake_open(uri: str, mode: str) -> FakeSomaExperiment:
         return FakeSomaExperiment(obs_data=obs_df)
@@ -256,10 +266,12 @@ def test_prepare_grouped_curriculum_group_filter_format(monkeypatch: pytest.Monk
 
 def test_prepare_grouped_curriculum_metadata_fields(monkeypatch: pytest.MonkeyPatch) -> None:
     """Verify all metadata fields are correctly populated."""
-    obs_df = pd.DataFrame({
-        "soma_joinid": [1, 2, 3],
-        "tissue": ["lung", "lung", "lung"],
-    })
+    obs_df = pd.DataFrame(
+        {
+            "soma_joinid": [1, 2, 3],
+            "tissue": ["lung", "lung", "lung"],
+        }
+    )
 
     def fake_open(uri: str, mode: str) -> FakeSomaExperiment:
         return FakeSomaExperiment(obs_data=obs_df)

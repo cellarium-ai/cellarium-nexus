@@ -512,9 +512,7 @@ def shuffle_extracted_chunks(
         partition_index=partition_index,
         block_size=max_output_chunks_per_partition,
     )
-    extract_bin_indexes = curriculum_metadata.extract_bin_indexes[
-        extract_bin_id_slice_start:extract_bin_id_slice_end
-    ]
+    extract_bin_indexes = curriculum_metadata.extract_bin_indexes[extract_bin_id_slice_start:extract_bin_id_slice_end]
 
     _num_bins_computed = (total_cells + chunk_size - 1) // chunk_size
     num_bins = len(extract_bin_indexes)

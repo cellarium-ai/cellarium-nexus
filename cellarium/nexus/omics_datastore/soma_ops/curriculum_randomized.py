@@ -239,7 +239,9 @@ def prepare_extract_curriculum(
 
     # Compute contiguous id ranges
     id_ranges = compute_contiguous_ranges(values=obs_ids, chunk_size=range_size, shuffle=shuffle_ranges)
-    extract_bin_indexes = compute_output_ids(n_values=total_cells, chunk_size=extract_bin_size, shuffle=shuffle_extract_bin_indexes)
+    extract_bin_indexes = compute_output_ids(
+        n_values=total_cells, chunk_size=extract_bin_size, shuffle=shuffle_extract_bin_indexes
+    )
     logger.info(f"Computed {len(id_ranges)} ranges. Extract bin indexes: {extract_bin_indexes}")
 
     num_bins = len(extract_bin_indexes)
