@@ -314,7 +314,6 @@ def test_extract_randomized_with_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert shuffle_calls[0]["curriculum_metadata"] == plan
     assert shuffle_calls[0]["partition_index"] == 0
     assert shuffle_calls[0]["max_output_chunks_per_partition"] is None
-    assert shuffle_calls[0]["output_format"] == "zarr"
     assert shuffle_calls[0]["max_workers"] == 4
 
     # Verify cleanup was called

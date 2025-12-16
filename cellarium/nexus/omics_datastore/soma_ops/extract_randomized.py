@@ -15,7 +15,6 @@ import anndata
 import numpy as np
 import tiledbsoma
 from anndata._core.aligned_df import ImplicitModificationWarning
-from anndata.experimental import AnnCollection
 from scipy.sparse import coo_matrix
 from tenacity import before_log, retry, stop_after_attempt, wait_exponential
 from tqdm import tqdm
@@ -369,114 +368,91 @@ def extract_ranges(
     logger.info(f"Successfully extracted all {len(ranges_to_process)} ranges to {output_dir}")
 
 
-@retry(
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=1, max=10),
-    before=before_log(logger, logging.INFO),
-    reraise=True,
-)
-def shuffle_chunk_to_anndata(
+def consolidate_zarr_extracts(
     *,
-    chunk_indices: np.ndarray,
-    input_files: list[Path],
-    input_format: Literal["zarr", "h5ad"],
+    input_dir: Path,
     output_path: Path,
-    output_format: Literal["zarr", "h5ad"],
-    var_joinids: list[int] | None = None,
-) -> None:
+    batch_size: int = 50,
+) -> int:
     """
-    Shuffle and write a single chunk of cells to an AnnData file.
+    Consolidate multiple Zarr range files into a single Zarr file.
 
-    Create an AnnCollection from all input files, extract cells at the specified
-    indices, optionally filter features, and write to the output path.
+    Read all range_*.zarr files from input directory and concatenate them
+    into a single consolidated Zarr file for efficient random access during shuffling.
 
-    :param chunk_indices: Array of cell indices to extract for this chunk.
-    :param input_files: List of all input file paths.
-    :param input_format: Input format - "zarr" or "h5ad".
-    :param output_path: Path to write the output file.
-    :param output_format: Output format - "zarr" or "h5ad".
-    :param var_joinids: Optional list of var soma_joinids to filter features by.
+    :param input_dir: Directory containing range_*.zarr files
+    :param output_path: Path to write the consolidated Zarr file
+    :param batch_size: Number of files to concatenate per batch to manage memory
 
+    :raise ValueError: If no input files found
     :raise IOError: If file operations fail
-    :raise ValueError: If output_format is invalid
+
+    :return: Total number of cells in the consolidated file
     """
-    logger.info(f"Processing {len(chunk_indices)} cells to {output_path}")
+    zarr_files = sorted(input_dir.glob("range_*.zarr"))
 
-    # Each worker creates its own AnnCollection with ALL files (backed mode)
-    if input_format == "zarr":
-        adatas = [anndata.read_zarr(str(f)) for f in input_files]
-    else:  # h5ad
-        adatas = [anndata.read_h5ad(str(f), backed="r") for f in input_files]
+    if not zarr_files:
+        raise ValueError(f"No range_*.zarr files found in {input_dir}")
 
-    ann_collection = AnnCollection(
-        adatas,
-        join_obs="inner",
-        join_vars="inner",
-    )
+    logger.info(f"Consolidating {len(zarr_files)} Zarr files into {output_path}")
 
-    # Extract shuffled cells
-    chunk_adata = ann_collection[chunk_indices].to_adata()
+    # Concatenate in batches to manage memory
+    consolidated = None
 
-    # AnnCollection.to_adata() doesn't preserve var columns, copy from source
-    # All input files have the same var structure, so use the first one
-    chunk_adata.var = adatas[0].var.loc[chunk_adata.var.index].copy()
+    for i in range(0, len(zarr_files), batch_size):
+        batch_files = zarr_files[i : i + batch_size]
+        batch_adatas = [anndata.read_zarr(str(f)) for f in batch_files]
+        batch_concat = anndata.concat(batch_adatas, join="outer")
 
-    # Apply feature filtering if var_joinids provided (preserves var_joinids order)
-    if var_joinids is not None:
-        # var index contains soma_joinid values, use direct label-based slicing
-        chunk_adata = chunk_adata[:, var_joinids].copy()
-        logger.info(f"Filtered to {chunk_adata.n_vars} features")
+        if consolidated is None:
+            consolidated = batch_concat
+        else:
+            consolidated = anndata.concat([consolidated, batch_concat], join="outer")
 
-    # Ensure output directory exists
+        logger.info(f"Processed {min(i + batch_size, len(zarr_files))}/{len(zarr_files)} files")
+
+        # Free memory
+        del batch_adatas
+        del batch_concat
+
+    # Write consolidated file
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    consolidated.write_zarr(output_path)
 
-    # Write output
-    if output_format == "zarr":
-        chunk_adata.write_zarr(output_path)
-    elif output_format == "h5ad":
-        chunk_adata.write_h5ad(output_path, compression="gzip")
-    else:
-        raise ValueError(f"output_format must be 'zarr' or 'h5ad', got {output_format}")
+    total_cells = consolidated.n_obs
+    logger.info(f"Consolidated {total_cells} cells into {output_path}")
 
-    logger.info(f"Successfully wrote {len(chunk_indices)} cells to {output_path}")
+    return total_cells
 
 
-def _shuffle_chunk_worker(
-    idx: int,
-    output_chunk_idx: int,
+def _write_shuffle_chunk(
+    consolidated: anndata.AnnData,
     chunk_indices: np.ndarray,
-    input_files: list[Path],
-    input_format: Literal["zarr", "h5ad"],
     output_path: Path,
-    output_format: Literal["zarr", "h5ad"],
     var_joinids: list[int] | None,
-) -> tuple[int, int, str]:
+) -> str:
     """
-    Worker function for parallel shuffle chunk writing.
+    Write a single shuffled chunk to h5ad file.
 
-    :param idx: Internal index of the chunk being processed.
-    :param output_chunk_idx: Pre-computed output index for the extract file name.
-    :param chunk_indices: Array of cell indices for this chunk.
-    :param input_files: List of all input file paths.
-    :param input_format: Input format.
-    :param output_path: Path to write the output file.
-    :param output_format: Output format.
-    :param var_joinids: Optional list of var soma_joinids to filter features by.
+    :param consolidated: Consolidated AnnData object (shared via fork copy-on-write)
+    :param chunk_indices: Array of cell indices for this chunk
+    :param output_path: Path to write the output file
+    :param var_joinids: Optional list of var soma_joinids to filter features by
 
     :raise IOError: If file operations fail
 
-    :return: Tuple of (idx, output_chunk_idx, output_path_str)
+    :return: Output path as string
     """
-    shuffle_chunk_to_anndata(
-        chunk_indices=chunk_indices,
-        input_files=input_files,
-        input_format=input_format,
-        output_path=output_path,
-        output_format=output_format,
-        var_joinids=var_joinids,
-    )
+    chunk_adata = consolidated[chunk_indices].copy()
 
-    return idx, output_chunk_idx, str(output_path)
+    # Apply feature filtering if var_joinids provided
+    if var_joinids is not None:
+        chunk_adata = chunk_adata[:, var_joinids].copy()
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    chunk_adata.write_h5ad(output_path, compression="gzip")
+
+    return str(output_path)
 
 
 def shuffle_extracted_chunks(
@@ -486,74 +462,51 @@ def shuffle_extracted_chunks(
     output_dir: Path,
     partition_index: int = 0,
     max_output_chunks_per_partition: int | None = None,
-    input_format: Literal["zarr", "h5ad"] = "zarr",
-    output_format: Literal["zarr", "h5ad"] = "h5ad",
     max_workers: int | None = None,
-    verbose: bool = True,
+    consolidate_batch_size: int = 50,
 ) -> None:
     """
     Shuffle cells across extracted AnnData chunks.
 
-    Read contiguous range files from input directory, redistribute cells
-    randomly across new chunks of the specified size, and write shuffled
-    output in the specified format. Feature filtering is applied during
-    this stage for better SOMA query performance.
+    Consolidate Zarr range files into a single file, then redistribute cells
+    randomly across output chunks using fork-based multiprocessing for
+    memory-efficient parallel writes.
 
-    :param curriculum_metadata: SOMA extract metadata with all data specification.
-    :param input_dir: Directory with contiguous range files
-    :param output_dir: Directory to write shuffled chunks
-    :param partition_index: Index used for slicing ranges and output chunk indexes.
-        Needed for distributing extracting over multiple distributed VMs. Default is 0 (single VM execution).
-    :param max_output_chunks_per_partition: Partition block size. Default is None, this means it will use all ranges
-    :param input_format: Input format - "zarr" or "h5ad" (default: "zarr")
-    :param output_format: Output format - "zarr" or "h5ad" (default: "h5ad")
-    :param max_workers: Maximum parallel workers for writing
-    :param verbose: If False, suppress INFO level logging in parallel workers
+    :param curriculum_metadata: SOMA extract metadata with all data specification
+    :param input_dir: Directory with range_*.zarr files from extraction stage
+    :param output_dir: Directory to write shuffled h5ad chunks
+    :param partition_index: Index used for slicing output chunk indexes.
+        Needed for distributing across multiple distributed VMs. Default is 0.
+    :param max_output_chunks_per_partition: Partition block size. Default is None (all chunks)
+    :param max_workers: Maximum parallel workers for writing shuffled chunks
+    :param consolidate_batch_size: Batch size for consolidation step
 
     :raise IOError: If file operations fail
-    :raise ValueError: If chunk_size is not positive or formats are invalid
+    :raise ValueError: If no input files found
+    :raise SomaExtractError: If bin count mismatch
     """
-    # Suppress ImplicitModificationWarning from anndata
     warnings.filterwarnings(action="ignore", category=ImplicitModificationWarning)
 
-    if input_format not in ("zarr", "h5ad"):
-        raise ValueError(f"input_format must be 'zarr' or 'h5ad', got {input_format}")
-
-    if output_format not in ("zarr", "h5ad"):
-        raise ValueError(f"output_format must be 'zarr' or 'h5ad', got {output_format}")
-
     if max_workers is None:
-        max_workers = multiprocessing.cpu_count() // 2 + 1
+        max_workers = multiprocessing.cpu_count()
 
     if max_output_chunks_per_partition is None:
         max_output_chunks_per_partition = curriculum_metadata.num_bins
 
-    logger.info(f"Shuffling cells from {input_dir} ({input_format}) to {output_dir} ({output_format})")
+    # Stage 1: Consolidate Zarr files into single file
+    logger.info("Stage 1: Consolidating Zarr files...")
+    consolidated_path = input_dir / "_consolidated.zarr"
+    total_cells = consolidate_zarr_extracts(
+        input_dir=input_dir,
+        output_path=consolidated_path,
+        batch_size=consolidate_batch_size,
+    )
 
-    # Find all input files based on input format
-    input_pattern = f"range_*.{input_format}" if input_format == "h5ad" else "range_*.zarr"
-    input_files = sorted(input_dir.glob(input_pattern))
-
-    if not input_files:
-        raise ValueError(f"No range files found in {input_dir} with pattern {input_pattern}")
-
-    logger.info(f"Found {len(input_files)} input files")
-
-    # Count total cells by reading metadata from files
-    logger.info("Computing total cell count...")
-    if input_format == "zarr":
-        total_cells = sum(anndata.read_zarr(str(f)).n_obs for f in input_files)
-    else:  # h5ad
-        total_cells = sum(anndata.read_h5ad(str(f), backed="r").n_obs for f in input_files)
-
-    logger.info(f"Total cells to shuffle: {total_cells}")
-
-    # Create random permutation of all cell indices
-    logger.info("Computing random permutation...")
-    cell_permutation = np.random.permutation(total_cells)
+    # Stage 2: Load consolidated file and prepare shuffle
+    logger.info("Stage 2: Loading consolidated data and preparing shuffle...")
+    consolidated = anndata.read_zarr(str(consolidated_path))
 
     chunk_size = curriculum_metadata.extract_bin_size
-    # Compute extract_bin_indexes
     extract_bin_id_slice_start, extract_bin_id_slice_end = utils.get_block_slice(
         total_items=curriculum_metadata.num_bins,
         partition_index=partition_index,
@@ -562,33 +515,27 @@ def shuffle_extracted_chunks(
     extract_bin_indexes = curriculum_metadata.extract_bin_indexes[
         extract_bin_id_slice_start:extract_bin_id_slice_end
     ]
-    # Compute extract bins
+
     _num_bins_computed = (total_cells + chunk_size - 1) // chunk_size
     num_bins = len(extract_bin_indexes)
 
     if _num_bins_computed != num_bins:
         raise SomaExtractError(
             f"Number of extract bin indexes doesn't accommodate all cells within this worker. "
-            f"Required number of extract bins {_num_bins_computed}, while"
+            f"Required number of extract bins {_num_bins_computed}, while "
             f"number of indexes for naming {num_bins}"
         )
 
-    logger.info(f"Creating {num_bins} extract bins")
+    # Create random permutation
+    cell_permutation = np.random.permutation(total_cells)
 
-    # Ensure output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Process each output chunk in parallel
-    logger.info(f"Writing shuffled chunks using {max_workers} workers (spawn mode)...")
+    # Stage 3: Write shuffled chunks in parallel using fork (copy-on-write)
+    logger.info(f"Stage 3: Writing {num_bins} shuffled chunks using {max_workers} workers (fork mode)...")
 
-    # Use spawn method for multiprocessing
-    mp_context = multiprocessing.get_context("spawn")
-    with ProcessPoolExecutor(
-        max_workers=max_workers,
-        mp_context=mp_context,
-        initializer=child_init,
-        initargs=(logging.getLevelName(logger.level), verbose),
-    ) as executor:
+    mp_context = multiprocessing.get_context("fork")
+    with ProcessPoolExecutor(max_workers=max_workers, mp_context=mp_context) as executor:
         futures = {}
         for bin_idx in range(num_bins):
             start_idx = bin_idx * chunk_size
@@ -596,31 +543,20 @@ def shuffle_extracted_chunks(
             chunk_indices = cell_permutation[start_idx:end_idx]
             extract_bin_idx = extract_bin_indexes[bin_idx]
 
-            # Determine output path
-            file_ext = ".zarr" if output_format == "zarr" else ".h5ad"
-            output_path = output_dir / f"extract_{extract_bin_idx:06d}{file_ext}"
+            output_path = output_dir / f"extract_{extract_bin_idx:06d}.h5ad"
 
-            # Submit chunk processing job
-            # Each worker will create its own AnnCollection with all files
             future = executor.submit(
-                _shuffle_chunk_worker,
-                bin_idx,
-                extract_bin_idx,
+                _write_shuffle_chunk,
+                consolidated,
                 chunk_indices,
-                input_files,
-                input_format,
                 output_path,
-                output_format,
                 curriculum_metadata.var_joinids,
             )
             futures[future] = bin_idx
 
-        # Wait for completion and track progress
-        completed = 0
         for future in tqdm(as_completed(futures), total=num_bins, desc="Shuffling extracts"):
             try:
-                bin_idx, extract_bin_idx, output_path = future.result()
-                completed += 1
+                future.result()
             except Exception as e:
                 bin_idx = futures[future]
                 logger.error(f"Failed to write extract {bin_idx}: {e}")

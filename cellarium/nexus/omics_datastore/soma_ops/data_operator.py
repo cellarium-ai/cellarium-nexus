@@ -306,13 +306,13 @@ class TileDBSOMADataOperator:
             temp_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            logger.info("Stage 1: Extracting contiguous ranges to H5AD format...")
+            logger.info("Stage 1: Extracting contiguous ranges to Zarr format...")
             extract_ranges(
                 curriculum_metadata=curriculum_metadata,
                 output_dir=temp_dir,
                 partition_index=partition_index,
                 max_ranges_per_partition=max_ranges_per_partition,
-                output_format="h5ad",
+                output_format="zarr",
                 max_workers=max_workers_extract,
                 verbose=verbose,
             )
@@ -330,10 +330,7 @@ class TileDBSOMADataOperator:
                 output_dir=output_dir,
                 partition_index=partition_index,
                 max_output_chunks_per_partition=max_output_chunks_per_partition,
-                input_format="h5ad",  # Read from H5AD temp files
-                output_format=output_format,  # Write in requested format
                 max_workers=max_workers_shuffle,
-                verbose=verbose,
             )
 
             logger.info("Extract and shuffle operation completed successfully")

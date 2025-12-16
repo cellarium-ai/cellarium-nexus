@@ -326,34 +326,24 @@ def test_extract_ranges_failure_handling(monkeypatch: pytest.MonkeyPatch, tmp_pa
         )
 
 
-def test_shuffle_extracted_chunks_invalid_output_format(tmp_path: Path) -> None:
+def test_consolidate_zarr_extracts_no_files(tmp_path: Path) -> None:
     """
-    Verify invalid output_format raises ValueError.
+    Verify missing input files raises ValueError.
     """
-    curriculum_metadata = RandomizedCurriculumMetadata(
-        experiment_uri="gs://bucket/soma",
-        value_filter="",
-        id_ranges=[IdContiguousRange(start=0, end=10)],
-        total_cells=10,
-        range_size=10,
-        num_ranges=1,
-        extract_bin_size=10,
-        num_bins=1,
-        last_bin_size=10,
-        extract_bin_indexes=[0],
-    )
+    input_dir = tmp_path / "input"
+    input_dir.mkdir()
+    output_path = tmp_path / "consolidated.zarr"
+
     with pytest.raises(ValueError):
-        extract.shuffle_extracted_chunks(
-            curriculum_metadata=curriculum_metadata,
-            input_dir=tmp_path,
-            output_dir=tmp_path,
-            output_format="invalid",
+        extract.consolidate_zarr_extracts(
+            input_dir=input_dir,
+            output_path=output_path,
         )
 
 
 def test_shuffle_extracted_chunks_no_input_files(tmp_path: Path) -> None:
     """
-    Verify missing input files raises ValueError.
+    Verify missing input files raises ValueError during consolidation.
     """
     input_dir = tmp_path / "input"
     input_dir.mkdir()
@@ -387,18 +377,23 @@ def test_shuffle_extracted_chunks_happy_path(monkeypatch: pytest.MonkeyPatch, tm
     input_dir.mkdir()
     output_dir = tmp_path / "output"
 
-    # Create fake input files
-    (input_dir / "range_000000.h5ad").touch()
-    (input_dir / "range_000001.h5ad").touch()
+    # Create fake input zarr directories
+    (input_dir / "range_000000.zarr").mkdir()
+    (input_dir / "range_000001.zarr").mkdir()
 
-    # Mock anndata.read_h5ad
-    def fake_read_h5ad(path: Path, backed: str | None = None) -> FakeAnnData:
-        if backed:
-            assert backed == "r"
+    # Mock anndata.read_zarr
+    def fake_read_zarr(path: str) -> FakeAnnData:
         # Return fake with 3 cells per file
         return FakeAnnData(n_obs=3)
 
-    monkeypatch.setattr("anndata.read_h5ad", fake_read_h5ad)
+    monkeypatch.setattr("anndata.read_zarr", fake_read_zarr)
+
+    # Mock anndata.concat
+    def fake_concat(adatas: list[FakeAnnData], join: str = "outer") -> FakeAnnData:
+        total_obs = sum(a.n_obs for a in adatas)
+        return FakeAnnData(n_obs=total_obs)
+
+    monkeypatch.setattr("anndata.concat", fake_concat)
 
     # Mock np.random.permutation
     def fake_permutation(n: int) -> np.ndarray:
@@ -407,26 +402,19 @@ def test_shuffle_extracted_chunks_happy_path(monkeypatch: pytest.MonkeyPatch, tm
 
     monkeypatch.setattr(np.random, "permutation", fake_permutation)
 
-    # Mock _write_shuffled_chunk worker
+    # Mock _write_shuffle_chunk worker
     def fake_write_chunk(
-        chunk_idx: int,
-        output_chunk_idx: int,
-        chunk_indices: object,
-        input_files: object,
-        input_format: str,
-        output_dir: Path,
-        output_format: str,
+        consolidated: FakeAnnData,
+        chunk_indices: np.ndarray,
+        output_path: Path,
         var_joinids: list[int] | None,
-    ) -> tuple[int, int, str]:
+    ) -> str:
         # Create output file
-        output_dir.mkdir(parents=True, exist_ok=True)
-        if output_format == "zarr":
-            output_path = output_dir / f"extract_{output_chunk_idx:06d}.zarr"
-            output_path.mkdir(exist_ok=True)
-        else:
-            output_path = output_dir / f"extract_{output_chunk_idx:06d}.h5ad"
-            output_path.touch()
-        return chunk_idx, output_chunk_idx, str(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.touch()
+        return str(output_path)
+
+    monkeypatch.setattr(extract, "_write_shuffle_chunk", fake_write_chunk)
 
     # Mock ProcessPoolExecutor
     executor = FakeExecutor(max_workers=1, worker_fn=fake_write_chunk)
@@ -457,8 +445,6 @@ def test_shuffle_extracted_chunks_happy_path(monkeypatch: pytest.MonkeyPatch, tm
         curriculum_metadata=curriculum_metadata,
         input_dir=input_dir,
         output_dir=output_dir,
-        input_format="h5ad",
-        output_format="h5ad",
         max_workers=1,
     )
 
