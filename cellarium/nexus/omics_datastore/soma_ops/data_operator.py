@@ -6,6 +6,7 @@ This module provides the main operator class for interacting with SOMA experimen
 
 import gc
 import logging
+import multiprocessing
 import shutil
 import tempfile
 from pathlib import Path
@@ -322,20 +323,32 @@ class TileDBSOMADataOperator:
             gc.collect()
 
             # Stage 2: Shuffle cells across extracts (feature filtering applied here)
-            logger.info("Stage 2: Shuffling cells across extracts...")
+            # Run in separate subprocess to get clean memory state (like kernel restart)
+            logger.info("Stage 2: Shuffling cells across extracts (in subprocess for clean memory)...")
             max_output_chunks_per_partition = (
                 int(max_ranges_per_partition * curriculum_metadata.range_size / curriculum_metadata.extract_bin_size)
                 if max_ranges_per_partition is not None
                 else None
             )
-            shuffle_extracted_chunks(
-                curriculum_metadata=curriculum_metadata,
-                input_dir=temp_dir,
-                output_dir=output_dir,
-                partition_index=partition_index,
-                max_output_chunks_per_partition=max_output_chunks_per_partition,
-                max_workers=max_workers_shuffle,
+
+            # Use spawn to get completely fresh memory space
+            ctx = multiprocessing.get_context("spawn")
+            shuffle_process = ctx.Process(
+                target=shuffle_extracted_chunks,
+                kwargs={
+                    "curriculum_metadata": curriculum_metadata,
+                    "input_dir": temp_dir,
+                    "output_dir": output_dir,
+                    "partition_index": partition_index,
+                    "max_output_chunks_per_partition": max_output_chunks_per_partition,
+                    "max_workers": max_workers_shuffle,
+                },
             )
+            shuffle_process.start()
+            shuffle_process.join()
+
+            if shuffle_process.exitcode != 0:
+                raise RuntimeError(f"Shuffle subprocess failed with exit code {shuffle_process.exitcode}")
 
             logger.info("Extract and shuffle operation completed successfully")
 
