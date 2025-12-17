@@ -368,21 +368,17 @@ def extract_ranges(
     logger.info(f"Successfully extracted all {len(ranges_to_process)} ranges to {output_dir}")
 
 
-def consolidate_zarr_extracts(
-    *,
+def _consolidate_worker(
     input_dir: Path,
-) -> anndata.AnnData:
+    output_path: Path,
+) -> None:
     """
-    Consolidate multiple Zarr range files into a single AnnData object.
+    Worker function to consolidate Zarr files in a subprocess.
 
-    Read all range_*.zarr files from input directory and concatenate them
-    into a single AnnData object for efficient random access during shuffling.
+    Run in a separate process so memory is fully released when process exits.
 
     :param input_dir: Directory containing range_*.zarr files
-
-    :raise ValueError: If no input files found
-
-    :return: Consolidated AnnData object
+    :param output_path: Path to write the consolidated Zarr file
     """
     zarr_files = sorted(input_dir.glob("range_*.zarr"))
 
@@ -395,42 +391,52 @@ def consolidate_zarr_extracts(
     adatas = [anndata.read_zarr(str(f)) for f in zarr_files]
     consolidated = anndata.concat(adatas, join="outer")
 
-    # Free memory from individual adatas
-    del adatas
+    logger.info(f"Concatenated {consolidated.n_obs} cells, writing to {output_path}...")
 
-    logger.info(f"Consolidated {consolidated.n_obs} cells from {len(zarr_files)} files")
-
-    return consolidated
-
-
-def _write_shuffle_chunk(
-    consolidated: anndata.AnnData,
-    chunk_indices: np.ndarray,
-    output_path: Path,
-    var_joinids: list[int] | None,
-) -> str:
-    """
-    Write a single shuffled chunk to h5ad file.
-
-    :param consolidated: Consolidated AnnData object (shared via fork copy-on-write)
-    :param chunk_indices: Array of cell indices for this chunk
-    :param output_path: Path to write the output file
-    :param var_joinids: Optional list of var soma_joinids to filter features by
-
-    :raise IOError: If file operations fail
-
-    :return: Output path as string
-    """
-    chunk_adata = consolidated[chunk_indices].copy()
-
-    # Apply feature filtering if var_joinids provided
-    if var_joinids is not None:
-        chunk_adata = chunk_adata[:, var_joinids].copy()
-
+    # Write to disk
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    chunk_adata.write_h5ad(output_path, compression="gzip")
+    consolidated.write_zarr(output_path)
 
-    return str(output_path)
+    logger.info(f"Consolidation complete: {consolidated.n_obs} cells written")
+    # Process exits here, OS reclaims all memory
+
+
+def consolidate_zarr_extracts(
+    *,
+    input_dir: Path,
+    output_path: Path,
+) -> None:
+    """
+    Consolidate multiple Zarr range files into a single Zarr file.
+
+    Run consolidation in a subprocess so memory is fully released when done.
+    Python's memory allocator doesn't return memory to OS after del/gc.collect,
+    but subprocess exit guarantees full memory release.
+
+    :param input_dir: Directory containing range_*.zarr files
+    :param output_path: Path to write the consolidated Zarr file
+
+    :raise ValueError: If no input files found
+    :raise RuntimeError: If consolidation subprocess fails
+    """
+    # Check for input files before spawning subprocess
+    zarr_files = list(input_dir.glob("range_*.zarr"))
+    if not zarr_files:
+        raise ValueError(f"No range_*.zarr files found in {input_dir}")
+
+    logger.info("Running consolidation in subprocess to ensure memory release...")
+
+    # Run in subprocess - when it exits, OS reclaims all memory
+    ctx = multiprocessing.get_context("spawn")
+    process = ctx.Process(
+        target=_consolidate_worker,
+        args=(input_dir, output_path),
+    )
+    process.start()
+    process.join()
+
+    if process.exitcode != 0:
+        raise RuntimeError(f"Consolidation subprocess failed with exit code {process.exitcode}")
 
 
 def shuffle_extracted_chunks(
@@ -469,13 +475,22 @@ def shuffle_extracted_chunks(
     if max_output_chunks_per_partition is None:
         max_output_chunks_per_partition = curriculum_metadata.num_bins
 
-    # Stage 1: Consolidate Zarr files into single AnnData
+    # Stage 1: Consolidate Zarr files (runs in subprocess for memory release)
     logger.info("Stage 1: Consolidating Zarr files...")
-    consolidated = consolidate_zarr_extracts(input_dir=input_dir)
-    total_cells = consolidated.n_obs
+    consolidated_path = input_dir / "_consolidated.zarr"
+    consolidate_zarr_extracts(
+        input_dir=input_dir,
+        output_path=consolidated_path,
+    )
 
-    # Stage 2: Prepare shuffle
-    logger.info("Stage 2: Preparing shuffle...")
+    # Stage 2: Load consolidated file (compact representation from disk)
+    logger.info("Stage 2: Loading consolidated data...")
+    consolidated = anndata.read_zarr(str(consolidated_path))
+    total_cells = consolidated.n_obs
+    var_joinids = curriculum_metadata.var_joinids
+
+    # Stage 3: Prepare shuffle
+    logger.info("Stage 3: Preparing shuffle...")
 
     chunk_size = curriculum_metadata.extract_bin_size
     extract_bin_id_slice_start, extract_bin_id_slice_end = utils.get_block_slice(
@@ -500,35 +515,29 @@ def shuffle_extracted_chunks(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Stage 3: Write shuffled chunks in parallel using fork (copy-on-write)
-    logger.info(f"Stage 3: Writing {num_bins} shuffled chunks using {max_workers} workers (fork mode)...")
+    # Define worker function inside to capture consolidated via closure (fork copy-on-write)
+    def write_chunk(chunk_idx: int) -> int:
+        """Write a single shuffled chunk to h5ad file."""
+        start_idx = chunk_idx * chunk_size
+        end_idx = min(start_idx + chunk_size, total_cells)
+        chunk_indices = cell_permutation[start_idx:end_idx]
+        extract_bin_idx = extract_bin_indexes[chunk_idx]
+
+        chunk_adata = consolidated[chunk_indices].copy()
+        if var_joinids is not None:
+            chunk_adata = chunk_adata[:, var_joinids].copy()
+
+        out_path = output_dir / f"extract_{extract_bin_idx:06d}.h5ad"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        chunk_adata.write_h5ad(out_path, compression="gzip")
+        return chunk_idx
+
+    # Stage 4: Write shuffled chunks in parallel using fork (copy-on-write)
+    # Using map() instead of submit() to avoid pickling the consolidated AnnData
+    logger.info(f"Stage 4: Writing {num_bins} shuffled chunks using {max_workers} workers (fork mode)...")
 
     mp_context = multiprocessing.get_context("fork")
     with ProcessPoolExecutor(max_workers=max_workers, mp_context=mp_context) as executor:
-        futures = {}
-        for bin_idx in range(num_bins):
-            start_idx = bin_idx * chunk_size
-            end_idx = min(start_idx + chunk_size, total_cells)
-            chunk_indices = cell_permutation[start_idx:end_idx]
-            extract_bin_idx = extract_bin_indexes[bin_idx]
-
-            output_path = output_dir / f"extract_{extract_bin_idx:06d}.h5ad"
-
-            future = executor.submit(
-                _write_shuffle_chunk,
-                consolidated,
-                chunk_indices,
-                output_path,
-                curriculum_metadata.var_joinids,
-            )
-            futures[future] = bin_idx
-
-        for future in tqdm(as_completed(futures), total=num_bins, desc="Shuffling extracts"):
-            try:
-                future.result()
-            except Exception as e:
-                bin_idx = futures[future]
-                logger.error(f"Failed to write extract {bin_idx}: {e}")
-                raise
+        list(tqdm(executor.map(write_chunk, range(num_bins)), total=num_bins, desc="Shuffling extracts"))
 
     logger.info(f"Successfully shuffled {total_cells} cells into {num_bins} extracts")

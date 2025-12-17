@@ -332,9 +332,13 @@ def test_consolidate_zarr_extracts_no_files(tmp_path: Path) -> None:
     """
     input_dir = tmp_path / "input"
     input_dir.mkdir()
+    output_path = tmp_path / "consolidated.zarr"
 
     with pytest.raises(ValueError):
-        extract.consolidate_zarr_extracts(input_dir=input_dir)
+        extract.consolidate_zarr_extracts(
+            input_dir=input_dir,
+            output_path=output_path,
+        )
 
 
 def test_shuffle_extracted_chunks_no_input_files(tmp_path: Path) -> None:
@@ -377,19 +381,19 @@ def test_shuffle_extracted_chunks_happy_path(monkeypatch: pytest.MonkeyPatch, tm
     (input_dir / "range_000000.zarr").mkdir()
     (input_dir / "range_000001.zarr").mkdir()
 
-    # Mock anndata.read_zarr
+    # Mock consolidate_zarr_extracts to skip subprocess (can't mock inside subprocess)
+    def fake_consolidate(*, input_dir: Path, output_path: Path) -> None:
+        # Just create the output path marker
+        output_path.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr(extract, "consolidate_zarr_extracts", fake_consolidate)
+
+    # Mock anndata.read_zarr to return fake consolidated data
     def fake_read_zarr(path: str) -> FakeAnnData:
-        # Return fake with 3 cells per file
-        return FakeAnnData(n_obs=3)
+        # Return fake with 6 cells (consolidated)
+        return FakeAnnData(n_obs=6)
 
     monkeypatch.setattr("anndata.read_zarr", fake_read_zarr)
-
-    # Mock anndata.concat
-    def fake_concat(adatas: list[FakeAnnData], join: str = "outer") -> FakeAnnData:
-        total_obs = sum(a.n_obs for a in adatas)
-        return FakeAnnData(n_obs=total_obs)
-
-    monkeypatch.setattr("anndata.concat", fake_concat)
 
     # Mock np.random.permutation
     def fake_permutation(n: int) -> np.ndarray:
@@ -398,29 +402,28 @@ def test_shuffle_extracted_chunks_happy_path(monkeypatch: pytest.MonkeyPatch, tm
 
     monkeypatch.setattr(np.random, "permutation", fake_permutation)
 
-    # Mock _write_shuffle_chunk worker
-    def fake_write_chunk(
-        consolidated: FakeAnnData,
-        chunk_indices: np.ndarray,
-        output_path: Path,
-        var_joinids: list[int] | None,
-    ) -> str:
-        # Create output file
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        output_path.touch()
-        return str(output_path)
+    # Mock ProcessPoolExecutor to run map() synchronously
+    class FakeMapExecutor:
+        def __init__(self, **kwargs: object) -> None:
+            pass
 
-    monkeypatch.setattr(extract, "_write_shuffle_chunk", fake_write_chunk)
+        def __enter__(self) -> "FakeMapExecutor":
+            return self
 
-    # Mock ProcessPoolExecutor
-    executor = FakeExecutor(max_workers=1, worker_fn=fake_write_chunk)
-    monkeypatch.setattr(extract, "ProcessPoolExecutor", lambda **kwargs: executor)
+        def __exit__(self, *args: object) -> None:
+            pass
 
-    # Mock as_completed
-    def fake_as_completed(futures: dict[object, int]) -> list[object]:
-        return list(futures.keys())
+        def map(self, fn: object, chunk_indexes: range) -> list[object]:
+            results = []
+            for chunk_idx in chunk_indexes:
+                # Create output file for each chunk
+                output_path = output_dir / f"extract_{chunk_idx:06d}.h5ad"
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                output_path.touch()
+                results.append(chunk_idx)
+            return results
 
-    monkeypatch.setattr(extract, "as_completed", fake_as_completed)
+    monkeypatch.setattr(extract, "ProcessPoolExecutor", lambda **kwargs: FakeMapExecutor())
 
     # 6 total cells, chunk_size=4 -> 2 extract bins
     curriculum_metadata = RandomizedCurriculumMetadata(
