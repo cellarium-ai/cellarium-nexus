@@ -416,10 +416,11 @@ def test_shuffle_extracted_chunks_happy_path(monkeypatch: pytest.MonkeyPatch, tm
         def map(self, fn: object, chunk_indexes: range) -> list[object]:
             results = []
             for chunk_idx in chunk_indexes:
-                # Create output file for each chunk
-                output_path = output_dir / f"extract_{chunk_idx:06d}.h5ad"
-                output_path.parent.mkdir(parents=True, exist_ok=True)
-                output_path.touch()
+                # Create output file for each chunk using _shuffle_state
+                extract_bin_idx = extract._shuffle_state["extract_bin_indexes"][chunk_idx]
+                out_path = extract._shuffle_state["output_dir"] / f"extract_{extract_bin_idx:06d}.h5ad"
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                out_path.touch()
                 results.append(chunk_idx)
             return results
 

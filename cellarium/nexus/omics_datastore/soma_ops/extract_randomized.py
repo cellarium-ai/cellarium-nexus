@@ -25,6 +25,9 @@ from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, Ra
 
 logger = logging.getLogger(__name__)
 
+# Module-level state for fork-based multiprocessing (copy-on-write sharing)
+_shuffle_state: dict[str, object] = {}
+
 
 def child_init(log_level: str, verbose: bool = True) -> None:
     """
@@ -401,6 +404,39 @@ def _consolidate_worker(
     # Process exits here, OS reclaims all memory
 
 
+def _write_shuffle_chunk(chunk_idx: int) -> int:
+    """
+    Write a single shuffled chunk to h5ad file.
+
+    Use module-level _shuffle_state for fork copy-on-write sharing.
+
+    :param chunk_idx: Index of the chunk to write
+
+    :return: Chunk index
+    """
+    consolidated = _shuffle_state["consolidated"]
+    var_joinids = _shuffle_state["var_joinids"]
+    chunk_size = _shuffle_state["chunk_size"]
+    total_cells = _shuffle_state["total_cells"]
+    cell_permutation = _shuffle_state["cell_permutation"]
+    extract_bin_indexes = _shuffle_state["extract_bin_indexes"]
+    output_dir = _shuffle_state["output_dir"]
+
+    start_idx = chunk_idx * chunk_size
+    end_idx = min(start_idx + chunk_size, total_cells)
+    chunk_indices = cell_permutation[start_idx:end_idx]
+    extract_bin_idx = extract_bin_indexes[chunk_idx]
+
+    chunk_adata = consolidated[chunk_indices].copy()
+    if var_joinids is not None:
+        chunk_adata = chunk_adata[:, var_joinids].copy()
+
+    out_path = output_dir / f"extract_{extract_bin_idx:06d}.h5ad"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    chunk_adata.write_h5ad(out_path, compression="gzip")
+    return chunk_idx
+
+
 def consolidate_zarr_extracts(
     *,
     input_dir: Path,
@@ -515,29 +551,24 @@ def shuffle_extracted_chunks(
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Define worker function inside to capture consolidated via closure (fork copy-on-write)
-    def write_chunk(chunk_idx: int) -> int:
-        """Write a single shuffled chunk to h5ad file."""
-        start_idx = chunk_idx * chunk_size
-        end_idx = min(start_idx + chunk_size, total_cells)
-        chunk_indices = cell_permutation[start_idx:end_idx]
-        extract_bin_idx = extract_bin_indexes[chunk_idx]
-
-        chunk_adata = consolidated[chunk_indices].copy()
-        if var_joinids is not None:
-            chunk_adata = chunk_adata[:, var_joinids].copy()
-
-        out_path = output_dir / f"extract_{extract_bin_idx:06d}.h5ad"
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        chunk_adata.write_h5ad(out_path, compression="gzip")
-        return chunk_idx
+    # Set up module-level state for fork copy-on-write sharing
+    # Fork will share this memory with child processes
+    _shuffle_state["consolidated"] = consolidated
+    _shuffle_state["var_joinids"] = var_joinids
+    _shuffle_state["chunk_size"] = chunk_size
+    _shuffle_state["total_cells"] = total_cells
+    _shuffle_state["cell_permutation"] = cell_permutation
+    _shuffle_state["extract_bin_indexes"] = extract_bin_indexes
+    _shuffle_state["output_dir"] = output_dir
 
     # Stage 4: Write shuffled chunks in parallel using fork (copy-on-write)
-    # Using map() instead of submit() to avoid pickling the consolidated AnnData
     logger.info(f"Stage 4: Writing {num_bins} shuffled chunks using {max_workers} workers (fork mode)...")
 
     mp_context = multiprocessing.get_context("fork")
     with ProcessPoolExecutor(max_workers=max_workers, mp_context=mp_context) as executor:
-        list(tqdm(executor.map(write_chunk, range(num_bins)), total=num_bins, desc="Shuffling extracts"))
+        list(tqdm(executor.map(_write_shuffle_chunk, range(num_bins)), total=num_bins, desc="Shuffling extracts"))
+
+    # Clear state after use
+    _shuffle_state.clear()
 
     logger.info(f"Successfully shuffled {total_cells} cells into {num_bins} extracts")
