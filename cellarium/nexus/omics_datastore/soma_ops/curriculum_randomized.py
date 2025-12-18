@@ -223,7 +223,7 @@ def prepare_extract_curriculum(
             var_filter_column=var_filter_column,
             var_filter_values=var_filter_values,
         )
-        logger.info(f"Found {len(var_ids)} var obs_ids for feature filter")
+        logger.info(f"Found {len(var_ids)} var joinids for feature filter")
 
     # Read and sort filtered obs_ids
     obs_ids = read_filtered_joinids(
