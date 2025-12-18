@@ -136,8 +136,8 @@ def extract_range_to_anndata(
 
             var_joinids_array = var_df.index.to_numpy(dtype=np.int64)
 
-            # Filter var columns if specified
-            if var_columns is not None:
+            # Filter var columns if specified (non-empty list)
+            if var_columns:
                 # Keep only requested columns (soma_joinid is already the index, skip it)
                 columns_to_keep = [col for col in var_columns if col in var_df.columns and col != "soma_joinid"]
                 missing_cols = [col for col in var_columns if col not in var_df.columns and col != "soma_joinid"]
@@ -392,7 +392,11 @@ def _consolidate_worker(
 
     # Load all files and concatenate in single operation
     adatas = [anndata.read_zarr(str(f)) for f in zarr_files]
+    # Use first file's var as reference (all files have same features)
+    reference_var = adatas[0].var.copy()
     consolidated = anndata.concat(adatas, join="outer")
+    # Restore var metadata (concat may lose it when joining along obs axis)
+    consolidated.var = reference_var
 
     logger.info(f"Concatenated {consolidated.n_obs} cells, writing to {output_path}...")
 
@@ -429,7 +433,10 @@ def _write_shuffle_chunk(chunk_idx: int) -> int:
 
     chunk_adata = consolidated[chunk_indices].copy()
     if var_joinids is not None:
-        chunk_adata = chunk_adata[:, var_joinids].copy()
+        # Filter to requested features using var index (soma_joinid)
+        # var_names may be strings after anndata.concat, so convert to match
+        var_joinids_str = set(str(v) for v in var_joinids)
+        chunk_adata = chunk_adata[:, chunk_adata.var_names.isin(var_joinids_str)].copy()
 
     out_path = output_dir / f"extract_{extract_bin_idx:06d}.h5ad"
     out_path.parent.mkdir(parents=True, exist_ok=True)
