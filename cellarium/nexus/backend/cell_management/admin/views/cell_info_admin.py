@@ -418,22 +418,23 @@ class ExtractCurriculumAdminView(generic.FormView):
 
         try:
             if omics_dataset.backend == cell_models.OmicsDatasetBackend.TILEDB_SOMA:
-                # Submit SOMA extract pipeline
-                pipeline_url = soma_workflows_utils.submit_soma_randomized_extract_pipeline(
+                # Submit SOMA extract pipeline (routes to randomized or grouped based on extract_bin_keys)
+                pipeline_url = soma_workflows_utils.submit_soma_extract_pipeline(
                     name=cleaned["name"],
                     creator_id=self.request.user.id,
                     omics_dataset=omics_dataset,
-                    range_size=settings.TILEDB_SOMA_EXTRACT_CONTIGUOUS_RANGE,
                     extract_bin_size=cleaned["extract_bin_size"],
-                    filters=cleaned.get("filters") or None,
-                    shuffle_ranges=True,
                     feature_schema=cleaned.get("feature_schema"),
+                    filters=cleaned.get("filters") or None,
                     obs_columns=cleaned.get("obs_columns") or None,
                     var_columns=settings.TILEDB_SOMA_EXTRACT_VAR_COLUMNS,
                     x_layer=settings.TILEDB_SOMA_EXTRACT_X_LAYER,
                     output_format=settings.TILEDB_SOMA_EXTRACT_OUTPUT_FORMAT,
-                    max_workers_extract=8,
-                    max_workers_shuffle=3,
+                    # Randomized extraction params
+                    range_size=settings.TILEDB_SOMA_EXTRACT_CONTIGUOUS_RANGE,
+                    shuffle_ranges=True,
+                    # Grouped extraction params (if provided, routes to grouped extraction)
+                    extract_bin_keys=cleaned.get("extract_bin_keys") or None,
                 )
             else:
                 # Submit BigQuery extract pipeline

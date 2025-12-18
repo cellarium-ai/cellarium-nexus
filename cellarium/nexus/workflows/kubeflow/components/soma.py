@@ -50,7 +50,7 @@ def soma_randomized_extract_job(config_path: str):
 
 
 @job.dsl_component_job(
-    machine_type="e2-highcpu-16",
+    machine_type="e2-standard-16",
     display_name="soma_grouped_extract",
     base_image=conf.BASE_IMAGE,
     service_account=conf.SERVICE_ACCOUNT,

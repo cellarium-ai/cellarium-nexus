@@ -247,7 +247,7 @@ def test_compose_and_dump_soma_configs(monkeypatch: pytest.MonkeyPatch, soma_dat
     coordinator.prepare_soma_extract.assert_called_once()
 
 
-def test_submit_soma_randomized_extract_pipeline(
+def test_submit_soma_extract_pipeline_randomized(
     monkeypatch: pytest.MonkeyPatch, soma_dataset: models.OmicsDataset
 ) -> None:
     settings = _make_settings()
@@ -255,8 +255,19 @@ def test_submit_soma_randomized_extract_pipeline(
 
     monkeypatch.setattr(
         soma_workflows_utils,
-        "compose_and_dump_soma_configs",
-        lambda **kwargs: ["gs://bucket/extract_1.yaml"],
+        "compose_soma_randomized_extract_configs",
+        lambda **kwargs: [mock.Mock()],
+        raising=True,
+    )
+
+    coordinator_mock = mock.Mock()
+    coordinator_mock.prepare_soma_extract.return_value = mock.Mock()
+    monkeypatch.setattr(soma_workflows_utils, "SomaDataOpsCoordinator", lambda **kwargs: coordinator_mock, raising=True)
+
+    monkeypatch.setattr(
+        soma_workflows_utils.workflows_configs,
+        "dump_configs_to_bucket",
+        lambda configs, bucket_path: ["gs://bucket/extract_1.yaml"],
         raising=True,
     )
 
@@ -267,7 +278,7 @@ def test_submit_soma_randomized_extract_pipeline(
         raising=True,
     )
 
-    url = soma_workflows_utils.submit_soma_randomized_extract_pipeline(
+    url = soma_workflows_utils.submit_soma_extract_pipeline(
         name="test_extract",
         creator_id=1,
         omics_dataset=soma_dataset,

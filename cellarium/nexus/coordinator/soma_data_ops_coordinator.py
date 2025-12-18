@@ -92,42 +92,48 @@ class SomaDataOpsCoordinator:
         extract_name: str,
         creator_id: int,
         curriculum_metadata_path: str,
-        range_size: int,
-        extract_bin_size: int,
         filters: dict[str, Any] | None = None,
-        shuffle_ranges: bool = True,
         var_filter_column: str | None = None,
         var_filter_values: list[str] | None = None,
         obs_columns: list[str] | None = None,
         var_columns: list[str] | None = None,
         x_layer: str = "X",
-    ) -> RandomizedCurriculumMetadata:
+        # Randomized extraction params
+        range_size: int | None = None,
+        extract_bin_size: int | None = None,
+        shuffle_ranges: bool = True,
+        # Grouped extraction params
+        extract_bin_keys: list[str] | None = None,
+    ) -> RandomizedCurriculumMetadata | GroupedCurriculumMetadata:
         """
         Prepare a SOMA extract by computing the plan and registering the curriculum.
 
-        Compute the extract plan (joinid ranges), save it to cloud storage, and register
-        the curriculum in the backend.
+        Compute the extract plan, save it to cloud storage, and register the curriculum
+        in the backend. Supports both randomized and grouped extraction modes.
 
         :param extract_name: Name for this extract/curriculum.
         :param creator_id: ID of the user creating the extract.
         :param curriculum_metadata_path: Path within bucket where the plan will be saved.
-        :param range_size: Target number of cells per range.
-        :param extract_bin_size: Target cells per extract bin (for shuffling).
         :param filters: Optional filter conditions in Nexus format.
-        :param shuffle_ranges: Whether to shuffle the joinid ranges.
         :param var_filter_column: Name of the var column to filter features by.
         :param var_filter_values: List of values to match in the var filter column.
         :param obs_columns: List of obs columns to include in extraction.
         :param var_columns: List of var columns to include in extraction.
         :param x_layer: Name of the SOMA X layer to read counts from.
+        :param range_size: Target number of cells per range (randomized extraction).
+        :param extract_bin_size: Target cells per output bin.
+        :param shuffle_ranges: Whether to shuffle the joinid ranges (randomized extraction).
+        :param extract_bin_keys: List of obs column names to group by (grouped extraction).
 
         :raise SomaPlanningError: If plan computation fails
         :raise IOError: If cloud storage operations fail
         :raise HTTPError: If backend API calls fail
+        :raise ValueError: If required parameters are missing
 
-        :return: SOMA extract plan
+        :return: SOMA extract plan (RandomizedCurriculumMetadata or GroupedCurriculumMetadata)
         """
-        logger.info(f"Preparing SOMA extract '{extract_name}' with range_size={range_size}")
+        extract_type = "grouped" if extract_bin_keys else "randomized"
+        logger.info(f"Preparing SOMA {extract_type} extract '{extract_name}'")
 
         try:
             # Step 1: Compute extract plan
@@ -141,8 +147,10 @@ class SomaDataOpsCoordinator:
                 obs_columns=obs_columns,
                 var_columns=var_columns,
                 x_layer=x_layer,
+                extract_bin_keys=extract_bin_keys,
+                bin_size=extract_bin_size,
             )
-            logger.info(f"Computed extract plan: {len(plan.id_ranges)} ranges, {plan.total_cells} total cells")
+            logger.info(f"Computed {extract_type} extract plan: {plan.num_bins} bins, {plan.total_cells} total cells")
 
             # Step 2: Save plan to cloud storage
             full_plan_path = self.workspace.save_json_to_bucket(

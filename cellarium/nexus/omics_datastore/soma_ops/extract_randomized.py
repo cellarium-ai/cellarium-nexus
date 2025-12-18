@@ -518,22 +518,19 @@ def shuffle_extracted_chunks(
     if max_output_chunks_per_partition is None:
         max_output_chunks_per_partition = curriculum_metadata.num_bins
 
-    # Stage 1: Consolidate Zarr files (runs in subprocess for memory release)
-    logger.info("Stage 1: Consolidating Zarr files...")
+    logger.info("Consolidating Zarr files...")
     consolidated_path = input_dir / "_consolidated.zarr"
     consolidate_zarr_extracts(
         input_dir=input_dir,
         output_path=consolidated_path,
     )
 
-    # Stage 2: Load consolidated file (compact representation from disk)
-    logger.info("Stage 2: Loading consolidated data...")
+    logger.info("Loading consolidated data...")
     consolidated = anndata.read_zarr(str(consolidated_path))
     total_cells = consolidated.n_obs
     var_joinids = curriculum_metadata.var_joinids
 
-    # Stage 3: Prepare shuffle
-    logger.info("Stage 3: Preparing shuffle...")
+    logger.info("Preparing shuffle...")
 
     chunk_size = curriculum_metadata.extract_bin_size
     extract_bin_id_slice_start, extract_bin_id_slice_end = utils.get_block_slice(
@@ -568,8 +565,7 @@ def shuffle_extracted_chunks(
     _shuffle_state["extract_bin_indexes"] = extract_bin_indexes
     _shuffle_state["output_dir"] = output_dir
 
-    # Stage 4: Write shuffled chunks in parallel using fork (copy-on-write)
-    logger.info(f"Stage 4: Writing {num_bins} shuffled chunks using {max_workers} workers (fork mode)...")
+    logger.info(f"Writing {num_bins} shuffled chunks using {max_workers} workers (fork mode)...")
 
     mp_context = multiprocessing.get_context("fork")
     with ProcessPoolExecutor(max_workers=max_workers, mp_context=mp_context) as executor:

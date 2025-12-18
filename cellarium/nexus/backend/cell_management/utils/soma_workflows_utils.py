@@ -294,97 +294,35 @@ def _submit_soma_pipeline(
     )
 
 
-def submit_soma_randomized_extract_pipeline(
+def submit_soma_extract_pipeline(
     name: str,
     creator_id: int,
     omics_dataset: models.OmicsDataset,
-    range_size: int,
     extract_bin_size: int,
     feature_schema: models.FeatureSchema | None = None,
     filters: dict | None = None,
+    obs_columns: list[str] | None = None,
+    var_columns: list[str] | None = None,
+    x_layer: str = "raw",
+    output_format: str = "h5ad",
+    max_workers_extract: int | None = None,
+    # Randomized extraction params
+    range_size: int | None = None,
     shuffle_ranges: bool = True,
-    obs_columns: list[str] | None = None,
-    var_columns: list[str] | None = None,
-    x_layer: str = "raw",
-    output_format: str = "h5ad",
-    max_workers_extract: int | None = None,
     max_workers_shuffle: int | None = None,
+    # Grouped extraction params
+    extract_bin_keys: list[str] | None = None,
 ) -> str:
     """
-    Submit a Kubeflow pipeline for SOMA randomized data extraction.
+    Submit a Kubeflow pipeline for SOMA data extraction.
 
-    Generate SOMA extract configs, save them to GCS, and submit the pipeline for execution.
+    Route to either randomized or grouped extraction based on whether extract_bin_keys
+    is provided. Generate SOMA extract configs, save them to GCS, and submit the pipeline.
 
     :param name: Name for the extract curriculum
     :param creator_id: ID of the user who initiated the extract
     :param omics_dataset: Omics dataset with TileDB SOMA backend
-    :param range_size: Target number of cells per range
-    :param extract_bin_size: Target cells per extract bin (for shuffling)
-    :param feature_schema: Feature schema used to derive feature IDs for filtering
-    :param filters: Optional dictionary of filter statements to apply
-    :param shuffle_ranges: Whether to shuffle the joinid ranges
-    :param obs_columns: Optional obs columns to include in output files
-    :param var_columns: Optional var columns to include in output files
-    :param x_layer: Name of the SOMA X layer to read counts from
-    :param output_format: Output format - "h5ad" or "zarr"
-    :param max_workers_extract: Maximum parallel workers for extraction
-    :param max_workers_shuffle: Maximum parallel workers for shuffling
-
-    :raise ValueError: If range_size <= 0 or extract_bin_size <= 0 or omics_dataset has no URI
-    :raise exceptions.ZeroCellsReturnedError: If no cells match the filters
-    :raise IOError: If there's an error writing configs to GCS
-    :raise google.api_core.exceptions.GoogleAPIError: If pipeline submission fails
-
-    :return: URL to the Vertex AI Pipeline dashboard for the submitted job
-    """
-    extract_config_paths = compose_and_dump_soma_configs(
-        name=name,
-        creator_id=creator_id,
-        omics_dataset=omics_dataset,
-        range_size=range_size,
-        extract_bin_size=extract_bin_size,
-        feature_schema=feature_schema,
-        filters=filters,
-        shuffle_ranges=shuffle_ranges,
-        obs_columns=obs_columns,
-        var_columns=var_columns,
-        x_layer=x_layer,
-        output_format=output_format,
-        max_workers_extract=max_workers_extract,
-        max_workers_shuffle=max_workers_shuffle,
-    )
-
-    return _submit_soma_pipeline(
-        extract_config_paths=extract_config_paths,
-        extract_type="randomized",
-        name=name,
-    )
-
-
-def submit_soma_grouped_extract_pipeline(
-    name: str,
-    creator_id: int,
-    omics_dataset: models.OmicsDataset,
-    extract_bin_keys: list[str],
-    bin_size: int,
-    feature_schema: models.FeatureSchema | None = None,
-    filters: dict | None = None,
-    obs_columns: list[str] | None = None,
-    var_columns: list[str] | None = None,
-    x_layer: str = "raw",
-    output_format: str = "h5ad",
-    max_workers_extract: int | None = None,
-) -> str:
-    """
-    Submit a Kubeflow pipeline for SOMA grouped data extraction.
-
-    Generate SOMA grouped extract configs, save them to GCS, and submit the pipeline for execution.
-
-    :param name: Name for the extract curriculum
-    :param creator_id: ID of the user who initiated the extract
-    :param omics_dataset: Omics dataset with TileDB SOMA backend
-    :param extract_bin_keys: List of obs column names to group by
-    :param bin_size: Maximum number of cells per bin
+    :param extract_bin_size: Target cells per output bin
     :param feature_schema: Feature schema used to derive feature IDs for filtering
     :param filters: Optional dictionary of filter statements to apply
     :param obs_columns: Optional obs columns to include in output files
@@ -392,8 +330,12 @@ def submit_soma_grouped_extract_pipeline(
     :param x_layer: Name of the SOMA X layer to read counts from
     :param output_format: Output format - "h5ad" or "zarr"
     :param max_workers_extract: Maximum parallel workers for extraction
+    :param range_size: Target number of cells per range (randomized extraction)
+    :param shuffle_ranges: Whether to shuffle the joinid ranges (randomized extraction)
+    :param max_workers_shuffle: Maximum parallel workers for shuffling (randomized extraction)
+    :param extract_bin_keys: List of obs column names to group by (grouped extraction)
 
-    :raise ValueError: If bin_size <= 0 or omics_dataset has no URI
+    :raise ValueError: If required parameters are missing or omics_dataset has no URI
     :raise exceptions.ZeroCellsReturnedError: If no cells match the filters
     :raise IOError: If there's an error writing configs to GCS
     :raise google.api_core.exceptions.GoogleAPIError: If pipeline submission fails
@@ -413,7 +355,10 @@ def submit_soma_grouped_extract_pipeline(
         bucket_name=settings.BUCKET_NAME_PRIVATE,
     )
 
-    # Prepare grouped curriculum metadata
+    # Determine extract type based on extract_bin_keys
+    extract_type: Literal["randomized", "grouped"] = "grouped" if extract_bin_keys else "randomized"
+
+    # Prepare curriculum metadata (routes internally based on extract_bin_keys)
     curriculum_metadata = coordinator.prepare_soma_extract(
         extract_name=name,
         creator_id=creator_id,
@@ -424,19 +369,36 @@ def submit_soma_grouped_extract_pipeline(
         obs_columns=obs_columns,
         var_columns=var_columns,
         x_layer=x_layer,
+        # Randomized params
+        range_size=range_size,
+        extract_bin_size=extract_bin_size,
+        shuffle_ranges=shuffle_ranges,
+        # Grouped params
         extract_bin_keys=extract_bin_keys,
-        bin_size=bin_size,
     )
 
-    extract_configs = compose_soma_grouped_extract_configs(
-        name=name,
-        omics_dataset=omics_dataset,
-        extract_bucket_path=extract_bucket_path,
-        curriculum_metadata=curriculum_metadata,
-        extract_metadata_path=extract_metadata_path,
-        output_format=output_format,
-        max_workers_extract=max_workers_extract,
-    )
+    # Compose configs based on extract type
+    if extract_type == "grouped":
+        extract_configs = compose_soma_grouped_extract_configs(
+            name=name,
+            omics_dataset=omics_dataset,
+            extract_bucket_path=extract_bucket_path,
+            curriculum_metadata=curriculum_metadata,
+            extract_metadata_path=extract_metadata_path,
+            output_format=output_format,
+            max_workers_extract=max_workers_extract,
+        )
+    else:
+        extract_configs = compose_soma_randomized_extract_configs(
+            name=name,
+            omics_dataset=omics_dataset,
+            extract_bucket_path=extract_bucket_path,
+            curriculum_metadata=curriculum_metadata,
+            extract_metadata_path=extract_metadata_path,
+            output_format=output_format,
+            max_workers_extract=max_workers_extract,
+            max_workers_shuffle=max_workers_shuffle,
+        )
 
     configs_stage_dir = f"gs://{settings.BUCKET_NAME_PRIVATE}/{settings.PIPELINE_CONFIGS_DIR}"
     extract_config_paths = workflows_configs.dump_configs_to_bucket(
@@ -445,7 +407,7 @@ def submit_soma_grouped_extract_pipeline(
 
     return _submit_soma_pipeline(
         extract_config_paths=extract_config_paths,
-        extract_type="grouped",
+        extract_type=extract_type,
         name=name,
     )
 
