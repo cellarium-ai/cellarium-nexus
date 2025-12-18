@@ -9,7 +9,8 @@ from cellarium.nexus.workflows.kubeflow.components.bq import (
 )
 from cellarium.nexus.workflows.kubeflow.components.soma import (
     mark_soma_curriculum_as_finished_job,
-    soma_extract_job,
+    soma_grouped_extract_job,
+    soma_randomized_extract_job,
 )
 from cellarium.nexus.workflows.kubeflow.components.validation import validate_anndata_files_job
 
@@ -21,7 +22,8 @@ __all__ = [
     "extract_job",
     "mark_curriculum_as_finished_job",
     # SOMA components
-    "soma_extract_job",
+    "soma_randomized_extract_job",
+    "soma_grouped_extract_job",
     "mark_soma_curriculum_as_finished_job",
     # Validation components
     "validate_anndata_files_job",

@@ -7,7 +7,10 @@ from typing import Any, Literal
 
 from cellarium.nexus.clients import NexusBackendAPIClient
 from cellarium.nexus.omics_datastore.soma_ops import TileDBSOMADataOperator
-from cellarium.nexus.shared.schemas.omics_datastore import RandomizedCurriculumMetadata
+from cellarium.nexus.shared.schemas.omics_datastore import (
+    GroupedCurriculumMetadata,
+    RandomizedCurriculumMetadata,
+)
 from cellarium.nexus.shared.utils.workspace_file_manager import WorkspaceFileManager
 
 logger = logging.getLogger(__name__)
@@ -43,18 +46,26 @@ class SomaDataOpsCoordinator:
 
         logger.info(f"Initialized SomaDataOpsCoordinator for {experiment_uri}")
 
-    def _load_metadata_from_bucket(self, *, curriculum_metadata_path: str) -> RandomizedCurriculumMetadata:
+    def _load_metadata_from_bucket(
+        self,
+        *,
+        curriculum_metadata_path: str,
+        extract_type: Literal["randomized", "grouped"] = "randomized",
+    ) -> RandomizedCurriculumMetadata | GroupedCurriculumMetadata:
         """
         Load a SOMA extract metadata from cloud storage.
 
         :param curriculum_metadata_path: Path to the metadata JSON file within the bucket
+        :param extract_type: Type of extraction - "randomized" or "grouped"
 
         :raise IOError: If file cannot be read
         :raise ValueError: If file is not valid JSON or metadata schema
 
-        :return: Loaded RandomizedCurriculumMetadata
+        :return: Loaded RandomizedCurriculumMetadata or GroupedCurriculumMetadata
         """
         curriculum_metadata_json = self.workspace.load_json_from_bucket(remote_path=curriculum_metadata_path)
+        if extract_type == "grouped":
+            return GroupedCurriculumMetadata.model_validate(obj=curriculum_metadata_json)
         return RandomizedCurriculumMetadata.model_validate(obj=curriculum_metadata_json)
 
     def _update_curriculum_with_error(
@@ -172,37 +183,44 @@ class SomaDataOpsCoordinator:
         extract_name: str,
         curriculum_metadata_path: str,
         extract_bucket_path: str,
+        extract_type: Literal["randomized", "grouped"] = "randomized",
         partition_index: int = 0,
-        max_ranges_per_partition: int | None = None,
         output_format: Literal["h5ad", "zarr"] = "h5ad",
         max_workers_extract: int | None = None,
+        # Randomized-specific params
+        max_ranges_per_partition: int | None = None,
         max_workers_shuffle: int | None = None,
+        # Grouped-specific params
+        max_bins_per_partition: int | None = None,
     ) -> None:
         """
-        Run SOMA data extraction for specified ranges.
+        Run SOMA data extraction for specified ranges or bins.
 
-        Load the extract curriculum_metadata from cloud storage, optionally subset to specific range indices,
-        and extract data to output files. All data specification (obs_columns, var_columns,
-        var_joinids, x_layer) is taken from the curriculum_metadata.
+        Load the extract curriculum_metadata from cloud storage and extract data to output files.
+        Routes to randomized or grouped extraction based on extract_type.
 
         :param extract_name: Name of the extract/curriculum (for error reporting)
         :param curriculum_metadata_path: Path to the extract curriculum_metadata JSON within the bucket
         :param extract_bucket_path: Path within bucket for output files
-        :param partition_index: Zero-based index of the worker/partition. Determines which slice of
-            ranges and output chunk IDs this worker will process. Default is 0 for processing all in once.
-        :param max_ranges_per_partition: Partition block size. Default is None, this means it will use all ranges
+        :param extract_type: Type of extraction - "randomized" or "grouped"
+        :param partition_index: Zero-based index of the worker/partition
         :param output_format: Output format - "h5ad" or "zarr"
         :param max_workers_extract: Maximum parallel workers for extraction
-        :param max_workers_shuffle: Maximum parallel workers for shuffling
+        :param max_ranges_per_partition: Partition block size for randomized extraction
+        :param max_workers_shuffle: Maximum parallel workers for shuffling (randomized only)
+        :param max_bins_per_partition: Partition block size for grouped extraction
 
         :raise SomaExtractError: If extraction fails
         :raise IOError: If file operations fail
         """
-        logger.info(f"Running SOMA extract for '{extract_name}'")
+        logger.info(f"Running SOMA {extract_type} extract for '{extract_name}'")
 
         try:
             # Step 1: Load curriculum_metadata from cloud storage
-            curriculum_metadata = self._load_metadata_from_bucket(curriculum_metadata_path=curriculum_metadata_path)
+            curriculum_metadata = self._load_metadata_from_bucket(
+                curriculum_metadata_path=curriculum_metadata_path,
+                extract_type=extract_type,
+            )
             logger.info(f"Loaded extract curriculum_metadata. Extracting partition index {partition_index}")
 
             # Step 2: Extract data using workspace for file management
@@ -210,21 +228,33 @@ class SomaDataOpsCoordinator:
 
             with self.workspace.temp_workspace() as paths:
                 output_dir = paths["output"]
-                temp_dir = paths["root"] / "temp_extract"
-                temp_dir.mkdir(exist_ok=True)
 
-                # Run randomized extraction pipeline
-                self.soma_operator.extract_randomized(
-                    curriculum_metadata=curriculum_metadata,
-                    output_dir=output_dir,
-                    partition_index=partition_index,
-                    max_ranges_per_partition=max_ranges_per_partition,
-                    output_format=output_format,
-                    temp_dir=temp_dir,
-                    max_workers_extract=max_workers_extract,
-                    max_workers_shuffle=max_workers_shuffle,
-                    cleanup_temp=True,
-                )
+                if extract_type == "grouped":
+                    # Grouped extraction - direct, no shuffle stage
+                    self.soma_operator.extract_grouped(
+                        curriculum_metadata=curriculum_metadata,
+                        output_dir=output_dir,
+                        partition_index=partition_index,
+                        max_bins_per_partition=max_bins_per_partition,
+                        output_format=output_format,
+                        max_workers=max_workers_extract,
+                    )
+                else:
+                    # Randomized extraction - two-stage with shuffle
+                    temp_dir = paths["root"] / "temp_extract"
+                    temp_dir.mkdir(exist_ok=True)
+
+                    self.soma_operator.extract_randomized(
+                        curriculum_metadata=curriculum_metadata,
+                        output_dir=output_dir,
+                        partition_index=partition_index,
+                        max_ranges_per_partition=max_ranges_per_partition,
+                        output_format=output_format,
+                        temp_dir=temp_dir,
+                        max_workers_extract=max_workers_extract,
+                        max_workers_shuffle=max_workers_shuffle,
+                        cleanup_temp=True,
+                    )
 
                 # Step 3: Upload output files to cloud storage
                 self.workspace.upload_directory_to_bucket(
@@ -247,6 +277,7 @@ class SomaDataOpsCoordinator:
         extract_name: str,
         curriculum_metadata_path: str,
         extract_bucket_path: str,
+        extract_type: Literal["randomized", "grouped"] = "randomized",
     ) -> None:
         """
         Mark a SOMA curriculum as finished and update with final metadata.
@@ -257,6 +288,7 @@ class SomaDataOpsCoordinator:
         :param extract_name: Name of the curriculum to update
         :param curriculum_metadata_path: Path to the extract curriculum_metadata JSON within the bucket
         :param extract_bucket_path: Path within bucket where extract files are stored
+        :param extract_type: Type of extraction - "randomized" or "grouped"
 
         :raise IOError: If cloud storage operations fail
         :raise HTTPError: If backend API calls fail
@@ -265,7 +297,10 @@ class SomaDataOpsCoordinator:
 
         try:
             # Step 1: Load curriculum_metadata to get metrics
-            curriculum_metadata = self._load_metadata_from_bucket(curriculum_metadata_path=curriculum_metadata_path)
+            curriculum_metadata = self._load_metadata_from_bucket(
+                curriculum_metadata_path=curriculum_metadata_path,
+                extract_type=extract_type,
+            )
 
             # Step 2: Update curriculum with final status and metrics
             extract_files_path = f"gs://{self.workspace.bucket_name}/{extract_bucket_path}/extract_files"
@@ -281,7 +316,7 @@ class SomaDataOpsCoordinator:
             )
             logger.info(
                 f"Marked curriculum '{extract_name}' as SUCCEEDED "
-                f"(cells: {curriculum_metadata.total_cells}, ranges: {len(curriculum_metadata.id_ranges)})"
+                f"(cells: {curriculum_metadata.total_cells}, bins: {curriculum_metadata.num_bins})"
             )
 
         except Exception as e:

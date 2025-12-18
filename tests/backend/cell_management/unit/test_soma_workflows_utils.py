@@ -89,7 +89,7 @@ def test_get_total_cells_in_soma_raises_without_uri(soma_dataset: models.OmicsDa
         soma_workflows_utils.get_total_cells_in_soma(omics_dataset=soma_dataset)
 
 
-def test_compose_soma_extract_configs_no_uri(soma_dataset: models.OmicsDataset) -> None:
+def test_compose_soma_randomized_extract_configs_no_uri(soma_dataset: models.OmicsDataset) -> None:
     soma_dataset.uri = None
     curriculum_metadata = RandomizedCurriculumMetadata(
         experiment_uri="gs://bucket/soma_experiment",
@@ -105,7 +105,7 @@ def test_compose_soma_extract_configs_no_uri(soma_dataset: models.OmicsDataset) 
     )
 
     with pytest.raises(ValueError, match="has no URI configured"):
-        soma_workflows_utils.compose_soma_extract_configs(
+        soma_workflows_utils.compose_soma_randomized_extract_configs(
             name="test_extract",
             omics_dataset=soma_dataset,
             curriculum_metadata=curriculum_metadata,
@@ -114,7 +114,7 @@ def test_compose_soma_extract_configs_no_uri(soma_dataset: models.OmicsDataset) 
         )
 
 
-def test_compose_soma_extract_configs_happy_path(
+def test_compose_soma_randomized_extract_configs_happy_path(
     monkeypatch: pytest.MonkeyPatch, soma_dataset: models.OmicsDataset
 ) -> None:
     settings = _make_settings()
@@ -134,7 +134,7 @@ def test_compose_soma_extract_configs_happy_path(
         extract_bin_indexes=[0, 1, 2, 3, 4],
     )
 
-    extract_configs = soma_workflows_utils.compose_soma_extract_configs(
+    extract_configs = soma_workflows_utils.compose_soma_randomized_extract_configs(
         name="test_extract",
         omics_dataset=soma_dataset,
         curriculum_metadata=curriculum_metadata,
@@ -151,7 +151,7 @@ def test_compose_soma_extract_configs_happy_path(
     assert cfg.max_ranges_per_partition == 32  # From settings.TILEDB_SOMA_RANGES_PER_WORKER
 
 
-def test_compose_soma_extract_configs_multiple_workers(
+def test_compose_soma_randomized_extract_configs_multiple_workers(
     monkeypatch: pytest.MonkeyPatch, soma_dataset: models.OmicsDataset
 ) -> None:
     settings = _make_settings()
@@ -171,7 +171,7 @@ def test_compose_soma_extract_configs_multiple_workers(
         extract_bin_indexes=list(range(100)),
     )
 
-    extract_configs = soma_workflows_utils.compose_soma_extract_configs(
+    extract_configs = soma_workflows_utils.compose_soma_randomized_extract_configs(
         name="test_extract",
         omics_dataset=soma_dataset,
         curriculum_metadata=curriculum_metadata,
@@ -207,7 +207,7 @@ def test_compose_and_dump_soma_configs(monkeypatch: pytest.MonkeyPatch, soma_dat
     ]
     monkeypatch.setattr(
         soma_workflows_utils,
-        "compose_soma_extract_configs",
+        "compose_soma_randomized_extract_configs",
         lambda **kwargs: mock_extract_configs,
         raising=True,
     )
@@ -247,7 +247,9 @@ def test_compose_and_dump_soma_configs(monkeypatch: pytest.MonkeyPatch, soma_dat
     coordinator.prepare_soma_extract.assert_called_once()
 
 
-def test_submit_soma_extract_pipeline(monkeypatch: pytest.MonkeyPatch, soma_dataset: models.OmicsDataset) -> None:
+def test_submit_soma_randomized_extract_pipeline(
+    monkeypatch: pytest.MonkeyPatch, soma_dataset: models.OmicsDataset
+) -> None:
     settings = _make_settings()
     monkeypatch.setattr(soma_workflows_utils, "settings", settings, raising=False)
 
@@ -265,7 +267,7 @@ def test_submit_soma_extract_pipeline(monkeypatch: pytest.MonkeyPatch, soma_data
         raising=True,
     )
 
-    url = soma_workflows_utils.submit_soma_extract_pipeline(
+    url = soma_workflows_utils.submit_soma_randomized_extract_pipeline(
         name="test_extract",
         creator_id=1,
         omics_dataset=soma_dataset,
@@ -275,7 +277,7 @@ def test_submit_soma_extract_pipeline(monkeypatch: pytest.MonkeyPatch, soma_data
 
     submit_stub.assert_called_once()
     kwargs = submit_stub.call_args.kwargs
-    assert kwargs["display_name"] == "Nexus SOMA Extract - test_extract"
+    assert kwargs["display_name"] == "Nexus SOMA Randomized Extract - test_extract"
     assert kwargs["gcp_project"] == "test-project"
     assert kwargs["pipeline_kwargs"]["extract_configs"] == ["gs://bucket/extract_1.yaml"]
     assert kwargs["pipeline_kwargs"]["mark_finished_config"] == "gs://bucket/extract_1.yaml"

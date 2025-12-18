@@ -419,7 +419,7 @@ class ExtractCurriculumAdminView(generic.FormView):
         try:
             if omics_dataset.backend == cell_models.OmicsDatasetBackend.TILEDB_SOMA:
                 # Submit SOMA extract pipeline
-                pipeline_url = soma_workflows_utils.submit_soma_extract_pipeline(
+                pipeline_url = soma_workflows_utils.submit_soma_randomized_extract_pipeline(
                     name=cleaned["name"],
                     creator_id=self.request.user.id,
                     omics_dataset=omics_dataset,

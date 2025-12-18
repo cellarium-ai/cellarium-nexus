@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -75,7 +75,15 @@ class SomaOpsExtract(BaseModel):
     extract_metadata_path: str
     extract_bucket_path: str
     partition_index: int = 0
-    max_ranges_per_partition: int | None = 1
     output_format: str = "h5ad"
     max_workers_extract: int | None = None
+
+    # Discriminator field
+    extract_type: Literal["randomized", "grouped"] = "randomized"
+
+    # Randomized-specific params
+    max_ranges_per_partition: int | None = None
     max_workers_shuffle: int | None = None
+
+    # Grouped-specific params
+    max_bins_per_partition: int | None = None
