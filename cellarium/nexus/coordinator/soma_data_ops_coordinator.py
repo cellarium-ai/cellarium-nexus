@@ -163,7 +163,7 @@ class SomaDataOpsCoordinator:
             self.backend_client.register_curriculum(
                 name=extract_name,
                 creator_id=creator_id,
-                extract_bin_size=range_size,
+                extract_bin_size=extract_bin_size,
                 filters_json=filters,
             )
             logger.info(f"Registered curriculum '{extract_name}'")
