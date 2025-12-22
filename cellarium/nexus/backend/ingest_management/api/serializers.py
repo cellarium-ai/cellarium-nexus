@@ -7,9 +7,7 @@ from cellarium.nexus.backend.ingest_management import models
 
 class IngestInfoSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField(read_only=True)
-    bigquery_dataset = serializers.SlugRelatedField(
-        slug_field="name", queryset=cell_models.BigQueryDataset.objects.all()
-    )
+    omics_dataset = serializers.SlugRelatedField(slug_field="name", queryset=cell_models.OmicsDataset.objects.all())
     ingest_start_timestamp = serializers.DateTimeField(read_only=True)
     status = serializers.ChoiceField(choices=models.IngestInfo.STATUS_CHOICES, required=False)
 
@@ -18,7 +16,7 @@ class IngestInfoSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "nexus_uuid",
-            "bigquery_dataset",
+            "omics_dataset",
             "status",
             "metadata_extra",
             "ingest_start_timestamp",
@@ -55,11 +53,11 @@ class IngestFromAvroSerializer(serializers.Serializer):
 class ReserveIndexesSerializer(serializers.Serializer):
     """Serialize input and output for reserving indexes."""
 
-    bigquery_dataset = serializers.SlugRelatedField(
+    omics_dataset = serializers.SlugRelatedField(
         slug_field="name",
-        queryset=cell_models.BigQueryDataset.objects.all(),
+        queryset=cell_models.OmicsDataset.objects.all(),
         write_only=True,
-        help_text="Name of the BigQuery dataset to scope the reservation",
+        help_text="Name of the omics dataset to scope the reservation",
     )
     batch_size = serializers.IntegerField(min_value=1, write_only=True)
     index_start = serializers.IntegerField(read_only=True)

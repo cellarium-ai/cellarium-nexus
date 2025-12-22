@@ -58,9 +58,26 @@
 
     rowEl.setAttribute('data-index', String(nextIndex));
 
+    // Rebuild field dropdown options based on current fieldsMeta
+    const fieldSel = rowEl.querySelector('select[name^="filters-"][name$="-field"]');
+    if (fieldSel && Array.isArray(fieldsMeta) && fieldsMeta.length > 0) {
+      // Clear existing options and rebuild from fieldsMeta
+      fieldSel.innerHTML = '';
+      const blankOpt = document.createElement('option');
+      blankOpt.value = '';
+      blankOpt.textContent = '---------';
+      fieldSel.appendChild(blankOpt);
+      for (const f of fieldsMeta) {
+        const opt = document.createElement('option');
+        opt.value = f.key;
+        opt.textContent = f.label || f.key;
+        fieldSel.appendChild(opt);
+      }
+      console.debug('[Cell Info Filters][rows.state] rebuilt field options from fieldsMeta:', fieldsMeta.length, 'fields');
+    }
+
     ns.bindRowEvents(rowEl, fieldsMeta);
     // Default field to first non-empty option and trigger change
-    const fieldSel = rowEl.querySelector('select[name^="filters-"][name$="-field"]');
     if (fieldSel) {
       const $ = window.jQuery || (window.django && window.django.jQuery);
       const firstVal = ns.firstNonEmptyOption(fieldSel);

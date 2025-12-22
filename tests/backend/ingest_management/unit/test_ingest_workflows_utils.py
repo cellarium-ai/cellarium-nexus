@@ -13,7 +13,7 @@ from cellarium.nexus.backend.ingest_management.utils import workflows_utils
 @pytest.mark.usefixtures("vertex_ai_pipeline_stub")
 @pytest.mark.django_db
 def test_submit_ingest_pipeline_creates_configs_and_calls_submit(
-    default_dataset: cm_models.BigQueryDataset, monkeypatch: pytest.MonkeyPatch, vertex_ai_pipeline_stub
+    default_dataset: cm_models.OmicsDataset, monkeypatch: pytest.MonkeyPatch, vertex_ai_pipeline_stub
 ) -> None:
     """
     Ensure submit_ingest_pipeline builds one CreateIngestFilesConfig per input row,
@@ -52,7 +52,7 @@ def test_submit_ingest_pipeline_creates_configs_and_calls_submit(
     # Act
     url = workflows_utils.submit_ingest_pipeline(
         df_ingest_file_info=df,
-        bigquery_dataset=default_dataset,
+        omics_dataset=default_dataset,
         column_mapping={"donor_id": "donor_id"},
         validation_methods=["validate_shapes"],
     )

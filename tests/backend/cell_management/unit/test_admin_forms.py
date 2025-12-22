@@ -18,12 +18,12 @@ def _make_feature_schema() -> cm_models.FeatureSchema:
     return fs
 
 
-def _valid_form_data(*, dataset: cm_models.BigQueryDataset) -> dict:
+def _valid_form_data(*, dataset: cm_models.OmicsDataset) -> dict:
     return {
         "feature_schema": _make_feature_schema().pk,
         "name": "uniq-name",
         "extract_bin_size": 1000,
-        "bigquery_dataset": dataset.pk,
+        "omics_dataset": dataset.pk,
         "obs_columns": ["organism"],
         "categorical_column_count_limit": 2000,
         # read-only widget, but still posted/cleaned
@@ -32,9 +32,7 @@ def _valid_form_data(*, dataset: cm_models.BigQueryDataset) -> dict:
 
 
 @pytest.mark.usefixtures("dummy_gcs_client")
-def test_extract_curriculum_form_clean_name_db_duplicate(
-    default_dataset: cm_models.BigQueryDataset, admin_user
-) -> None:
+def test_extract_curriculum_form_clean_name_db_duplicate(default_dataset: cm_models.OmicsDataset, admin_user) -> None:
     # Create a curriculum with the same name in DB
     from cellarium.nexus.backend.curriculum import models as cur_models
 
@@ -52,7 +50,7 @@ def test_extract_curriculum_form_clean_name_db_duplicate(
 
 @pytest.mark.usefixtures("dummy_gcs_client")
 def test_extract_curriculum_form_clean_name_gcs_duplicate(
-    default_dataset: cm_models.BigQueryDataset, monkeypatch: pytest.MonkeyPatch
+    default_dataset: cm_models.OmicsDataset, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Pretend GCS contains a curriculum prefix with that name
     monkeypatch.setattr(
@@ -70,7 +68,7 @@ def test_extract_curriculum_form_clean_name_gcs_duplicate(
 
 
 @pytest.mark.usefixtures("dummy_gcs_client")
-def test_extract_curriculum_form_clean_filters_parsing(default_dataset: cm_models.BigQueryDataset) -> None:
+def test_extract_curriculum_form_clean_filters_parsing(default_dataset: cm_models.OmicsDataset) -> None:
     data = _valid_form_data(dataset=default_dataset)
     data["filters"] = json.dumps({"organism__eq": ["human"]})
 

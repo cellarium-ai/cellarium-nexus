@@ -10,4 +10,4 @@ from tests.backend.fixtures.data import (
 )
 from tests.backend.fixtures.db import _enable_db_access, admin_user, backend_test_db_setup
 from tests.backend.fixtures.gcp import dummy_bigquery_client, dummy_gcs_client, vertex_ai_pipeline_stub
-from tests.backend.fixtures.mocks import bigquery_cached_manager_stub
+from tests.backend.fixtures.mocks import omics_cached_manager_stub

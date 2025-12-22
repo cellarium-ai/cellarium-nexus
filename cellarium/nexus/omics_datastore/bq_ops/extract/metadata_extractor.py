@@ -11,7 +11,7 @@ from typing import Any
 import certifi
 from google.cloud import bigquery
 
-from cellarium.nexus.omics_datastore import bq_sql
+from cellarium.nexus.omics_datastore.bq_ops import bq_sql
 from cellarium.nexus.shared.schemas.omics_datastore import ExtractMetadata
 
 # Configure SSL context for aiohttp
@@ -23,7 +23,7 @@ os.environ["SSL_CERT_FILE"] = certifi.where()
 logger = logging.getLogger(__name__)
 
 # Template paths
-TEMPLATE_DIR = Path(__file__).parent.parent.parent / "sql_templates" / "metadata"
+TEMPLATE_DIR = Path(__file__).parent.parent / "sql_templates" / "metadata"
 EXTRACT_METADATA_TEMPLATE = TEMPLATE_DIR / "extract_metadata.sql.mako"
 MEASURED_GENES_TEMPLATE = TEMPLATE_DIR / "measured_genes.sql.mako"
 

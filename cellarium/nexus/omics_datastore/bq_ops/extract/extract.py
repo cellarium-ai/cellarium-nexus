@@ -16,15 +16,14 @@ from google.cloud.bigquery_storage import BigQueryReadClient, types
 from scipy.sparse import coo_matrix
 from tenacity import before_log, retry, stop_after_attempt, wait_exponential
 
-from cellarium.nexus.omics_datastore import bq_sql
-from cellarium.nexus.omics_datastore.bq_ops import constants
+from cellarium.nexus.omics_datastore.bq_ops import bq_sql, constants
 from cellarium.nexus.shared import schemas
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 # Template paths
-TEMPLATE_DIR = Path(__file__).parent.parent.parent / "sql_templates" / "extract"
+TEMPLATE_DIR = Path(__file__).parent.parent / "sql_templates" / "extract"
 GET_CELLS_IN_BIN_RANGE_TEMPLATE = TEMPLATE_DIR / "get_cells_in_bin_range.sql.mako"
 GET_FEATURES_TEMPLATE = TEMPLATE_DIR / "get_features.sql.mako"
 

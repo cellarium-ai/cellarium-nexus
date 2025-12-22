@@ -8,33 +8,12 @@ from pydantic import BaseModel, Field
 
 
 class FeatureSchema(BaseModel):
-    """
-    Schema for feature data.
-
-    :param id: Unique identifier for the feature
-    :param symbol: Gene symbol
-    :param ensemble_id: Ensemble identifier
-    """
-
     id: int
     symbol: str
     ensemble_id: str
 
 
 class ExtractMetadata(BaseModel):
-    """
-    Store metadata about the extract.
-
-    :param total_bins: Total number of extract bins
-    :param last_bin_size: Size of the last bin
-    :param total_cells: Total number of cells in the extract
-    :param filters: Filters used for the extract
-    :param extract_bin_size: Size of extract bins
-    :param category_metadata: Metadata about categorical columns
-
-    :raise ValueError: If validation fails
-    """
-
     total_bins: int
     last_bin_size: int
     total_cells: int = 0
@@ -55,3 +34,52 @@ class ExtractMetadata(BaseModel):
 
         bin_size = self.extract_bin_size or 0
         return bin_size * (self.total_bins - 1) + self.last_bin_size if self.total_bins > 0 else 0
+
+
+class IdContiguousRange(BaseModel):
+    start: int
+    end: int
+
+
+class GroupedBin(BaseModel):
+    """A bin containing cells from a specific group combination."""
+
+    group_key: str
+    group_filter: str
+    joinid_min: int
+    joinid_max: int
+    cell_count: int
+
+
+class BaseCurriculumMetadata(BaseModel):
+    """Base class for SOMA curriculum metadata."""
+
+    experiment_uri: str
+    value_filter: str
+    total_cells: int
+    num_bins: int
+    extract_bin_size: int
+    last_bin_size: int
+    filters: dict[str, Any] | None = None
+    var_joinids: list[int] | None = None
+    var_filter_column: str | None = None
+    var_filter_values: list[str] | None = None
+    obs_columns: list[str] | None = None
+    var_columns: list[str] | None = None
+    x_layer: str = "X"
+
+
+class RandomizedCurriculumMetadata(BaseCurriculumMetadata):
+    """Curriculum metadata for randomized extraction with contiguous ranges."""
+
+    id_ranges: list[IdContiguousRange]
+    range_size: int
+    num_ranges: int
+    extract_bin_indexes: list[int]
+
+
+class GroupedCurriculumMetadata(BaseCurriculumMetadata):
+    """Curriculum metadata for grouped extraction."""
+
+    extract_bin_keys: list[str]
+    grouped_bins: list[GroupedBin]

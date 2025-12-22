@@ -19,7 +19,7 @@ def dummy_bigquery_client(monkeypatch: pytest.MonkeyPatch) -> None:
     Patch bigquery.Client to a no-op dummy for backend tests.
 
     This prevents network or ADC interactions when code constructs a client
-    internally (for example, ``BigQueryCachedDataManager``).
+    internally (for example, ``OmicsCachedDataManager`` with ``BigQueryDataOperator``).
     """
 
     monkeypatch.setattr(bigquery, "Client", DummyBigQueryClient, raising=True)

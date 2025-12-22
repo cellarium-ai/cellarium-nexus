@@ -14,7 +14,11 @@
 
       const addBtn = document.getElementById('filters-add');
       if (addBtn) {
-        addBtn.addEventListener('click', () => ns.addNewRow(fieldsMeta));
+        addBtn.addEventListener('click', () => {
+          // Always use current dataset's fields metadata when adding new rows
+          const currentFieldsMeta = ns.getFieldsMeta();
+          ns.addNewRow(currentFieldsMeta);
+        });
       }
 
       const applyBtn = document.getElementById('filters-apply');

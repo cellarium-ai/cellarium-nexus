@@ -77,12 +77,12 @@ class IngestInfoAdmin(ModelAdmin):
         "id",
         "nexus_uuid",
         "status",
-        "bigquery_dataset",
+        "omics_dataset",
         "ingest_start_timestamp",
         "ingest_finish_timestamp",
     )
     search_fields = ("nexus_uuid", "status")
-    list_filter = ("status", "bigquery_dataset")
+    list_filter = ("status", "omics_dataset")
     ordering = ("-ingest_start_timestamp",)
     readonly_fields = ("ingest_start_timestamp", "ingest_finish_timestamp", "nexus_uuid")
     fieldsets = (
@@ -92,7 +92,7 @@ class IngestInfoAdmin(ModelAdmin):
                 "fields": (
                     "nexus_uuid",
                     "status",
-                    "bigquery_dataset",
+                    "omics_dataset",
                     "metadata_extra",
                     "ingest_start_timestamp",
                     "ingest_finish_timestamp",
@@ -130,7 +130,7 @@ class IngestInfoAdmin(ModelAdmin):
 
         if request.method == "POST" and form.is_valid():
             csv_file = form.cleaned_data["ingest_csv_file"]
-            bigquery_dataset = form.cleaned_data["bigquery_dataset"]
+            omics_dataset = form.cleaned_data["omics_dataset"]
             column_mapping_obj = form.cleaned_data.get("column_mapping")
             # Get the selected genecode version
             gencode_version = form.cleaned_data["gencode_version"]
@@ -144,7 +144,7 @@ class IngestInfoAdmin(ModelAdmin):
             pipeline_url = workflows_utils.submit_ingest_pipeline(
                 df_ingest_file_info=df,
                 column_mapping=column_mapping,
-                bigquery_dataset=bigquery_dataset,
+                omics_dataset=omics_dataset,
                 validation_methods=validation_methods,
             )
 

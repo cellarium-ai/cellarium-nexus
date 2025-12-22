@@ -13,7 +13,7 @@ from cellarium.nexus.backend.ingest_management.api import serializers
 
 
 @pytest.fixture()
-def ingest(default_dataset: cell_management_models.BigQueryDataset) -> ingest_models.IngestInfo:
+def ingest(default_dataset: cell_management_models.OmicsDataset) -> ingest_models.IngestInfo:
     """
     Create ingest info bound to the provided default dataset.
 
@@ -21,7 +21,7 @@ def ingest(default_dataset: cell_management_models.BigQueryDataset) -> ingest_mo
 
     :return: Newly created ingest info instance
     """
-    return ingest_models.IngestInfo.objects.create(bigquery_dataset=default_dataset)
+    return ingest_models.IngestInfo.objects.create(omics_dataset=default_dataset)
 
 
 def test_ingest_from_avro_validate_happy_path(ingest: ingest_models.IngestInfo) -> None:
@@ -84,10 +84,10 @@ def test_ingest_from_avro_validation_errors(
         serializer.is_valid(raise_exception=True)
 
 
-def test_reserve_indexes_serializer_slug_field(default_dataset: cell_management_models.BigQueryDataset) -> None:
+def test_reserve_indexes_serializer_slug_field(default_dataset: cell_management_models.OmicsDataset) -> None:
     """
     Validate slug field resolves dataset by name and returns model instance.
     """
-    s = serializers.ReserveIndexesSerializer(data={"bigquery_dataset": default_dataset.name, "batch_size": 10})
+    s = serializers.ReserveIndexesSerializer(data={"omics_dataset": default_dataset.name, "batch_size": 10})
     assert s.is_valid(), s.errors
-    assert s.validated_data["bigquery_dataset"].id == default_dataset.id
+    assert s.validated_data["omics_dataset"].id == default_dataset.id

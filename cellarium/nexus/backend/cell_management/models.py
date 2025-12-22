@@ -6,37 +6,71 @@ def default_empty_dict():
     return {}
 
 
-class BigQueryDatasetQuerySet(models.QuerySet):
+class OmicsDatasetBackend(models.TextChoices):
+    """Backend types for omics datasets."""
+
+    BIGQUERY = "bigquery", _("BigQuery")
+    TILEDB_SOMA = "tiledb_soma", _("TileDB SOMA")
+
+
+class OmicsDatasetQuerySet(models.QuerySet):
     def get_default_dataset(self) -> models.Model | None:
         """
-        Get the default BigQuery dataset if only one exists.
+        Get the default omics dataset if only one exists.
 
-        :return: The default BigQuery dataset or None if none or multiple exist
+        :return: The default omics dataset or None if none or multiple exist
         """
         dataset_count = self.model.objects.count()
 
         if dataset_count == 1:
-            bigquery_dataset = self.model.objects.first()
-            if bigquery_dataset:
-                # logger.info(f"Using default dataset: {bigquery_dataset.name}")
-                return bigquery_dataset
+            dataset = self.model.objects.first()
+            if dataset:
+                return dataset
 
         return None
 
 
-class BigQueryDataset(models.Model):
+class OmicsDataset(models.Model):
+    """Model for storing omics dataset configurations."""
+
     name = models.CharField(max_length=256, verbose_name=_("name"), unique=True)
     description = models.TextField(verbose_name=_("description"), null=True, blank=True)
-    link = models.CharField(max_length=512, verbose_name=_("link"), unique=True, null=True, blank=True)
-    objects = BigQueryDatasetQuerySet.as_manager()
+    backend = models.CharField(
+        max_length=32,
+        choices=OmicsDatasetBackend.choices,
+        default=OmicsDatasetBackend.BIGQUERY,
+        verbose_name=_("backend"),
+        help_text=_("The storage backend for this dataset"),
+    )
+    link = models.CharField(
+        max_length=512,
+        verbose_name=_("link"),
+        unique=True,
+        null=True,
+        blank=True,
+        help_text=_("Link to the Google Cloud dashboard for this dataset"),
+    )
+    uri = models.CharField(
+        max_length=512,
+        verbose_name=_("URI"),
+        unique=True,
+        null=True,
+        blank=True,
+        help_text=_("URI for the dataset (e.g., gs:// path for SOMA, or BigQuery dataset name)"),
+    )
+    objects = OmicsDatasetQuerySet.as_manager()
 
     class Meta:
-        verbose_name = _("BigQuery dataset")
-        verbose_name_plural = _("BigQuery datasets")
+        verbose_name = _("omics dataset")
+        verbose_name_plural = _("omics datasets")
         app_label = "cell_management"
 
     def __str__(self):
         return self.name
+
+
+# Backwards compatibility alias for migrations
+BigQueryDataset = OmicsDataset
 
 
 class FeatureSchema(models.Model):

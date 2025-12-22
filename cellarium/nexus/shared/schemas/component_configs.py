@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -63,3 +63,27 @@ class BQOpsExtract(BaseModel):
     extract_bucket_path: str
     obs_columns: list[str] | None = None
     max_workers: int | None = None
+
+
+class SomaOpsExtract(BaseModel):
+    """Configuration for running a SOMA extract."""
+
+    extract_name: str
+    experiment_uri: str
+    nexus_backend_api_url: str
+    bucket_name: str
+    extract_metadata_path: str
+    extract_bucket_path: str
+    partition_index: int = 0
+    output_format: str = "h5ad"
+    max_workers_extract: int | None = None
+
+    # Discriminator field
+    extract_type: Literal["randomized", "grouped"] = "randomized"
+
+    # Randomized-specific params
+    max_ranges_per_partition: int | None = None
+    max_workers_shuffle: int | None = None
+
+    # Grouped-specific params
+    max_bins_per_partition: int | None = None

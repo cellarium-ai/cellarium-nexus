@@ -29,13 +29,13 @@ from anndata._io.h5ad import _clean_uns, _read_raw
 from anndata._io.specs import read_elem
 from fastavro import parse_schema, writer
 
-from cellarium.nexus.omics_datastore.bq_avro_schemas import converter
-from cellarium.nexus.omics_datastore.bq_avro_schemas.cell_management import (
+from cellarium.nexus.omics_datastore.bq_ops import constants, exceptions
+from cellarium.nexus.omics_datastore.bq_ops.bq_avro_schemas import converter
+from cellarium.nexus.omics_datastore.bq_ops.bq_avro_schemas.cell_management import (
     CellInfoBQAvroSchema,
     FeatureInfoBQAvroSchema,
     IngestInfoBQAvroSchema,
 )
-from cellarium.nexus.omics_datastore.bq_ops import constants, exceptions
 
 # Default value for maximum batch size of avro files when they are being created by avro writer
 FLUSH_BATCH_SIZE_DEFAULT = 10000

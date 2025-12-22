@@ -6,7 +6,7 @@ from cellarium.nexus.backend.cell_management import models
 
 
 @pytest.mark.usefixtures("backend_cache_cleaner")
-def test_feature_schema_roundtrip(default_dataset: models.BigQueryDataset) -> None:
+def test_feature_schema_roundtrip(default_dataset: models.OmicsDataset) -> None:
     """
     Persist ``FeatureInfo`` objects and ensure schema relations resolve.
 
@@ -27,7 +27,7 @@ def test_feature_schema_roundtrip(default_dataset: models.BigQueryDataset) -> No
 
 
 @pytest.mark.usefixtures("backend_cache_cleaner")
-def test_feature_schema_cascade_delete(default_dataset: models.BigQueryDataset) -> None:
+def test_feature_schema_cascade_delete(default_dataset: models.OmicsDataset) -> None:
     """
     Verify that deleting a schema cascades to delete its features.
 
@@ -57,16 +57,16 @@ def test_feature_schema_cascade_delete(default_dataset: models.BigQueryDataset) 
     assert not models.FeatureInfo.objects.filter(pk=feature2.pk).exists()
 
 
-def test_get_default_dataset_only_when_single(default_dataset: models.BigQueryDataset) -> None:
+def test_get_default_dataset_only_when_single(default_dataset: models.OmicsDataset) -> None:
     """
-    Evaluate ``BigQueryDatasetQuerySet.get_default_dataset`` behavior.
+    Evaluate ``OmicsDatasetQuerySet.get_default_dataset`` behavior.
 
     :param default_dataset: Default dataset fixture
     """
 
-    singleton = models.BigQueryDataset.objects.get_default_dataset()
+    singleton = models.OmicsDataset.objects.get_default_dataset()
     assert singleton == default_dataset
 
-    models.BigQueryDataset.objects.create(name="secondary", description="secondary")
+    models.OmicsDataset.objects.create(name="secondary", description="secondary")
 
-    assert models.BigQueryDataset.objects.get_default_dataset() is None
+    assert models.OmicsDataset.objects.get_default_dataset() is None

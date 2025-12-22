@@ -47,6 +47,42 @@ def download_file_from_bucket(bucket_name: str, source_blob_name: str, destinati
     blob.download_to_filename(destination_file_name)
 
 
+def download_blob_as_string(bucket_name: str, blob_name: str) -> str:
+    """
+    Download a blob from GCS as a string.
+
+    :param bucket_name: Bucket name in Google Cloud Storage
+    :param blob_name: Name of the blob in Google Cloud Storage Bucket
+
+    :raise: google.cloud.exceptions.GoogleCloudError - If there's an error communicating with Google Cloud Storage
+    :raise: google.cloud.exceptions.NotFound - If the specified blob doesn't exist
+
+    :return: Content of the blob as a string
+    """
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(blob_name)
+
+    return blob.download_as_text()
+
+
+def upload_string_as_blob(content: str, bucket_name: str, blob_name: str) -> None:
+    """
+    Upload a string directly to GCS as a blob.
+
+    :param content: String content to upload
+    :param bucket_name: Bucket name in Google Cloud Storage
+    :param blob_name: Name to give the blob in the bucket
+
+    :raise: google.cloud.exceptions.GoogleCloudError - If there's an error communicating with Google Cloud Storage
+    """
+    storage_client = storage.Client()
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(blob_name)
+
+    blob.upload_from_string(content)
+
+
 def upload_file_to_bucket(local_file_path: str, bucket_name: str, blob_name: str) -> None:
     """
     Upload a file to a GCS bucket.

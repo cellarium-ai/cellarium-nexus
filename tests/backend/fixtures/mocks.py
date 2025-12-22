@@ -5,55 +5,49 @@ import pytest
 from cellarium.nexus.backend.cell_management.utils import bigquery_utils
 
 
-class BigQueryCachedManagerStub:
+class OmicsCachedManagerStub:
     """
-    Provide deterministic responses for `BigQueryCachedDataManager` methods.
+    Provide deterministic responses for `OmicsCachedDataManager` methods.
 
-    :param args: Positional constructor arguments (ignored)
-    :param kwargs: Keyword constructor arguments (ignored)
+    :param operator: Data operator (ignored in stub)
+    :param cache_namespace: Cache namespace (ignored in stub)
     """
 
-    def __init__(self, *args, **kwargs) -> None:  # noqa: D401
-        self.args = args
-        self.kwargs = kwargs
+    def __init__(self, *, operator: object = None, cache_namespace: str = "") -> None:
+        self.operator = operator
+        self.cache_namespace = cache_namespace
 
-    def get_cached_count_bq(
+    def get_cached_count(
         self,
         *,
-        dataset_name: str,
         filters_dict: dict[str, object],
         timeout: int = 0,
     ) -> int:
         return 42
 
-    def get_cached_categorical_columns_bq(
+    def get_cached_categorical_obs_columns(
         self,
         *,
-        dataset_name: str,
-        table_name: str = "",
         distinct_threshold: int = 0,
         timeout: int = 0,
     ) -> set[str]:
         return set()
 
-    def get_cached_distinct_values_bq(
+    def get_cached_distinct_obs_values(
         self,
         *,
-        dataset_name: str,
         column_name: str,
-        table_name: str = "",
-        limit: int = 0,
         timeout: int = 0,
     ) -> list[str]:
         return []
 
 
 @pytest.fixture()
-def bigquery_cached_manager_stub(monkeypatch: pytest.MonkeyPatch) -> None:
+def omics_cached_manager_stub(monkeypatch: pytest.MonkeyPatch) -> None:
     """
-    Patch `BigQueryCachedDataManager` to a deterministic stub for backend tests.
+    Patch `OmicsCachedDataManager` to a deterministic stub for backend tests.
 
     :param monkeypatch: Pytest monkeypatch fixture
     """
 
-    monkeypatch.setattr(bigquery_utils, "BigQueryCachedDataManager", BigQueryCachedManagerStub)
+    monkeypatch.setattr(bigquery_utils, "OmicsCachedDataManager", OmicsCachedManagerStub)

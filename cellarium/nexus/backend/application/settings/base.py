@@ -224,9 +224,9 @@ UNFOLD = {
                 "expanded": False,
                 "items": [
                     {
-                        "title": _("BigQuery Datasets"),
+                        "title": _("Omics Datasets"),
                         "icon": "database",
-                        "link": reverse_lazy("admin:cell_management_bigquerydataset_changelist"),
+                        "link": reverse_lazy("admin:cell_management_omicsdataset_changelist"),
                     },
                     {
                         "title": _("Data Ingests"),
@@ -328,11 +328,26 @@ BACKEND_PIPELINE_DIR = "pipeline"
 PIPELINE_DATA_EXTRACTS_DIR = "data-extracts"
 PIPELINE_CONFIGS_DIR = "pipeline-configs"
 
+# Pipeline settings
 INGEST_INPUT_FILE_MAX_SIZE = 3e9  # 3 Gb
 MAX_ADATA_FILES_PER_VALIDATION_BATCH = 50  # Maximum number of AnnData files per validation batch
 INGEST_BATCH_SIZE = 2_500  # Used by Django's api that inserts Cell Info and Cell Feature Info into the database
 INGEST_NUM_WORKERS = 4
 INGEST_UNS_KEYS_TO_KEEP = ["citation", "schema_reference", "schema_version", "title", "batch_condition"]
+TILEDB_SOMA_EXTRACT_VAR_COLUMNS = [
+    "soma_joinid",
+    "feature_id",
+    "feature_name",
+    "feature_type",
+    "feature_length",
+    "nnz",
+    "n_measured_obs",
+]
+TILEDB_SOMA_EXTRACT_X_LAYER = "raw"
+TILEDB_SOMA_EXTRACT_OUTPUT_FORMAT = "h5ad"
+TILEDB_SOMA_EXTRACT_CONTIGUOUS_RANGE = 1_000
+TILEDB_SOMA_RANGES_PER_WORKER = 500
+TILEDB_SOMA_BINS_PER_WORKER = 50
 
 # Vertex AI Pipeline settings
 PIPELINE_SERVICE_ACCOUNT = env("PIPELINE_SERVICE_ACCOUNT", default=None)

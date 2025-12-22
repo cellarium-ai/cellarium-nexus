@@ -87,6 +87,8 @@
   {{ dataset_counts|json_script:"dataset-counts" }}
   {# Provide fields metadata so the frontend can initialize without an API call #}
   {{ filters_fields_meta|json_script:"filters-fields-meta" }}
+  {# Provide fields metadata for all datasets to enable instant switching #}
+  {{ filters_fields_meta_all|json_script:"filters-fields-meta-all" }}
   {# Provide precomputed maps for all datasets to enable instant switching #}
   {{ precomputed_categorical_columns_all|json_script:"precomputed-categorical-columns-all" }}
   {{ precomputed_suggestions_all|json_script:"precomputed-suggestions-all" }}
