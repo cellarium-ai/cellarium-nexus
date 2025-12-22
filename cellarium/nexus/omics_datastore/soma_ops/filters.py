@@ -36,7 +36,7 @@ def _format_literal(value: object) -> str:
         return _escape_string_literal(value)
     elif isinstance(value, bool):
         # Boolean must be checked before int since bool is a subclass of int
-        return "true" if value else "false"
+        return str(value)
     elif isinstance(value, (int, float)):
         return str(value)
     elif isinstance(value, list):

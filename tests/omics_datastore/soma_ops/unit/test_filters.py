@@ -47,13 +47,13 @@ def test_build_soma_value_filter_numeric_operators(filters: dict[str, object], e
 @pytest.mark.parametrize(
     "filters,expected",
     [
-        ({"is_primary__eq": True}, "(is_primary == true)"),
-        ({"is_primary__eq": False}, "(is_primary == false)"),
+        ({"is_primary__eq": True}, "(is_primary == True)"),
+        ({"is_primary__eq": False}, "(is_primary == False)"),
     ],
 )
 def test_build_soma_value_filter_boolean_values(filters: dict[str, object], expected: str) -> None:
     """
-    Verify boolean values translate to true/false literals.
+    Verify boolean values translate to True/False literals.
     """
     result = filters_module.build_soma_value_filter(filters=filters)
     assert result == expected
