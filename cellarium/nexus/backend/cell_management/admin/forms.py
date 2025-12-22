@@ -223,11 +223,12 @@ class ExtractCurriculumForm(forms.Form):
         widget=SimpleJSONWidget,
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, omics_dataset: OmicsDataset | None = None, **kwargs):
         """
         Initialize the form.
 
-        If there's only one BigQuery dataset, make the field read-only.
+        :param omics_dataset: OmicsDataset instance to dynamically set obs_columns and
+            extract_bin_keys choices based on the dataset backend
         """
         # If initial data contains filters as a string, parse it to dict
         if "initial" in kwargs and "filters" in kwargs["initial"]:
@@ -240,6 +241,18 @@ class ExtractCurriculumForm(forms.Form):
                     pass
 
         super().__init__(*args, **kwargs)
+
+        # Dynamically set obs_columns and extract_bin_keys choices based on dataset backend
+        if omics_dataset is not None:
+            from cellarium.nexus.backend.cell_management.admin.views.cell_info_admin import (
+                get_extract_bin_keys_choices_for_dataset,
+                get_obs_column_choices_for_dataset,
+            )
+
+            self.fields["obs_columns"].choices = get_obs_column_choices_for_dataset(omics_dataset=omics_dataset)
+            self.fields["extract_bin_keys"].choices = get_extract_bin_keys_choices_for_dataset(
+                omics_dataset=omics_dataset
+            )
 
     def clean_name(self):
         """

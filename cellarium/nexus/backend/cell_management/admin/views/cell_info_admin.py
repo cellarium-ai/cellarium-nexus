@@ -284,6 +284,73 @@ def _get_bigquery_column_types_from_schema() -> dict[str, str]:
     return result
 
 
+def get_obs_column_choices_for_dataset(*, omics_dataset: cell_models.OmicsDataset | None) -> list[tuple[str, str]]:
+    """
+    Get obs column choices for the extract form based on dataset backend.
+
+    For SOMA datasets, columns are derived from the obs schema.
+    For BigQuery datasets, columns are derived from CellInfoBQAvroSchema.
+
+    :param omics_dataset: OmicsDataset instance to get columns for
+
+    :return: List of (value, label) tuples for form choices
+    """
+    from cellarium.nexus.backend.cell_management.admin import constants
+
+    if omics_dataset is None:
+        return constants.CELL_INFO_EXTRACT_COLUMNS_CHOICES
+
+    if omics_dataset.backend == cell_models.OmicsDatasetBackend.TILEDB_SOMA:
+        if not omics_dataset.uri:
+            logger.warning(f"get_obs_column_choices_for_dataset: SOMA dataset {omics_dataset.name} has no URI")
+            return []
+
+        column_types = _get_soma_obs_column_types(experiment_uri=omics_dataset.uri)
+        choices = [(col, col.replace("_", " ").title()) for col in sorted(column_types.keys())]
+        logger.info(f"get_obs_column_choices_for_dataset: SOMA dataset returned {len(choices)} columns")
+        return choices
+
+    # BigQuery - use static schema
+    return constants.CELL_INFO_EXTRACT_COLUMNS_CHOICES
+
+
+def get_extract_bin_keys_choices_for_dataset(
+    *, omics_dataset: cell_models.OmicsDataset | None
+) -> list[tuple[str, str]]:
+    """
+    Get extract bin keys choices for the extract form based on dataset backend.
+
+    For SOMA datasets, only string columns are valid bin keys.
+    For BigQuery datasets, columns are derived from the static list.
+
+    :param omics_dataset: OmicsDataset instance to get columns for
+
+    :return: List of (value, label) tuples for form choices
+    """
+    from cellarium.nexus.backend.cell_management.admin import constants
+
+    if omics_dataset is None:
+        return constants.CELL_INFO_EXTRACT_BIN_KEYS_COLUMNS_CHOICES
+
+    if omics_dataset.backend == cell_models.OmicsDatasetBackend.TILEDB_SOMA:
+        if not omics_dataset.uri:
+            logger.warning(f"get_extract_bin_keys_choices_for_dataset: SOMA dataset {omics_dataset.name} has no URI")
+            return []
+
+        column_types = _get_soma_obs_column_types(experiment_uri=omics_dataset.uri)
+        # Only string columns can be used as bin keys
+        choices = [
+            (col, col.replace("_", " ").title())
+            for col, col_type in sorted(column_types.items())
+            if col_type == "string"
+        ]
+        logger.info(f"get_extract_bin_keys_choices_for_dataset: SOMA dataset returned {len(choices)} string columns")
+        return choices
+
+    # BigQuery - use static schema
+    return constants.CELL_INFO_EXTRACT_BIN_KEYS_COLUMNS_CHOICES
+
+
 def _get_cellinfo_filters_fields(*, dataset: str | None = None) -> list[dict]:
     """
     Return filters metadata used by the server-rendered formset and API endpoints.
@@ -478,24 +545,64 @@ class ExtractCurriculumAdminView(generic.FormView):
             context["filters_initial"] = {}
         return context
 
+    def _get_omics_dataset_from_request(self) -> cell_models.OmicsDataset:
+        """
+        Get the OmicsDataset instance from query parameters.
+
+        :raise cell_models.OmicsDataset.DoesNotExist: If dataset not found
+        :raise ValueError: If dataset query parameter is missing
+
+        :return: OmicsDataset instance
+        """
+        dataset_name = self.request.GET.get("dataset")
+        if not dataset_name:
+            raise ValueError("Missing required 'dataset' query parameter")
+
+        return cell_models.OmicsDataset.objects.get(name=dataset_name)
+
+    def dispatch(self, request, *args, **kwargs):
+        """
+        Validate that dataset query parameter is present and valid before processing.
+
+        :param request: HTTP request
+        :param args: Positional arguments
+        :param kwargs: Keyword arguments
+
+        :return: HTTP response or redirect on error
+        """
+        try:
+            self._get_omics_dataset_from_request()
+        except ValueError:
+            messages.error(request, "Dataset is required. Please select a dataset from the Cell Info page.")
+            return http_HttpResponseRedirect(django_urls.reverse("admin:cell_management_cellinfo_changelist"))
+        except cell_models.OmicsDataset.DoesNotExist:
+            dataset_name = request.GET.get("dataset", "")
+            messages.error(request, f"Dataset '{dataset_name}' not found.")
+            return http_HttpResponseRedirect(django_urls.reverse("admin:cell_management_cellinfo_changelist"))
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self) -> dict:
+        """
+        Build keyword arguments for the form, including the omics_dataset.
+
+        :return: Keyword arguments dictionary for form instantiation
+        """
+        kwargs = super().get_form_kwargs()
+        kwargs["omics_dataset"] = self._get_omics_dataset_from_request()
+        return kwargs
+
     def get_initial(self) -> dict:
         """
         Build initial form data from query parameters.
 
-        :raise: None
-
         :return: Initial dictionary for the form
         """
         initial: dict[str, t.Any] = super().get_initial()
-        dataset_name = self.request.GET.get("dataset") or ""
         filters_raw = self.request.GET.get("filters") or ""
 
-        if dataset_name:
-            try:
-                ds_obj = cell_models.OmicsDataset.objects.get(name=dataset_name)
-                initial["omics_dataset"] = ds_obj.pk
-            except cell_models.OmicsDataset.DoesNotExist:
-                pass
+        ds_obj = self._get_omics_dataset_from_request()
+        initial["omics_dataset"] = ds_obj.pk
 
         if filters_raw:
             try:
