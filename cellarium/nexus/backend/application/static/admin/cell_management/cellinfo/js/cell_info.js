@@ -66,8 +66,11 @@
       if (countEl && ds && counts && Object.prototype.hasOwnProperty.call(counts, ds)) {
         countEl.textContent = fmt(counts[ds]);
       }
-      // Reset filters on dataset change
+      // Update fields metadata for the new dataset, then reset filters
       try {
+        if (window.CellInfoFilters && typeof window.CellInfoFilters.updateFieldsMeta === 'function') {
+          window.CellInfoFilters.updateFieldsMeta(ds);
+        }
         if (window.CellInfoFilters && typeof window.CellInfoFilters.resetFilters === 'function') {
           window.CellInfoFilters.resetFilters();
         }

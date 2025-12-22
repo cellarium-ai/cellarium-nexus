@@ -14,6 +14,8 @@ import django.utils.html as django_html
 import django.views.decorators.http as http_decorators
 import django.views.generic as generic
 import google.api_core as google_api_core
+import pyarrow as pa
+import tiledbsoma
 from django.conf import settings
 from django.contrib import admin, messages
 from django.http import HttpResponseRedirect as http_HttpResponseRedirect
@@ -120,8 +122,14 @@ class CellInfoAdminView(generic.TemplateView):
                 ),
             )
 
-        # Build server-rendered filters formset
-        fields_meta = _get_cellinfo_filters_fields(dataset=selected_dataset)
+        # Build filter fields metadata for all datasets (for instant switching)
+        fields_meta_all: dict[str, list[dict]] = {}
+        for ds in datasets:
+            if ds:
+                fields_meta_all[ds] = _get_cellinfo_filters_fields(dataset=ds)
+
+        # Use selected dataset's metadata for initial formset
+        fields_meta = fields_meta_all.get(selected_dataset, [])
         field_choices: list[tuple[str, str]] = [(f["key"], f.get("label") or f["key"]) for f in fields_meta]
 
         class _BaseFilterFormSet(dj_forms.formsets.BaseFormSet):
@@ -192,12 +200,88 @@ class CellInfoAdminView(generic.TemplateView):
                 "dataset_counts": dataset_counts,
                 "filters_formset": formset,
                 "filters_fields_meta": fields_meta,
+                "filters_fields_meta_all": fields_meta_all,
                 "precomputed_categorical_columns_all": precomputed_categorical_all,
                 "precomputed_suggestions_all": precomputed_suggestions_all,
                 **admin.site.each_context(self.request),
             }
         )
         return context
+
+
+def _get_soma_obs_column_types(*, experiment_uri: str) -> dict[str, str]:
+    """
+    Get obs column names and their simplified type names from a SOMA experiment.
+
+    :param experiment_uri: URI of the SOMA experiment
+
+    :return: Dict mapping column name to type string ("string", "int", "float", "bool")
+    """
+    result: dict[str, str] = {}
+    try:
+        with tiledbsoma.open(experiment_uri, mode="r") as exp:
+            obs_schema = exp.obs.schema
+
+            for field in obs_schema:
+                if field.name == "soma_joinid":
+                    continue
+
+                ftype = field.type
+                if pa.types.is_boolean(ftype):
+                    result[field.name] = "bool"
+                elif pa.types.is_integer(ftype):
+                    result[field.name] = "int"
+                elif pa.types.is_floating(ftype):
+                    result[field.name] = "float"
+                elif (
+                    pa.types.is_string(ftype)
+                    or pa.types.is_large_string(ftype)
+                    or (pa.types.is_dictionary(ftype) and pa.types.is_string(ftype.value_type))
+                ):
+                    result[field.name] = "string"
+                else:
+                    logger.debug(f"Skipping unsupported SOMA type for column {field.name}: {ftype}")
+
+        logger.info(f"_get_soma_obs_column_types: Found {len(result)} columns")
+    except Exception as e:
+        logger.error(f"_get_soma_obs_column_types: Failed to get column types: {e}")
+
+    return result
+
+
+def _get_bigquery_column_types_from_schema() -> dict[str, str]:
+    """
+    Get cell_info column names and their simplified type names from the Pydantic schema.
+
+    Use the CellInfoBQAvroSchema to derive column types, matching the existing ingest schema.
+
+    :return: Dict mapping column name to type string ("string", "int", "float", "bool")
+    """
+    result: dict[str, str] = {}
+    schema_fields = bq_schemas.CellInfoBQAvroSchema.model_fields
+    type_hints = t.get_type_hints(bq_schemas.CellInfoBQAvroSchema, include_extras=True)
+    exclude_keys = {"metadata_extra"}
+
+    for key, field_info in schema_fields.items():
+        if key in exclude_keys:
+            continue
+
+        anno = type_hints.get(key, field_info.annotation)
+        base = filters_utils.resolve_base_type(anno)
+
+        match base:
+            case builtins.bool:
+                result[key] = "bool"
+            case builtins.float | py_decimal.Decimal | builtins.int:
+                result[key] = "float" if base in (builtins.float, py_decimal.Decimal) else "int"
+            case builtins.str:
+                result[key] = "string"
+            case _:
+                # Skip unsupported/complex types
+                continue
+
+    logger.info(f"_get_bigquery_column_types_from_schema: Found {len(result)} columns")
+    return result
 
 
 def _get_cellinfo_filters_fields(*, dataset: str | None = None) -> list[dict]:
@@ -216,6 +300,7 @@ def _get_cellinfo_filters_fields(*, dataset: str | None = None) -> list[dict]:
     # Determine which string columns are categorical based on distinct count per dataset
     categorical_columns: set[str] = set()
     is_soma = False
+    dataset_obj: cell_models.OmicsDataset | None = None
     if dataset:
         try:
             dataset_obj = cell_models.OmicsDataset.objects.get(name=dataset)
@@ -232,20 +317,48 @@ def _get_cellinfo_filters_fields(*, dataset: str | None = None) -> list[dict]:
         )
         logger.info(f"_get_cellinfo_filters_fields: categorical_columns={categorical_columns}")
 
-    if is_soma:
-        # For SOMA, build fields directly from categorical columns (all are strings with suggestions)
-        for col in sorted(categorical_columns):
-            results.append(
-                {
-                    "key": col,
-                    "label": col.replace("_", " ").title(),
-                    "type": "string",
-                    "operators": ["in", "not_in"],
-                    "suggest": True,
-                    "suggest_mode": "prefix",
-                    "suggest_min_chars": 2,
-                }
-            )
+    if is_soma and dataset_obj is not None:
+        # For SOMA, build fields from all obs columns with their types
+        # Only enable suggestions for categorical string columns
+        all_column_types = _get_soma_obs_column_types(experiment_uri=dataset_obj.uri)
+        logger.info(f"_get_cellinfo_filters_fields: SOMA column_types={all_column_types}")
+
+        for col in sorted(all_column_types.keys()):
+            col_type = all_column_types[col]
+            is_categorical = col in categorical_columns
+
+            if col_type == "bool":
+                results.append(
+                    {
+                        "key": col,
+                        "label": col.replace("_", " ").title(),
+                        "type": "boolean",
+                        "operators": ["eq", "not_eq"],
+                        "suggest": False,
+                    }
+                )
+            elif col_type in ("int", "float"):
+                results.append(
+                    {
+                        "key": col,
+                        "label": col.replace("_", " ").title(),
+                        "type": "number",
+                        "operators": ["eq", "gt", "gte", "lt", "lte"],
+                        "suggest": False,
+                    }
+                )
+            elif col_type == "string":
+                # Enable suggestions only for categorical strings
+                results.append(
+                    {
+                        "key": col,
+                        "label": col.replace("_", " ").title(),
+                        "type": "string",
+                        "operators": ["in", "not_in"] if is_categorical else ["eq", "not_eq", "in", "not_in"],
+                        "suggest": is_categorical,
+                        **({"suggest_mode": "prefix", "suggest_min_chars": 2} if is_categorical else {}),
+                    }
+                )
     else:
         # For BigQuery, build fields from CellInfoBQAvroSchema
         schema_fields = bq_schemas.CellInfoBQAvroSchema.model_fields
