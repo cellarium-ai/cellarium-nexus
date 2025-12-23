@@ -19,7 +19,7 @@ def run_soma_randomized_extracts_pipeline(extract_configs: t.List[str]) -> None:
 
     :raise RuntimeError: If any component fails
     """
-    with dsl.ParallelFor(items=extract_configs, name="soma-randomized-extract-workers", parallelism=128) as item:
+    with dsl.ParallelFor(items=extract_configs, name="soma-randomized-extract-workers", parallelism=256) as item:
         components.soma_randomized_extract_job(config_path=item)
 
 
@@ -35,7 +35,7 @@ def run_soma_grouped_extracts_pipeline(extract_configs: t.List[str]) -> None:
 
     :raise RuntimeError: If any component fails
     """
-    with dsl.ParallelFor(items=extract_configs, name="soma-grouped-extract-workers", parallelism=128) as item:
+    with dsl.ParallelFor(items=extract_configs, name="soma-grouped-extract-workers", parallelism=256) as item:
         components.soma_grouped_extract_job(config_path=item)
 
 
