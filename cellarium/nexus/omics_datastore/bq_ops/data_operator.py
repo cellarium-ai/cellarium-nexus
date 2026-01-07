@@ -15,12 +15,13 @@ from cellarium.nexus.omics_datastore.bq_ops.extract.metadata_extractor import Me
 from cellarium.nexus.omics_datastore.bq_ops.extract.prepare_extract import prepare_extract_tables
 from cellarium.nexus.omics_datastore.bq_ops.ingest.create_ingest_files import create_ingest_files
 from cellarium.nexus.omics_datastore.bq_ops.ingest.ingest_data_to_bigquery import bigquery_ingest_context
+from cellarium.nexus.omics_datastore.protocols import DataOperatorProtocol
 from cellarium.nexus.shared import schemas
 
 logger = logging.getLogger(__name__)
 
 
-class BigQueryDataOperator:
+class BigQueryDataOperator(DataOperatorProtocol):
     """
     Control and manage BigQuery operations for the Nexus datastore.
 

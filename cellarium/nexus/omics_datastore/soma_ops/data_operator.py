@@ -13,6 +13,7 @@ from typing import Any, Literal
 import pyarrow as pa
 import tiledbsoma
 
+from cellarium.nexus.omics_datastore.protocols import DataOperatorProtocol
 from cellarium.nexus.omics_datastore.soma_ops.curriculum_grouped import prepare_grouped_curriculum
 from cellarium.nexus.omics_datastore.soma_ops.curriculum_randomized import prepare_extract_curriculum
 from cellarium.nexus.omics_datastore.soma_ops.exceptions import SomaReadError
@@ -27,7 +28,7 @@ from cellarium.nexus.shared.schemas.omics_datastore import (
 logger = logging.getLogger(__name__)
 
 
-class TileDBSOMADataOperator:
+class TileDBSOMADataOperator(DataOperatorProtocol):
     """
     Control and manage TileDB SOMA operations for the Nexus datastore.
 
@@ -116,39 +117,26 @@ class TileDBSOMADataOperator:
                 obs_schema = exp.obs.schema
 
                 # Get string-like columns from schema (plain, large, or dictionary-encoded strings)
-                string_columns: list[str] = []
+                string_columns = set()
                 for field in obs_schema:
-                    if field.name in exclude_set or field.name == "soma_joinid":
+                    if field.name in exclude_set:
                         continue
 
                     ftype = field.type
                     is_string_like = bool(
                         pa.types.is_string(ftype)
-                        or pa.types.is_large_string(ftype)
+                        # or pa.types.is_large_string(ftype)
                         or (pa.types.is_dictionary(ftype) and pa.types.is_string(ftype.value_type))
                     )
 
                     logger.debug(f"Field {field.name}: type={ftype}, is_string_like={is_string_like}")
 
                     if is_string_like:
-                        string_columns.append(field.name)
+                        string_columns.add(field.name)
 
                 logger.info(f"Found {len(string_columns)} string-like columns in SOMA obs: {string_columns}")
 
-                if not string_columns:
-                    return set()
-
-                categorical: set[str] = set()
-                for col in string_columns:
-                    # Count distinct values for each column
-                    obs_query = exp.obs.read(column_names=[col])
-                    obs_df = obs_query.concat().to_pandas()
-                    distinct_count = obs_df[col].nunique()
-
-                    if distinct_count <= threshold:
-                        categorical.add(col)
-
-                return categorical
+                return string_columns
 
         except Exception as e:
             logger.error(f"Failed to get categorical obs columns: {e}")
