@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from cellarium.nexus.omics_datastore.soma_ops import SomaReadError
+from cellarium.nexus.omics_datastore.soma_ops import SomaReadError, _extract
 from cellarium.nexus.omics_datastore.soma_ops import data_operator as data_operator_module
 from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, RandomizedCurriculumMetadata
 
@@ -153,7 +153,7 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
     """
     operator = data_operator_module.TileDBSOMADataOperator(experiment_uri="gs://bucket/soma")
 
-    # Mock plan_soma_extract at the data_operator module level
+    # Mock plan_soma_extract at the _extract module level
     plan_calls = []
 
     def _fake_plan_soma_extract(
@@ -201,7 +201,7 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
             x_layer=x_layer,
         )
 
-    monkeypatch.setattr(data_operator_module, "prepare_extract_curriculum", _fake_plan_soma_extract)
+    monkeypatch.setattr(_extract, "prepare_extract_curriculum", _fake_plan_soma_extract)
 
     # Execute
     filters = {"tissue__eq": "lung"}
@@ -247,7 +247,7 @@ def test_extract_randomized_with_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_p
     """
     operator = data_operator_module.TileDBSOMADataOperator(experiment_uri="gs://bucket/soma")
 
-    # Mock extract_ranges and shuffle_extracted_chunks at data_operator module level
+    # Mock extract_ranges and shuffle_extracted_chunks at _extract module level
     extract_calls = []
     shuffle_calls = []
 
@@ -257,8 +257,8 @@ def test_extract_randomized_with_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_p
     def _fake_shuffle(**kwargs: object) -> None:
         shuffle_calls.append(kwargs)
 
-    monkeypatch.setattr(data_operator_module, "extract_ranges", _fake_extract_ranges)
-    monkeypatch.setattr(data_operator_module, "shuffle_extracted_chunks", _fake_shuffle)
+    monkeypatch.setattr(_extract, "extract_ranges", _fake_extract_ranges)
+    monkeypatch.setattr(_extract, "shuffle_extracted_chunks", _fake_shuffle)
 
     # Mock shutil.rmtree
     import shutil
@@ -326,7 +326,7 @@ def test_extract_randomized_auto_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_p
     """
     operator = data_operator_module.TileDBSOMADataOperator(experiment_uri="gs://bucket/soma")
 
-    # Mock extract_ranges and shuffle_extracted_chunks at data_operator module level
+    # Mock extract_ranges and shuffle_extracted_chunks at _extract module level
     extract_calls = []
     shuffle_calls = []
 
@@ -336,8 +336,8 @@ def test_extract_randomized_auto_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_p
     def _fake_shuffle(**kwargs: object) -> None:
         shuffle_calls.append(kwargs)
 
-    monkeypatch.setattr(data_operator_module, "extract_ranges", _fake_extract_ranges)
-    monkeypatch.setattr(data_operator_module, "shuffle_extracted_chunks", _fake_shuffle)
+    monkeypatch.setattr(_extract, "extract_ranges", _fake_extract_ranges)
+    monkeypatch.setattr(_extract, "shuffle_extracted_chunks", _fake_shuffle)
 
     # Mock tempfile.mkdtemp
     import tempfile
@@ -405,15 +405,15 @@ def test_extract_randomized_no_cleanup(monkeypatch: pytest.MonkeyPatch, tmp_path
     """
     operator = data_operator_module.TileDBSOMADataOperator(experiment_uri="gs://bucket/soma")
 
-    # Mock extract_ranges and shuffle_extracted_chunks at data_operator module level
+    # Mock extract_ranges and shuffle_extracted_chunks at _extract module level
     def _fake_extract_ranges(**kwargs: object) -> None:
         pass
 
     def _fake_shuffle(**kwargs: object) -> None:
         pass
 
-    monkeypatch.setattr(data_operator_module, "extract_ranges", _fake_extract_ranges)
-    monkeypatch.setattr(data_operator_module, "shuffle_extracted_chunks", _fake_shuffle)
+    monkeypatch.setattr(_extract, "extract_ranges", _fake_extract_ranges)
+    monkeypatch.setattr(_extract, "shuffle_extracted_chunks", _fake_shuffle)
 
     # Mock shutil.rmtree
     import shutil

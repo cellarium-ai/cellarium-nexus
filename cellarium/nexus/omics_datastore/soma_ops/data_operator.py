@@ -14,11 +14,8 @@ import pyarrow as pa
 import tiledbsoma
 
 from cellarium.nexus.omics_datastore.protocols import DataOperatorProtocol
-from cellarium.nexus.omics_datastore.soma_ops.curriculum_grouped import prepare_grouped_curriculum
-from cellarium.nexus.omics_datastore.soma_ops.curriculum_randomized import prepare_extract_curriculum
+from cellarium.nexus.omics_datastore.soma_ops import _extract
 from cellarium.nexus.omics_datastore.soma_ops.exceptions import SomaReadError
-from cellarium.nexus.omics_datastore.soma_ops.extract_grouped import extract_grouped_bins
-from cellarium.nexus.omics_datastore.soma_ops.extract_randomized import extract_ranges, shuffle_extracted_chunks
 from cellarium.nexus.omics_datastore.soma_ops.filters import build_soma_value_filter
 from cellarium.nexus.shared.schemas.omics_datastore import (
     GroupedCurriculumMetadata,
@@ -215,7 +212,7 @@ class TileDBSOMADataOperator(DataOperatorProtocol):
             # Grouped extraction mode
             if bin_size is None:
                 raise ValueError("bin_size is required for grouped extraction")
-            return prepare_grouped_curriculum(
+            return _extract.prepare_grouped_curriculum(
                 experiment_uri=self.experiment_uri,
                 filters=filters,
                 extract_bin_keys=extract_bin_keys,
@@ -232,7 +229,7 @@ class TileDBSOMADataOperator(DataOperatorProtocol):
                 raise ValueError("range_size is required for randomized extraction")
             if extract_bin_size is None:
                 raise ValueError("extract_bin_size is required for randomized extraction")
-            return prepare_extract_curriculum(
+            return _extract.prepare_extract_curriculum(
                 experiment_uri=self.experiment_uri,
                 filters=filters,
                 range_size=range_size,
@@ -266,7 +263,7 @@ class TileDBSOMADataOperator(DataOperatorProtocol):
         1. Extract contiguous ranges to temp directory in Zarr format (fast SOMA reads)
         2. Shuffle cells across final output chunks (true randomization)
 
-        Delegate to extract and shuffle modules for implementation.
+        Delegate to _extract and shuffle modules for implementation.
         All data specification (obs_columns, var_columns, var_joinids, x_layer)
         is taken from the plan.
 
@@ -295,7 +292,7 @@ class TileDBSOMADataOperator(DataOperatorProtocol):
 
         try:
             logger.info("Stage 1: Extracting contiguous ranges to Zarr format...")
-            extract_ranges(
+            _extract.extract_ranges(
                 curriculum_metadata=curriculum_metadata,
                 output_dir=temp_dir,
                 partition_index=partition_index,
@@ -314,7 +311,7 @@ class TileDBSOMADataOperator(DataOperatorProtocol):
                 else None
             )
 
-            shuffle_extracted_chunks(
+            _extract.shuffle_extracted_chunks(
                 curriculum_metadata=curriculum_metadata,
                 input_dir=temp_dir,
                 output_dir=output_dir,
@@ -360,7 +357,7 @@ class TileDBSOMADataOperator(DataOperatorProtocol):
         :raise IOError: If file operations fail
         :raise ValueError: If output_format is invalid or grouped_bins is None
         """
-        extract_grouped_bins(
+        _extract.extract_grouped_bins(
             curriculum_metadata=curriculum_metadata,
             output_dir=output_dir,
             partition_index=partition_index,

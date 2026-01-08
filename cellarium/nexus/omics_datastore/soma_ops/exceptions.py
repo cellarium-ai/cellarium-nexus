@@ -58,9 +58,9 @@ class SomaExtractError(SomaOperationError):
 
 class SomaPrepareCurriculumMetadataError(SomaOperationError):
     """
-    SOMA extract planning failed.
+    SOMA _extract planning failed.
 
-    Indicates that computing extract plans or joinid ranges encountered an error.
+    Indicates that computing _extract plans or joinid ranges encountered an error.
     """
 
     pass

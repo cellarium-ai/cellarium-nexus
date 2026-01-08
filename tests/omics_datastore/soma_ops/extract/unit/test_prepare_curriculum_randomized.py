@@ -7,7 +7,7 @@ from cellarium.nexus.omics_datastore.soma_ops import (
     SomaPrepareCurriculumMetadataError,
     SomaReadError,
 )
-from cellarium.nexus.omics_datastore.soma_ops import curriculum_randomized as curriculum_metadata
+from cellarium.nexus.omics_datastore.soma_ops._extract import prepare_curriculum_randomized
 from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange
 from tests.omics_datastore.soma_ops.conftest import FakeSomaExperiment
 
@@ -17,7 +17,7 @@ def test_compute_contiguous_ranges_basic_chunking() -> None:
     Verify basic chunking of sorted values into contiguous ranges.
     """
     values = np.array([1, 2, 3, 4, 5], dtype=np.int64)
-    ranges = curriculum_metadata.compute_contiguous_ranges(values=values, chunk_size=2, shuffle=False)
+    ranges = prepare_curriculum_randomized.compute_contiguous_ranges(values=values, chunk_size=2, shuffle=False)
     assert ranges == [
         IdContiguousRange(start=1, end=2),
         IdContiguousRange(start=3, end=4),
@@ -30,7 +30,7 @@ def test_compute_contiguous_ranges_non_consecutive_values() -> None:
     Verify that non-consecutive values are still chunked by position.
     """
     values = np.array([10, 20, 21, 100], dtype=np.int64)
-    ranges = curriculum_metadata.compute_contiguous_ranges(values=values, chunk_size=2, shuffle=False)
+    ranges = prepare_curriculum_randomized.compute_contiguous_ranges(values=values, chunk_size=2, shuffle=False)
     assert ranges == [
         IdContiguousRange(start=10, end=20),
         IdContiguousRange(start=21, end=100),
@@ -42,7 +42,7 @@ def test_compute_contiguous_ranges_empty_values() -> None:
     Verify empty values array returns empty ranges list.
     """
     values = np.array([], dtype=np.int64)
-    ranges = curriculum_metadata.compute_contiguous_ranges(values=values, chunk_size=10, shuffle=False)
+    ranges = prepare_curriculum_randomized.compute_contiguous_ranges(values=values, chunk_size=10, shuffle=False)
     assert ranges == [], "Expected empty ranges list for empty input"
 
 
@@ -53,7 +53,7 @@ def test_shuffle_but_keep_last():
     values = [1, 2, 3, 4, 99]
     values_original = list(values)
 
-    out = curriculum_metadata.shuffle_but_keep_last(values=values)
+    out = prepare_curriculum_randomized.shuffle_but_keep_last(values=values)
 
     assert out[-1] == values[-1], "Last element must stay the same"
     assert len(out) == len(values), "Lengths must stay the same"
@@ -68,7 +68,7 @@ def test_compute_contiguous_ranges_invalid_chunk_size(chunk_size: int) -> None:
     """
     values = np.array([1, 2, 3], dtype=np.int64)
     with pytest.raises(ValueError):
-        curriculum_metadata.compute_contiguous_ranges(values=values, chunk_size=chunk_size)
+        prepare_curriculum_randomized.compute_contiguous_ranges(values=values, chunk_size=chunk_size)
 
 
 def test_read_filtered_joinids_happy_path(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -88,7 +88,7 @@ def test_read_filtered_joinids_happy_path(monkeypatch: pytest.MonkeyPatch) -> No
 
     monkeypatch.setattr("tiledbsoma.open", fake_open)
 
-    result = curriculum_metadata.read_filtered_joinids(
+    result = prepare_curriculum_randomized.read_filtered_joinids(
         experiment_uri=experiment_uri,
         value_filter=value_filter,
     )
@@ -112,7 +112,7 @@ def test_read_filtered_joinids_empty_filter(monkeypatch: pytest.MonkeyPatch) -> 
 
     monkeypatch.setattr("tiledbsoma.open", fake_open)
 
-    result = curriculum_metadata.read_filtered_joinids(
+    result = prepare_curriculum_randomized.read_filtered_joinids(
         experiment_uri=experiment_uri,
         value_filter=value_filter,
     )
@@ -134,7 +134,7 @@ def test_read_filtered_joinids_error_handling(monkeypatch: pytest.MonkeyPatch) -
     monkeypatch.setattr("tiledbsoma.open", fake_open)
 
     with pytest.raises(SomaReadError):
-        curriculum_metadata.read_filtered_joinids(
+        prepare_curriculum_randomized.read_filtered_joinids(
             experiment_uri=experiment_uri,
             value_filter=value_filter,
         )
@@ -146,7 +146,7 @@ def test_plan_soma_extract_invalid_range_size(range_size: int) -> None:
     Verify non-positive range_size raises ValueError.
     """
     with pytest.raises(ValueError):
-        curriculum_metadata.prepare_extract_curriculum(
+        prepare_curriculum_randomized.prepare_extract_curriculum(
             experiment_uri="gs://bucket/soma",
             filters=None,
             range_size=range_size,
@@ -163,12 +163,12 @@ def test_plan_soma_extract_no_cells(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Mock read_filtered_joinids to return empty array
     monkeypatch.setattr(
-        curriculum_metadata,
+        prepare_curriculum_randomized,
         "read_filtered_joinids",
         lambda experiment_uri, value_filter: np.array([], dtype=np.int64),
     )
     with pytest.raises(SomaPrepareCurriculumMetadataError):
-        _ = curriculum_metadata.prepare_extract_curriculum(
+        _ = prepare_curriculum_randomized.prepare_extract_curriculum(
             experiment_uri=experiment_uri,
             filters=filters,
             range_size=100,
@@ -186,12 +186,12 @@ def test_plan_soma_extract_normal_flow(monkeypatch: pytest.MonkeyPatch) -> None:
 
     # Mock read_filtered_joinids
     monkeypatch.setattr(
-        curriculum_metadata,
+        prepare_curriculum_randomized,
         "read_filtered_joinids",
         lambda experiment_uri, value_filter: np.array([5, 10, 15, 20], dtype=np.int64),
     )
 
-    plan = curriculum_metadata.prepare_extract_curriculum(
+    plan = prepare_curriculum_randomized.prepare_extract_curriculum(
         experiment_uri=experiment_uri,
         filters=filters,
         range_size=2,
@@ -220,7 +220,7 @@ def test_plan_soma_extract_with_shuffle(monkeypatch: pytest.MonkeyPatch) -> None
 
     # Mock read_filtered_joinids
     monkeypatch.setattr(
-        curriculum_metadata,
+        prepare_curriculum_randomized,
         "read_filtered_joinids",
         lambda experiment_uri, value_filter: np.array([1, 2, 3, 4, 5, 6], dtype=np.int64),
     )
@@ -237,7 +237,7 @@ def test_plan_soma_extract_with_shuffle(monkeypatch: pytest.MonkeyPatch) -> None
 
     monkeypatch.setattr(random, "sample", _fake_sample)
 
-    plan = curriculum_metadata.prepare_extract_curriculum(
+    plan = prepare_curriculum_randomized.prepare_extract_curriculum(
         experiment_uri=experiment_uri,
         filters=filters,
         range_size=2,
@@ -269,7 +269,7 @@ def test_plan_soma_extract_filter_error_propagation(monkeypatch: pytest.MonkeyPa
     """
     # Use a filter with an unsupported operator to trigger SomaFilterError
     with pytest.raises(SomaFilterError):
-        curriculum_metadata.prepare_extract_curriculum(
+        prepare_curriculum_randomized.prepare_extract_curriculum(
             experiment_uri="gs://bucket/soma",
             filters={"bad__unsupported_op": "value"},
             range_size=100,
@@ -288,10 +288,10 @@ def test_plan_soma_extract_read_error_propagation(monkeypatch: pytest.MonkeyPatc
     def _raise_read_error(experiment_uri: str, value_filter: str) -> np.ndarray:
         raise SomaReadError("Read failed")
 
-    monkeypatch.setattr(curriculum_metadata, "read_filtered_joinids", _raise_read_error)
+    monkeypatch.setattr(prepare_curriculum_randomized, "read_filtered_joinids", _raise_read_error)
 
     with pytest.raises(SomaReadError):
-        curriculum_metadata.prepare_extract_curriculum(
+        prepare_curriculum_randomized.prepare_extract_curriculum(
             experiment_uri="gs://bucket/soma",
             filters=None,
             range_size=100,

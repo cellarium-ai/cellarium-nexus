@@ -1,7 +1,7 @@
 """
 SOMA data extraction utilities.
 
-This module provides functions to extract data from SOMA experiments into AnnData files.
+This module provides functions to _extract data from SOMA experiments into AnnData files.
 """
 
 import logging
@@ -19,7 +19,7 @@ from scipy.sparse import coo_matrix
 from tenacity import before_log, retry, stop_after_attempt, wait_exponential
 from tqdm import tqdm
 
-from cellarium.nexus.omics_datastore.soma_ops import utils
+from cellarium.nexus.omics_datastore.soma_ops._extract import utils
 from cellarium.nexus.omics_datastore.soma_ops.exceptions import SomaExtractError
 from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, RandomizedCurriculumMetadata
 
@@ -75,7 +75,7 @@ def extract_range_to_anndata(
 
     :param experiment_uri: URI of the SOMA experiment
     :param value_filter: SOMA obs value_filter expression
-    :param joinid_range: Inclusive soma_joinid range to extract
+    :param joinid_range: Inclusive soma_joinid range to _extract
     :param output_path: Local path to save AnnData file
     :param obs_columns: Optional obs columns to include
     :param var_columns: Optional var columns to include
@@ -220,7 +220,7 @@ def extract_range_to_anndata(
             logger.info(f"Successfully extracted {len(obs_df)} cells to {output_path}")
 
     except Exception as e:
-        logger.error(f"Failed to extract joinid range [{joinid_range.start}, {joinid_range.end}]: {e}")
+        logger.error(f"Failed to _extract joinid range [{joinid_range.start}, {joinid_range.end}]: {e}")
         raise SomaExtractError(f"SOMA extraction failed for range [{joinid_range.start}, {joinid_range.end}]") from e
 
 
@@ -241,7 +241,7 @@ def _extract_range_worker(
     :param idx: Index of the range being processed.
     :param experiment_uri: URI of the SOMA experiment.
     :param value_filter: SOMA value filter string for obs.
-    :param joinid_range: Range of soma_joinids to extract.
+    :param joinid_range: Range of soma_joinids to _extract.
     :param output_path: Path to write the output file.
     :param obs_columns: Optional list of obs columns to include.
     :param var_columns: Optional list of var columns to include.
@@ -283,7 +283,7 @@ def extract_ranges(
     for each range in the specified format. All data specification (obs_columns,
     var_columns, var_joinids, x_layer) is taken from the curriculum metadata.
 
-    :param curriculum_metadata: SOMA extract metadata with all data specification.
+    :param curriculum_metadata: SOMA _extract metadata with all data specification.
     :param output_dir: Local directory to save AnnData files.
     :param partition_index: Index used for slicing ranges and output chunk indexes.
         Needed for distributing extracting over multiple distributed VMs. Default is 0 (single VM execution).
@@ -308,7 +308,7 @@ def extract_ranges(
     # Ensure output directory exists
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Calculating current extract ranges and output ids
+    # Calculating current _extract ranges and output ids
     range_slice_start, range_slice_end = utils.get_block_slice(
         total_items=curriculum_metadata.num_ranges,
         partition_index=partition_index,
@@ -364,7 +364,7 @@ def extract_ranges(
                 logger.error(f"Range {idx} failed: {e}")
 
     if failed:
-        error_msg = f"Failed to extract {len(failed)} ranges: {failed}"
+        error_msg = f"Failed to _extract {len(failed)} ranges: {failed}"
         logger.error(error_msg)
         raise SomaExtractError(error_msg)
 
@@ -498,7 +498,7 @@ def shuffle_extracted_chunks(
     randomly across output chunks using fork-based multiprocessing for
     memory-efficient parallel writes.
 
-    :param curriculum_metadata: SOMA extract metadata with all data specification
+    :param curriculum_metadata: SOMA _extract metadata with all data specification
     :param input_dir: Directory with range_*.zarr files from extraction stage
     :param output_dir: Directory to write shuffled h5ad chunks
     :param partition_index: Index used for slicing output chunk indexes.
@@ -545,8 +545,8 @@ def shuffle_extracted_chunks(
 
     if _num_bins_computed != num_bins:
         raise SomaExtractError(
-            f"Number of extract bin indexes doesn't accommodate all cells within this worker. "
-            f"Required number of extract bins {_num_bins_computed}, while "
+            f"Number of _extract bin indexes doesn't accommodate all cells within this worker. "
+            f"Required number of _extract bins {_num_bins_computed}, while "
             f"number of indexes for naming {num_bins}"
         )
 
