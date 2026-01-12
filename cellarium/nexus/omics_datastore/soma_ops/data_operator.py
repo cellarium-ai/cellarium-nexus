@@ -54,11 +54,7 @@ class TileDBSOMADataOperator(DataOperatorProtocol):
 
         logger.info(f"Initialized TileDBSOMADataOperator for {experiment_uri}")
 
-    def count_cells(
-        self,
-        *,
-        filter_statements: dict[str, Any] | None = None,
-    ) -> int:
+    def count_cells(self, *, filter_statements: dict[str, Any] | None = None) -> int:
         """
         Count cells in the SOMA obs table matching the given filters.
 
@@ -91,12 +87,7 @@ class TileDBSOMADataOperator(DataOperatorProtocol):
             logger.error(f"Failed to count cells: {e}")
             raise SomaReadError("SOMA cell count operation failed") from e
 
-    def get_categorical_obs_columns(
-        self,
-        *,
-        threshold: int,
-        exclude: list[str] | None = None,
-    ) -> set[str]:
+    def get_categorical_obs_columns(self, *, threshold: int, exclude: list[str] | None = None) -> set[str]:
         """
         Determine categorical string columns in obs by distinct count threshold.
 
@@ -139,11 +130,7 @@ class TileDBSOMADataOperator(DataOperatorProtocol):
             logger.error(f"Failed to get categorical obs columns: {e}")
             raise SomaReadError("SOMA categorical columns operation failed") from e
 
-    def get_distinct_obs_values(
-        self,
-        *,
-        column_name: str,
-    ) -> list[str]:
+    def get_distinct_obs_values(self, *, column_name: str) -> list[str]:
         """
         Fetch distinct values for an obs column.
 
