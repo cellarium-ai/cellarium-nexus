@@ -1,7 +1,7 @@
 """
 SOMA grouped data extraction utilities.
 
-This module provides functions to _extract data from SOMA experiments into AnnData files
+This module provides functions to extract data from SOMA experiments into AnnData files
 where cells are grouped by specified obs columns.
 """
 
@@ -212,7 +212,7 @@ def extract_grouped_bin_to_anndata(
             logger.info(f"Successfully extracted {len(obs_df)} cells to {output_path}")
 
     except Exception as e:
-        logger.error(f"Failed to _extract grouped bin {grouped_bin.group_key}: {e}")
+        logger.error(f"Failed to extract grouped bin {grouped_bin.group_key}: {e}")
         raise SomaExtractError(f"SOMA extraction failed for grouped bin {grouped_bin.group_key}") from e
 
 
@@ -235,7 +235,7 @@ def _extract_grouped_bin_worker(
     :param bin_idx: Internal index of the bin being processed
     :param global_bin_idx: Global bin index for output file naming
     :param experiment_uri: URI of the SOMA experiment
-    :param grouped_bin: GroupedBin to _extract
+    :param grouped_bin: GroupedBin to extract
     :param output_path: Path to write the output file
     :param value_filter: Optional user-provided filter to combine with group filter
     :param obs_columns: Optional list of obs columns to include

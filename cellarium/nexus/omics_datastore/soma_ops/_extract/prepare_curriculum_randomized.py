@@ -1,5 +1,5 @@
 """
-SOMA _extract planning utilities.
+SOMA extract planning utilities.
 
 This module provides high-level planning logic for SOMA extracts.
 """
@@ -177,18 +177,18 @@ def prepare_extract_curriculum(
     x_layer: str = "X",
 ) -> RandomizedCurriculumMetadata:
     """
-    Plan a SOMA _extract by computing soma_joinid ranges for a given filter.
+    Plan a SOMA extract by computing soma_joinid ranges for a given filter.
 
     Read filtered obs data, compute contiguous joinid ranges, and return
-    an _extract metadata. This is the main entry point for dashboard/backend
+    an extract metadata. This is the main entry point for dashboard/backend
     to metadata SOMA extracts.
 
     :param experiment_uri: URI of the SOMA experiment.
     :param filters: Dict of filter conditions using the Nexus format.
     :param range_size: Target number of cells per range (for extraction).
-    :param extract_bin_size: Target number of cells per _extract bin (for shuffling).
+    :param extract_bin_size: Target number of cells per extract bin (for shuffling).
     :param shuffle_ranges: Whether to shuffle id ranges.
-    :param shuffle_extract_bin_indexes: Whether to shuffle _extract bin indexes.
+    :param shuffle_extract_bin_indexes: Whether to shuffle extract bin indexes.
     :param var_filter_column: Name of the var column to filter features by.
     :param var_filter_values: List of values to match in the var filter column.
     :param obs_columns: List of obs columns to include in extraction.
@@ -209,7 +209,7 @@ def prepare_extract_curriculum(
     value_filter = build_soma_value_filter(filters=filters)
 
     logger.info(
-        f"Planning SOMA _extract for {experiment_uri} with range_size={range_size},\n"
+        f"Planning SOMA extract for {experiment_uri} with range_size={range_size},\n"
         f"filter={value_filter if value_filter else 'no filter'},\n"
         f"var_filter_column={var_filter_column},\n"
         f"var_filter_values_count={len(var_filter_values) if var_filter_values else 0}"
@@ -232,7 +232,7 @@ def prepare_extract_curriculum(
     )
 
     total_cells = len(obs_ids)
-    logger.info(f"Found {total_cells} cells to _extract")
+    logger.info(f"Found {total_cells} cells to extract")
 
     if total_cells == 0:
         raise exceptions.SomaPrepareCurriculumMetadataError(f"No cells found matching the filter: {value_filter}")
