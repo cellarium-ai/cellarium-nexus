@@ -428,7 +428,7 @@ def test_shuffle_extracted_chunks_happy_path(monkeypatch: pytest.MonkeyPatch, tm
 
     monkeypatch.setattr(extract_curriculum_randomized, "ProcessPoolExecutor", lambda **kwargs: FakeMapExecutor())
 
-    # 6 total cells, chunk_size=4 -> 2 _extract bins
+    # 6 total cells, chunk_size=4 -> 2 extract bins
     curriculum_metadata = RandomizedCurriculumMetadata(
         experiment_uri="gs://bucket/soma",
         value_filter="",
