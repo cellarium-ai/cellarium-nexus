@@ -64,3 +64,18 @@ class SomaPrepareCurriculumMetadataError(SomaOperationError):
     """
 
     pass
+
+
+class SomaValidationError(SomaOperationError):
+    """
+    SOMA data validation failed.
+
+    Indicates that input data failed validation checks before ingest.
+
+    :param errors: List of validation error messages.
+    """
+
+    def __init__(self, *, errors: list[str]) -> None:
+        self.errors = errors
+        message = f"Validation failed with {len(errors)} error(s):\n" + "\n".join(f"  - {e}" for e in errors)
+        super().__init__(message)

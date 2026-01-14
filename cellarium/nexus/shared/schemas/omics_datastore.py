@@ -2,7 +2,7 @@
 Schema definitions for omics datastore.
 """
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -83,3 +83,40 @@ class GroupedCurriculumMetadata(BaseCurriculumMetadata):
 
     extract_bin_keys: list[str]
     grouped_bins: list[GroupedBin]
+
+
+# Ingest validation schemas
+
+
+class ObsDescriptor(BaseModel):
+    """Descriptor for a single obs column validation."""
+
+    name: str
+    dtype: str
+    nullable: bool = False
+
+
+class VarDescriptor(BaseModel):
+    """Descriptor for a single var column."""
+
+    name: str
+    dtype: str
+    nullable: bool = False
+
+
+class ExperimentVarSchema(BaseModel):
+    """Schema for var (features) validation.
+
+    Define only feature ids without additional descriptors.
+    """
+
+    features: list[str]
+    is_subset: bool = True
+
+
+class IngestSchema(BaseModel):
+    """Schema for validating AnnData before SOMA ingest."""
+
+    obs_columns: list[ObsDescriptor]
+    var_schema: ExperimentVarSchema
+    x_validation_type: Literal["count_matrix", "feature_matrix"]
