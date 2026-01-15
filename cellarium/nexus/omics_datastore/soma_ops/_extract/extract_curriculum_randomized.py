@@ -19,7 +19,7 @@ from scipy.sparse import coo_matrix
 from tenacity import before_log, retry, stop_after_attempt, wait_exponential
 from tqdm import tqdm
 
-from cellarium.nexus.omics_datastore.soma_ops._extract import utils
+from cellarium.nexus.omics_datastore.soma_ops import utils
 from cellarium.nexus.omics_datastore.soma_ops.exceptions import SomaExtractError
 from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, RandomizedCurriculumMetadata
 

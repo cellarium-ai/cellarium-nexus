@@ -9,5 +9,7 @@ from cellarium.nexus.shared.schemas.omics_datastore import (  # noqa: F401
     GroupedBin,
     GroupedCurriculumMetadata,
     IdContiguousRange,
+    IngestPlanMetadata,
+    IngestSchema,
     RandomizedCurriculumMetadata,
 )

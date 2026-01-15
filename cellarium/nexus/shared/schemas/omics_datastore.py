@@ -120,3 +120,28 @@ class IngestSchema(BaseModel):
     obs_columns: list[ObsDescriptor]
     var_schema: ExperimentVarSchema
     x_validation_type: Literal["count_matrix", "feature_matrix"]
+
+
+class IngestPlanMetadata(BaseModel):
+    """
+    Metadata for a partitioned SOMA ingest plan.
+
+    This schema captures all information needed to execute a partitioned ingest
+    workflow. The `source_h5ad_uris` field contains remote URIs (e.g., GCS paths)
+    representing the logical dataset. The actual ingest function receives local
+    file paths after the coordinator downloads the files.
+
+    The `registration_mapping` field contains a base64-encoded pickle of
+    `tiledbsoma.io.ExperimentAmbientLabelMapping` that can be deserialized
+    for use during ingestion.
+    """
+
+    experiment_uri: str
+    source_h5ad_uris: list[str]
+    measurement_name: str
+    total_files: int
+    ingest_batch_size: int
+    num_partitions: int
+    last_partition_size: int
+    ingest_schema: IngestSchema
+    registration_mapping_pickle: str
