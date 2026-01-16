@@ -8,7 +8,11 @@ import tiledbsoma.io
 from anndata import AnnData
 from tiledbsoma import DoesNotExistError
 
-from cellarium.nexus.omics_datastore.soma_ops._ingest.preprocessing import sanitize_for_ingest, validate_for_ingest
+from cellarium.nexus.omics_datastore.soma_ops._ingest.preprocessing import (
+    sanitize_first_adata_for_schema,
+    sanitize_for_ingest,
+    validate_for_ingest,
+)
 from cellarium.nexus.omics_datastore.soma_ops.utils import get_block_slice
 from cellarium.nexus.shared.schemas.omics_datastore import IngestPlanMetadata, IngestSchema
 
@@ -77,6 +81,7 @@ def prepare_for_ingest(
     experiment_uri: str,
     h5ad_paths: list[str],
     measurement_name: str,
+    first_adata: AnnData | None = None,
 ) -> tiledbsoma.io.ExperimentAmbientLabelMapping:
     """
     Prepare the SOMA experiment for ingestion.
@@ -87,14 +92,24 @@ def prepare_for_ingest(
     :param experiment_uri: URI of the SOMA experiment.
     :param h5ad_paths: List of paths to h5ad files to register.
     :param measurement_name: Name of the measurement.
+    :param first_adata: AnnData object to use for schema creation. Required if
+        the experiment does not exist. Should be pre-sanitized with the full
+        feature schema using sanitize_first_adata_for_schema.
+
+    :raises ValueError: If the experiment does not exist and first_adata is None.
 
     :returns: Experiment mapping for the registered h5ad files.
     """
     if not _soma_experiment_exists(soma_uri=experiment_uri):
+        if first_adata is None:
+            raise ValueError(
+                "first_adata is required when the SOMA experiment does not exist. "
+                "Provide an AnnData object sanitized with the full feature schema."
+            )
         logger.info(f"Creating schema-only SOMA experiment at URI: {experiment_uri}")
-        tiledbsoma.io.from_h5ad(
+        tiledbsoma.io.from_anndata(
             experiment_uri=experiment_uri,
-            input_path=h5ad_paths[0],
+            anndata=first_adata,
             measurement_name=measurement_name,
             obs_id_name="obs_id",
             var_id_name="var_id",
@@ -125,6 +140,7 @@ def prepare_ingest_plan(
     measurement_name: str,
     ingest_schema: IngestSchema,
     ingest_batch_size: int,
+    first_adata: AnnData | None = None,
 ) -> IngestPlanMetadata:
     """
     Prepare an ingest plan for partitioned SOMA ingestion.
@@ -137,8 +153,12 @@ def prepare_ingest_plan(
     :param measurement_name: Name of the measurement.
     :param ingest_schema: Schema for validating AnnData objects during ingest.
     :param ingest_batch_size: Number of h5ad files to ingest per partition.
+    :param first_adata: AnnData object to use for schema creation. Required if
+        the experiment does not exist. Will be validated and sanitized with the
+        full feature schema before use.
 
     :raises ValueError: If ingest_batch_size is not positive.
+    :raises ValueError: If the experiment does not exist and first_adata is None.
 
     :returns: IngestPlanMetadata containing all info needed for partitioned ingest.
     """
@@ -155,10 +175,20 @@ def prepare_ingest_plan(
 
     logger.info(f"Preparing ingest plan for {total_files} files across {num_partitions} partitions")
 
+    # Validate and sanitize first_adata if provided
+    sanitized_first_adata = None
+    if first_adata is not None:
+        logger.info("Validating first AnnData for schema creation")
+        validate_for_ingest(adata=first_adata, schema=ingest_schema)
+        logger.info("Sanitizing first AnnData with full feature schema")
+        sanitize_first_adata_for_schema(adata=first_adata, ingest_schema=ingest_schema)
+        sanitized_first_adata = first_adata
+
     registration_mapping = prepare_for_ingest(
         experiment_uri=experiment_uri,
         h5ad_paths=h5ad_paths,
         measurement_name=measurement_name,
+        first_adata=sanitized_first_adata,
     )
 
     serialized_mapping = serialize_registration_mapping(mapping=registration_mapping)
@@ -174,36 +204,6 @@ def prepare_ingest_plan(
         ingest_schema=ingest_schema,
         registration_mapping_pickle=serialized_mapping,
     )
-
-
-def ingest_h5ads(
-    *,
-    experiment_uri: str,
-    h5ad_paths: list[str],
-    measurement_name: str,
-    registration_mapping: tiledbsoma.io.ExperimentAmbientLabelMapping,
-) -> None:
-    """
-    Ingest h5ad files into a SOMA experiment.
-
-    :param experiment_uri: URI of the SOMA experiment.
-    :param h5ad_paths: List of paths to h5ad files to ingest.
-    :param measurement_name: Name of the measurement.
-    :param registration_mapping: Registration mapping from prepare_for_ingest.
-    """
-    logger.info(f"Starting ingestion of {len(h5ad_paths)} h5ad files")
-    for idx, h5ad_path in enumerate(h5ad_paths, start=1):
-        logger.info(f"Ingesting h5ad file {idx}/{len(h5ad_paths)}: {h5ad_path}")
-        tiledbsoma.io.from_h5ad(
-            experiment_uri=experiment_uri,
-            input_path=h5ad_path,
-            measurement_name=measurement_name,
-            obs_id_name="obs_id",
-            var_id_name="var_id",
-            ingest_mode="write",
-            registration_mapping=registration_mapping,
-        )
-    logger.info("Completed ingestion of all h5ad files")
 
 
 def ingest_h5ads_partition(

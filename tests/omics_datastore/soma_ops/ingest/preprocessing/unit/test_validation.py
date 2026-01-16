@@ -6,34 +6,34 @@ import scipy.sparse as sp
 
 from cellarium.nexus.omics_datastore.soma_ops._ingest.preprocessing import validation
 from cellarium.nexus.omics_datastore.soma_ops.exceptions import SomaValidationError
-from cellarium.nexus.shared.schemas.omics_datastore import ExperimentVarSchema, IngestSchema, ObsDescriptor
+from cellarium.nexus.shared.schemas.omics_datastore import ExperimentVarFeatures, IngestSchema, ObsSchemaDescriptor
 
 # Fixtures
 
 
 @pytest.fixture()
-def obs_columns() -> list[ObsDescriptor]:
+def obs_columns() -> list[ObsSchemaDescriptor]:
     """
     Create a list of obs column descriptors for testing.
 
     :return: List of ObsDescriptor objects.
     """
     return [
-        ObsDescriptor(name="cell_type", dtype="str", nullable=False),
-        ObsDescriptor(name="sample_id", dtype="str", nullable=False),
-        ObsDescriptor(name="age", dtype="int64", nullable=True),
-        ObsDescriptor(name="score", dtype="float64", nullable=True),
+        ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False),
+        ObsSchemaDescriptor(name="sample_id", dtype="str", nullable=False),
+        ObsSchemaDescriptor(name="age", dtype="int64", nullable=True),
+        ObsSchemaDescriptor(name="score", dtype="float64", nullable=True),
     ]
 
 
 @pytest.fixture()
-def var_schema() -> ExperimentVarSchema:
+def var_schema() -> ExperimentVarFeatures:
     """
     Create a var schema for testing.
 
     :return: ExperimentVarSchema object.
     """
-    return ExperimentVarSchema(
+    return ExperimentVarFeatures(
         features=["ENSG0001", "ENSG0002", "ENSG0003", "ENSG0004", "ENSG0005"],
         is_subset=True,
     )
@@ -86,14 +86,16 @@ def valid_x_count_matrix() -> sp.csr_matrix:
 # Tests for validate_obs
 
 
-def test_validate_obs_valid_dataframe(valid_obs_df: pd.DataFrame, obs_columns: list[ObsDescriptor]) -> None:
+def test_validate_obs_valid_dataframe(valid_obs_df: pd.DataFrame, obs_columns: list[ObsSchemaDescriptor]) -> None:
     """Verify valid obs DataFrame passes validation."""
     errors = validation.validate_obs(obs_df=valid_obs_df, obs_columns=obs_columns)
 
     assert errors == []
 
 
-def test_validate_obs_missing_required_column(valid_obs_df: pd.DataFrame, obs_columns: list[ObsDescriptor]) -> None:
+def test_validate_obs_missing_required_column(
+    valid_obs_df: pd.DataFrame, obs_columns: list[ObsSchemaDescriptor]
+) -> None:
     """Verify missing required column is detected."""
     obs_df = valid_obs_df.drop(columns=["cell_type"])
 
@@ -104,7 +106,9 @@ def test_validate_obs_missing_required_column(valid_obs_df: pd.DataFrame, obs_co
     assert "missing" in errors[0].lower()
 
 
-def test_validate_obs_missing_nullable_column(valid_obs_df: pd.DataFrame, obs_columns: list[ObsDescriptor]) -> None:
+def test_validate_obs_missing_nullable_column(
+    valid_obs_df: pd.DataFrame, obs_columns: list[ObsSchemaDescriptor]
+) -> None:
     """Verify missing nullable column is allowed."""
     obs_df = valid_obs_df.drop(columns=["age"])
 
@@ -113,7 +117,7 @@ def test_validate_obs_missing_nullable_column(valid_obs_df: pd.DataFrame, obs_co
     assert errors == []
 
 
-def test_validate_obs_invalid_dtype_cast(valid_obs_df: pd.DataFrame, obs_columns: list[ObsDescriptor]) -> None:
+def test_validate_obs_invalid_dtype_cast(valid_obs_df: pd.DataFrame, obs_columns: list[ObsSchemaDescriptor]) -> None:
     """Verify column that cannot be cast to target dtype is detected."""
     obs_df = valid_obs_df.copy()
     obs_df["age"] = ["young", "middle", "old"]  # String values cannot cast to int64
@@ -125,7 +129,7 @@ def test_validate_obs_invalid_dtype_cast(valid_obs_df: pd.DataFrame, obs_columns
     assert "cast" in errors[0].lower()
 
 
-def test_validate_obs_multiple_errors(obs_columns: list[ObsDescriptor]) -> None:
+def test_validate_obs_multiple_errors(obs_columns: list[ObsSchemaDescriptor]) -> None:
     """Verify multiple errors are collected."""
     obs_df = pd.DataFrame(
         data={
@@ -143,14 +147,14 @@ def test_validate_obs_multiple_errors(obs_columns: list[ObsDescriptor]) -> None:
 # Tests for validate_var
 
 
-def test_validate_var_valid_dataframe(valid_var_df: pd.DataFrame, var_schema: ExperimentVarSchema) -> None:
+def test_validate_var_valid_dataframe(valid_var_df: pd.DataFrame, var_schema: ExperimentVarFeatures) -> None:
     """Verify valid var DataFrame passes validation."""
     errors = validation.validate_var(var_df=valid_var_df, var_schema=var_schema)
 
     assert errors == []
 
 
-def test_validate_var_non_string_index(var_schema: ExperimentVarSchema) -> None:
+def test_validate_var_non_string_index(var_schema: ExperimentVarFeatures) -> None:
     """Verify non-string var index is detected."""
     var_df = pd.DataFrame(
         data={"gene_name": ["gene_1", "gene_2"]},
@@ -163,7 +167,7 @@ def test_validate_var_non_string_index(var_schema: ExperimentVarSchema) -> None:
     assert any("string" in e.lower() for e in errors)
 
 
-def test_validate_var_unknown_features(var_schema: ExperimentVarSchema) -> None:
+def test_validate_var_unknown_features(var_schema: ExperimentVarFeatures) -> None:
     """Verify features not in schema are detected."""
     var_df = pd.DataFrame(
         data={"gene_name": ["gene_1", "gene_2"]},
@@ -176,7 +180,7 @@ def test_validate_var_unknown_features(var_schema: ExperimentVarSchema) -> None:
     assert "not in schema" in errors[0].lower()
 
 
-def test_validate_var_subset_allowed(var_schema: ExperimentVarSchema) -> None:
+def test_validate_var_subset_allowed(var_schema: ExperimentVarFeatures) -> None:
     """Verify subset of features is allowed when is_subset=True."""
     var_df = pd.DataFrame(
         data={"gene_name": ["gene_1"]},
@@ -190,7 +194,7 @@ def test_validate_var_subset_allowed(var_schema: ExperimentVarSchema) -> None:
 
 def test_validate_var_exact_match_required() -> None:
     """Verify exact match is required when is_subset=False."""
-    var_schema = ExperimentVarSchema(
+    var_schema = ExperimentVarFeatures(
         features=["ENSG0001", "ENSG0002", "ENSG0003"],
         is_subset=False,
     )
@@ -395,14 +399,15 @@ def test_validate_for_ingest_valid_adata(
     valid_obs_df: pd.DataFrame,
     valid_var_df: pd.DataFrame,
     valid_x_count_matrix: sp.csr_matrix,
-    obs_columns: list[ObsDescriptor],
-    var_schema: ExperimentVarSchema,
+    obs_columns: list[ObsSchemaDescriptor],
+    var_schema: ExperimentVarFeatures,
 ) -> None:
     """Verify valid AnnData passes validation without raising."""
     adata = anndata.AnnData(X=valid_x_count_matrix, obs=valid_obs_df, var=valid_var_df)
     schema = IngestSchema(
         obs_columns=obs_columns,
-        var_schema=var_schema,
+        var_columns=[],
+        var_features=var_schema,
         x_validation_type="count_matrix",
     )
 
@@ -413,8 +418,8 @@ def test_validate_for_ingest_valid_adata(
 def test_validate_for_ingest_raises_on_errors(
     valid_var_df: pd.DataFrame,
     valid_x_count_matrix: sp.csr_matrix,
-    obs_columns: list[ObsDescriptor],
-    var_schema: ExperimentVarSchema,
+    obs_columns: list[ObsSchemaDescriptor],
+    var_schema: ExperimentVarFeatures,
 ) -> None:
     """Verify SomaValidationError is raised with all errors."""
     # Create invalid obs (missing required column)
@@ -426,7 +431,8 @@ def test_validate_for_ingest_raises_on_errors(
     adata = anndata.AnnData(X=valid_x_count_matrix, obs=obs_df, var=valid_var_df)
     schema = IngestSchema(
         obs_columns=obs_columns,
-        var_schema=var_schema,
+        var_columns=[],
+        var_features=var_schema,
         x_validation_type="count_matrix",
     )
 
@@ -438,7 +444,7 @@ def test_validate_for_ingest_raises_on_errors(
 
 
 def test_validate_for_ingest_collects_all_errors(
-    obs_columns: list[ObsDescriptor],
+    obs_columns: list[ObsSchemaDescriptor],
 ) -> None:
     """Verify all errors from obs, var, and X are collected."""
     # Create AnnData with multiple validation issues
@@ -455,7 +461,8 @@ def test_validate_for_ingest_collects_all_errors(
     adata = anndata.AnnData(X=X, obs=obs_df, var=var_df)
     schema = IngestSchema(
         obs_columns=obs_columns,
-        var_schema=ExperimentVarSchema(features=["ENSG0001", "ENSG0002"], is_subset=True),
+        var_columns=[],
+        var_features=ExperimentVarFeatures(features=["ENSG0001", "ENSG0002"], is_subset=True),
         x_validation_type="count_matrix",
     )
 

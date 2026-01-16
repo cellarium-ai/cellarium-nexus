@@ -299,3 +299,213 @@ def test_sanitize_for_ingest_handles_minimal_adata() -> None:
     assert len(adata.varp) == 0
     assert len(adata.layers) == 0
     assert adata.raw is None
+
+
+# Tests for sanitize_first_adata_for_schema
+
+
+@pytest.fixture()
+def ingest_schema_with_full_features():
+    """Create an IngestSchema with full feature set and var columns."""
+    from cellarium.nexus.shared.schemas.omics_datastore import (
+        ExperimentVarFeatures,
+        IngestSchema,
+        ObsSchemaDescriptor,
+        VarSchemaDescriptor,
+    )
+
+    return IngestSchema(
+        obs_columns=[
+            ObsSchemaDescriptor(name="cell_type", dtype="str"),
+        ],
+        var_columns=[
+            VarSchemaDescriptor(name="gene_name", dtype="str"),
+            VarSchemaDescriptor(name="feature_length", dtype="int"),
+        ],
+        var_features=ExperimentVarFeatures(
+            features=["ENSG0000", "ENSG0001", "ENSG0002", "ENSG0003", "ENSG0004"],
+            is_subset=True,
+        ),
+        x_validation_type="count_matrix",
+    )
+
+
+@pytest.fixture()
+def adata_with_partial_features() -> anndata.AnnData:
+    """Create an AnnData with a subset of features for schema expansion testing."""
+    n_obs, n_vars = 3, 2
+    X = sp.random(n_obs, n_vars, density=0.5, format="csr", dtype=np.float32)
+
+    obs = pd.DataFrame(
+        data={"cell_type": ["A", "B", "C"], "obs_id": ["obs_0", "obs_1", "obs_2"]},
+        index=pd.Index(["obs_0", "obs_1", "obs_2"]),
+    )
+    var = pd.DataFrame(
+        data={"gene_name": ["gene_0", "gene_1"], "var_id": ["ENSG0001", "ENSG0003"]},
+        index=pd.Index(["ENSG0001", "ENSG0003"]),
+    )
+
+    return anndata.AnnData(X=X, obs=obs, var=var)
+
+
+def test_sanitize_first_adata_for_schema_expands_features(
+    adata_with_partial_features: anndata.AnnData,
+    ingest_schema_with_full_features,
+) -> None:
+    """Verify that missing features are added to var and X."""
+    original_n_obs = adata_with_partial_features.n_obs
+
+    sanitization.sanitize_first_adata_for_schema(
+        adata=adata_with_partial_features,
+        ingest_schema=ingest_schema_with_full_features,
+    )
+
+    # Should now have all features
+    assert adata_with_partial_features.n_vars == 5
+    assert list(adata_with_partial_features.var_names) == [
+        "ENSG0000",
+        "ENSG0001",
+        "ENSG0002",
+        "ENSG0003",
+        "ENSG0004",
+    ]
+    # Obs count should be unchanged
+    assert adata_with_partial_features.n_obs == original_n_obs
+    # X shape should match
+    assert adata_with_partial_features.X.shape == (original_n_obs, 5)
+
+
+def test_sanitize_first_adata_for_schema_adds_var_columns(
+    adata_with_partial_features: anndata.AnnData,
+    ingest_schema_with_full_features,
+) -> None:
+    """Verify var columns are added with default value 0."""
+    sanitization.sanitize_first_adata_for_schema(
+        adata=adata_with_partial_features,
+        ingest_schema=ingest_schema_with_full_features,
+    )
+
+    # Both var columns should be present
+    assert "gene_name" in adata_with_partial_features.var.columns
+    assert "feature_length" in adata_with_partial_features.var.columns
+
+    # Missing features should have 0 for the new var columns
+    missing_feature_row = adata_with_partial_features.var.loc["ENSG0000"]
+    assert missing_feature_row["gene_name"] == 0
+    assert missing_feature_row["feature_length"] == 0
+
+
+def test_sanitize_first_adata_for_schema_zero_fills_x_for_missing(
+    adata_with_partial_features: anndata.AnnData,
+    ingest_schema_with_full_features,
+) -> None:
+    """Verify X rows for missing features are zero-filled."""
+    sanitization.sanitize_first_adata_for_schema(
+        adata=adata_with_partial_features,
+        ingest_schema=ingest_schema_with_full_features,
+    )
+
+    # Get X as dense for easier inspection
+    X_dense = (
+        adata_with_partial_features.X.toarray()
+        if sp.issparse(adata_with_partial_features.X)
+        else adata_with_partial_features.X
+    )
+
+    # Missing features: ENSG0000, ENSG0002, ENSG0004 (indices 0, 2, 4 after reordering)
+    assert np.all(X_dense[:, 0] == 0)  # ENSG0000
+    assert np.all(X_dense[:, 2] == 0)  # ENSG0002
+    assert np.all(X_dense[:, 4] == 0)  # ENSG0004
+
+
+def test_sanitize_first_adata_for_schema_preserves_existing_data(
+    adata_with_partial_features: anndata.AnnData,
+    ingest_schema_with_full_features,
+) -> None:
+    """Verify existing X data and var values are preserved."""
+    # Store original data
+    original_x = adata_with_partial_features[:, ["ENSG0001", "ENSG0003"]].X.toarray().copy()
+
+    sanitization.sanitize_first_adata_for_schema(
+        adata=adata_with_partial_features,
+        ingest_schema=ingest_schema_with_full_features,
+    )
+
+    # Get X as dense
+    X_dense = (
+        adata_with_partial_features.X.toarray()
+        if sp.issparse(adata_with_partial_features.X)
+        else adata_with_partial_features.X
+    )
+
+    # Original features should be at indices 1 and 3 after reordering
+    np.testing.assert_array_equal(X_dense[:, 1], original_x[:, 0])  # ENSG0001
+    np.testing.assert_array_equal(X_dense[:, 3], original_x[:, 1])  # ENSG0003
+
+
+def test_sanitize_first_adata_for_schema_no_op_when_all_features_present(
+    ingest_schema_with_full_features,
+) -> None:
+    """Verify no expansion when all features are already present."""
+    n_obs = 3
+    X = sp.random(n_obs, 5, density=0.5, format="csr", dtype=np.float32)
+    obs = pd.DataFrame(
+        data={"cell_type": ["A", "B", "C"], "obs_id": ["obs_0", "obs_1", "obs_2"]},
+        index=pd.Index(["obs_0", "obs_1", "obs_2"]),
+    )
+    var = pd.DataFrame(
+        data={
+            "gene_name": ["g0", "g1", "g2", "g3", "g4"],
+            "var_id": ["ENSG0000", "ENSG0001", "ENSG0002", "ENSG0003", "ENSG0004"],
+        },
+        index=pd.Index(["ENSG0000", "ENSG0001", "ENSG0002", "ENSG0003", "ENSG0004"]),
+    )
+    adata = anndata.AnnData(X=X, obs=obs, var=var)
+
+    original_shape = adata.X.shape
+
+    sanitization.sanitize_first_adata_for_schema(
+        adata=adata,
+        ingest_schema=ingest_schema_with_full_features,
+    )
+
+    # Shape should be unchanged
+    assert adata.X.shape == original_shape
+    assert adata.n_vars == 5
+
+
+def test_sanitize_first_adata_for_schema_calls_sanitize_for_ingest(
+    adata_with_all_slots: anndata.AnnData,
+) -> None:
+    """Verify standard sanitization is also applied."""
+    from cellarium.nexus.shared.schemas.omics_datastore import (
+        ExperimentVarFeatures,
+        IngestSchema,
+        ObsSchemaDescriptor,
+        VarSchemaDescriptor,
+    )
+
+    # Use features that match the adata_with_all_slots fixture
+    ingest_schema = IngestSchema(
+        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str")],
+        var_columns=[VarSchemaDescriptor(name="gene_name", dtype="str")],
+        var_features=ExperimentVarFeatures(
+            features=["ENSG0000", "ENSG0001", "ENSG0002", "ENSG0003"],
+            is_subset=True,
+        ),
+        x_validation_type="count_matrix",
+    )
+
+    sanitization.sanitize_first_adata_for_schema(
+        adata=adata_with_all_slots,
+        ingest_schema=ingest_schema,
+    )
+
+    # Standard sanitization should have been applied
+    assert len(adata_with_all_slots.obsm) == 0
+    assert len(adata_with_all_slots.varm) == 0
+    assert len(adata_with_all_slots.uns) == 0
+    assert len(adata_with_all_slots.obsp) == 0
+    assert len(adata_with_all_slots.varp) == 0
+    assert len(adata_with_all_slots.layers) == 0
+    assert adata_with_all_slots.raw is None

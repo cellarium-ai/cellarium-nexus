@@ -1,6 +1,6 @@
 from anndata import AnnData
 
-from cellarium.nexus.omics_datastore.soma_ops._ingest.prepare_ingest import (
+from cellarium.nexus.omics_datastore.soma_ops._ingest.ingest import (
     ingest_h5ads_partition,
     prepare_ingest_plan,
     validate_and_sanitize_for_ingest,
@@ -27,6 +27,7 @@ class TileDBSOMAIngestor:
         measurement_name: str,
         ingest_schema: IngestSchema,
         ingest_batch_size: int,
+        first_adata: AnnData | None = None,
     ) -> IngestPlanMetadata:
         """
         Prepare an ingest plan for partitioned SOMA ingestion.
@@ -39,8 +40,12 @@ class TileDBSOMAIngestor:
         :param measurement_name: Name of the measurement.
         :param ingest_schema: Schema for validating AnnData objects during ingest.
         :param ingest_batch_size: Number of h5ad files to ingest per partition.
+        :param first_adata: AnnData object to use for schema creation. Required if
+            the experiment does not exist. Will be validated and sanitized with the
+            full feature schema before use.
 
         :raises ValueError: If ingest_batch_size is not positive.
+        :raises ValueError: If the experiment does not exist and first_adata is None.
 
         :returns: IngestPlanMetadata containing all info needed for partitioned ingest.
         """
@@ -50,6 +55,7 @@ class TileDBSOMAIngestor:
             measurement_name=measurement_name,
             ingest_schema=ingest_schema,
             ingest_batch_size=ingest_batch_size,
+            first_adata=first_adata,
         )
 
     def ingest_h5ads_partition(

@@ -5,7 +5,12 @@ This module provides functions to remove unsupported AnnData slots
 and prepare data for TileDB SOMA ingestion.
 """
 
-from anndata import AnnData
+import numpy as np
+import pandas as pd
+import scipy.sparse as sp
+from anndata import AnnData, concat
+
+from cellarium.nexus.shared.schemas.omics_datastore import IngestSchema
 
 
 def _remove_obsm(*, adata: AnnData) -> None:
@@ -90,6 +95,75 @@ def _reset_index_names(*, adata: AnnData) -> None:
     adata.var.index.name = None
 
 
+def _expand_to_full_feature_schema(*, adata: AnnData, ingest_schema: IngestSchema) -> None:
+    """
+    Expand AnnData var to include all features from the ingest schema in-place.
+
+    Add missing features with zero-filled X rows and var columns defaulted to 0.
+    Reorder features to match the schema feature order.
+
+    :param adata: The AnnData object to expand. Modified in-place.
+    :param ingest_schema: Schema containing the full feature set and var columns.
+    """
+    all_features = ingest_schema.var_features.features
+    current_features = set(adata.var_names)
+    missing_features = [f for f in all_features if f not in current_features]
+
+    # Ensure existing var has all required columns (default to 0 if missing)
+    for var_col in ingest_schema.var_columns:
+        if var_col.name not in adata.var.columns:
+            adata.var[var_col.name] = 0
+
+    if missing_features:
+        n_cells = adata.n_obs
+        n_missing = len(missing_features)
+
+        # Create var DataFrame for missing features with columns defaulted to 0
+        missing_var_data: dict[str, list] = {"var_id": missing_features}
+        for var_col in ingest_schema.var_columns:
+            missing_var_data[var_col.name] = [0] * n_missing
+
+        missing_var_df = pd.DataFrame(missing_var_data)
+        missing_var_df = missing_var_df.set_index("var_id")
+        missing_var_df.index.name = None
+
+        # Create zero X matrix for missing features
+        x_dtype = adata.X.dtype if adata.X is not None else np.float32  # type: ignore[union-attr]
+        if sp.issparse(adata.X):
+            missing_x = sp.csr_matrix((n_cells, n_missing), dtype=x_dtype)
+        else:
+            missing_x = np.zeros((n_cells, n_missing), dtype=x_dtype)
+
+        # Create AnnData for missing features
+        missing_adata = AnnData(
+            X=missing_x,
+            obs=adata.obs.copy(),
+            var=missing_var_df,
+        )
+
+        # Concatenate along var axis
+        combined = concat([adata, missing_adata], axis=1, merge="first")
+    else:
+        combined = adata
+
+    # Reorder to match schema feature order
+    combined = combined[:, all_features].copy()  # type: ignore[index]
+
+    # Update adata in-place
+    adata._init_as_actual(
+        X=combined.X,
+        obs=combined.obs,
+        var=combined.var,
+        uns=combined.uns,
+        obsm=combined.obsm,
+        varm=combined.varm,
+        obsp=combined.obsp,
+        varp=combined.varp,
+        layers=combined.layers,
+        raw=combined.raw,
+    )
+
+
 def sanitize_for_ingest(*, adata: AnnData) -> None:
     """
     Sanitize AnnData for TileDB SOMA ingest in-place.
@@ -107,3 +181,19 @@ def sanitize_for_ingest(*, adata: AnnData) -> None:
     _remove_layers(adata=adata)
     _remove_raw(adata=adata)
     _reset_index_names(adata=adata)
+
+
+def sanitize_first_adata_for_schema(*, adata: AnnData, ingest_schema: IngestSchema) -> None:
+    """
+    Sanitize the first AnnData for SOMA schema creation in-place.
+
+    Perform standard sanitization, then expand the var DataFrame to include
+    all features from the ingest schema. Missing features are added with
+    zero-filled X rows and var columns defaulted to 0. Features are reordered
+    to match the schema feature order.
+
+    :param adata: The AnnData object to sanitize. Modified in-place.
+    :param ingest_schema: Schema containing the full feature set and var columns.
+    """
+    sanitize_for_ingest(adata=adata)
+    _expand_to_full_feature_schema(adata=adata, ingest_schema=ingest_schema)

@@ -15,7 +15,7 @@ import scipy.sparse as sp
 from anndata import AnnData
 
 from cellarium.nexus.omics_datastore.soma_ops.exceptions import SomaValidationError
-from cellarium.nexus.shared.schemas.omics_datastore import ExperimentVarSchema, IngestSchema, ObsDescriptor
+from cellarium.nexus.shared.schemas.omics_datastore import ExperimentVarFeatures, IngestSchema, ObsSchemaDescriptor
 
 # Type alias for X matrix
 XMatrix = sp.spmatrix | np.ndarray[Any, Any]
@@ -41,7 +41,7 @@ def _try_cast_column(*, series: pd.Series[Any], target_dtype: Any) -> tuple[bool
 def _validate_obs_column_presence(
     *,
     obs_df: pd.DataFrame,
-    obs_columns: list[ObsDescriptor],
+    obs_columns: list[ObsSchemaDescriptor],
 ) -> list[str]:
     """
     Validate that required (non-nullable) columns exist in obs.
@@ -61,7 +61,7 @@ def _validate_obs_column_presence(
 def _validate_obs_column_dtypes(
     *,
     obs_df: pd.DataFrame,
-    obs_columns: list[ObsDescriptor],
+    obs_columns: list[ObsSchemaDescriptor],
 ) -> list[str]:
     """
     Validate that existing obs columns can be cast to their target dtypes.
@@ -82,7 +82,7 @@ def _validate_obs_column_dtypes(
     return errors
 
 
-def validate_obs(*, obs_df: pd.DataFrame, obs_columns: list[ObsDescriptor]) -> list[str]:
+def validate_obs(*, obs_df: pd.DataFrame, obs_columns: list[ObsSchemaDescriptor]) -> list[str]:
     """
     Validate obs DataFrame against schema.
 
@@ -100,7 +100,7 @@ def validate_obs(*, obs_df: pd.DataFrame, obs_columns: list[ObsDescriptor]) -> l
     return errors
 
 
-def validate_var(*, var_df: pd.DataFrame, var_schema: ExperimentVarSchema) -> list[str]:
+def validate_var(*, var_df: pd.DataFrame, var_schema: ExperimentVarFeatures) -> list[str]:
     """
     Validate var DataFrame against schema.
 
@@ -345,7 +345,7 @@ def validate_for_ingest(*, adata: AnnData, schema: IngestSchema) -> None:
     errors = []
 
     errors.extend(validate_obs(obs_df=adata.obs, obs_columns=schema.obs_columns))
-    errors.extend(validate_var(var_df=adata.var, var_schema=schema.var_schema))
+    errors.extend(validate_var(var_df=adata.var, var_schema=schema.var_features))
     errors.extend(
         validate_x(X=adata.X, validation_type=schema.x_validation_type, n_obs=adata.n_obs, n_vars=adata.n_vars)
     )

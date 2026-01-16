@@ -88,7 +88,7 @@ class GroupedCurriculumMetadata(BaseCurriculumMetadata):
 # Ingest validation schemas
 
 
-class ObsDescriptor(BaseModel):
+class ObsSchemaDescriptor(BaseModel):
     """Descriptor for a single obs column validation."""
 
     name: str
@@ -96,15 +96,14 @@ class ObsDescriptor(BaseModel):
     nullable: bool = False
 
 
-class VarDescriptor(BaseModel):
+class VarSchemaDescriptor(BaseModel):
     """Descriptor for a single var column."""
 
     name: str
     dtype: str
-    nullable: bool = False
 
 
-class ExperimentVarSchema(BaseModel):
+class ExperimentVarFeatures(BaseModel):
     """Schema for var (features) validation.
 
     Define only feature ids without additional descriptors.
@@ -117,8 +116,9 @@ class ExperimentVarSchema(BaseModel):
 class IngestSchema(BaseModel):
     """Schema for validating AnnData before SOMA ingest."""
 
-    obs_columns: list[ObsDescriptor]
-    var_schema: ExperimentVarSchema
+    obs_columns: list[ObsSchemaDescriptor]
+    var_columns: list[VarSchemaDescriptor]
+    var_features: ExperimentVarFeatures
     x_validation_type: Literal["count_matrix", "feature_matrix"]
 
 
