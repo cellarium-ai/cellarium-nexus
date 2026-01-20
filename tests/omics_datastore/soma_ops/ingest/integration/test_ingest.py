@@ -15,6 +15,10 @@ from cellarium.nexus.omics_datastore.soma_ops._ingest.ingest import (
     ingest_h5ads_partition,
     prepare_ingest_plan,
 )
+from cellarium.nexus.omics_datastore.soma_ops._ingest.preprocessing import (
+    sanitize_first_adata_for_schema,
+    sanitize_for_ingest,
+)
 from cellarium.nexus.shared.schemas.omics_datastore import (
     ExperimentVarSchema,
     IngestPlanMetadata,
@@ -35,9 +39,11 @@ def test_prepare_ingest_plan_creates_valid_metadata(
     # Create test adata
     X = sp.csr_matrix(np.array([[1, 0, 2], [0, 3, 0], [4, 0, 0], [0, 0, 5], [1, 1, 0]], dtype=np.int32))
     obs = pd.DataFrame(data={"cell_type": ["a", "b", "c", "d", "e"]}, index=[f"cell_{i}" for i in range(n_obs)])
-    var = pd.DataFrame(data={"feature_name": ["g0", "g1", "g2"]}, index=all_features)
+    var = pd.DataFrame(index=all_features)  # No columns, only index
     adata = anndata.AnnData(X=X, obs=obs, var=var)
 
+    # Sanitize and save h5ad
+    sanitize_for_ingest(adata=adata)
     h5ad_path = tmp_path / "test.h5ad"
     adata.write_h5ad(filename=h5ad_path)
 
@@ -49,13 +55,17 @@ def test_prepare_ingest_plan_creates_valid_metadata(
 
     experiment_uri = str(tmp_path / "experiment")
 
+    # Prepare first_adata with schema
+    first_adata = adata.copy()
+    sanitize_first_adata_for_schema(adata=first_adata, ingest_schema=schema)
+
     plan = prepare_ingest_plan(
         experiment_uri=experiment_uri,
         h5ad_paths=[str(h5ad_path)],
         measurement_name="RNA",
         ingest_schema=schema,
         ingest_batch_size=1,
-        first_adata=adata,
+        first_adata=first_adata,
     )
 
     assert isinstance(plan, IngestPlanMetadata)
@@ -83,19 +93,14 @@ def test_prepare_ingest_plan_computes_correct_partitions_for_multiple_files(
     for i in range(5):
         X = sp.csr_matrix(np.array([[1, 0, 2], [0, 3, 0]], dtype=np.int32))
         obs = pd.DataFrame(data={"cell_type": ["a", "b"]}, index=[f"cell_{i}_{j}" for j in range(2)])
-        var = pd.DataFrame(data={"feature_name": ["g0", "g1", "g2"]}, index=all_features)
+        var = pd.DataFrame(index=all_features)  # No columns, only index
         adata = anndata.AnnData(X=X, obs=obs, var=var)
+        sanitize_for_ingest(adata=adata)
         h5ad_path = tmp_path / f"file_{i}.h5ad"
         adata.write_h5ad(filename=h5ad_path)
         h5ad_paths.append(str(h5ad_path))
 
-    # Load first adata for schema creation
-    first_adata = anndata.read_h5ad(filename=h5ad_paths[0])
-
-    schema_var_df = pd.DataFrame(
-        data={"feature_name": ["g0", "g1", "g2"]},
-        index=all_features,
-    )
+    schema_var_df = pd.DataFrame(index=all_features)  # No columns, only index
     schema = IngestSchema(
         obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False)],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=schema_var_df),
@@ -103,6 +108,10 @@ def test_prepare_ingest_plan_computes_correct_partitions_for_multiple_files(
     )
 
     experiment_uri = str(tmp_path / "experiment")
+
+    # Prepare first_adata with schema
+    first_adata = anndata.read_h5ad(filename=h5ad_paths[0])
+    sanitize_first_adata_for_schema(adata=first_adata, ingest_schema=schema)
 
     plan = prepare_ingest_plan(
         experiment_uri=experiment_uri,
@@ -134,17 +143,23 @@ def test_ingest_h5ads_partition_writes_data_to_soma(
         data={"cell_type": ["type_a", "type_b", "type_a"]},
         index=["cell_0", "cell_1", "cell_2"],
     )
-    var = pd.DataFrame(data={"feature_name": ["gene_0", "gene_1", "gene_2"]}, index=all_features)
+    var = pd.DataFrame(index=all_features)  # No columns, only index
     adata = anndata.AnnData(X=X, obs=obs, var=var)
-
-    h5ad_path = tmp_path / "test.h5ad"
-    adata.write_h5ad(filename=h5ad_path)
 
     schema = IngestSchema(
         obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False)],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=var),
         x_validation_type="count_matrix",
     )
+
+    # Sanitize and save h5ad file
+    sanitize_for_ingest(adata=adata)
+    h5ad_path = tmp_path / "test.h5ad"
+    adata.write_h5ad(filename=h5ad_path)
+
+    # Prepare first_adata with schema (expands var to full schema)
+    first_adata = adata.copy()
+    sanitize_first_adata_for_schema(adata=first_adata, ingest_schema=schema)
 
     experiment_uri = str(tmp_path / "experiment")
 
@@ -155,7 +170,7 @@ def test_ingest_h5ads_partition_writes_data_to_soma(
         measurement_name="RNA",
         ingest_schema=schema,
         ingest_batch_size=1,
-        first_adata=adata.copy(),
+        first_adata=first_adata,
     )
 
     # Ingest the partition
@@ -188,30 +203,30 @@ def test_ingest_h5ads_partition_appends_data_across_multiple_partitions(
     all_features = ["ENSG0001", "ENSG0002"]
     h5ad_paths = []
 
-    # Create 3 h5ad files with 2 cells each
+    schema_var_df = pd.DataFrame(index=all_features)  # No columns, only index
+    schema = IngestSchema(
+        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False)],
+        var_schema=ExperimentVarSchema.from_dataframe(var_df=schema_var_df),
+        x_validation_type="count_matrix",
+    )
+
+    # Create 3 h5ad files with 2 cells each - sanitize before saving
     for i in range(3):
         X = sp.csr_matrix(np.array([[1, 2], [3, 4]], dtype=np.int32))
         obs = pd.DataFrame(
             data={"cell_type": [f"type_{i}_a", f"type_{i}_b"]},
             index=[f"cell_{i}_0", f"cell_{i}_1"],
         )
-        var = pd.DataFrame(data={"feature_name": ["g0", "g1"]}, index=all_features)
+        var = pd.DataFrame(index=all_features)  # No columns, only index
         adata = anndata.AnnData(X=X, obs=obs, var=var)
+        sanitize_for_ingest(adata=adata)
         h5ad_path = tmp_path / f"file_{i}.h5ad"
         adata.write_h5ad(filename=h5ad_path)
         h5ad_paths.append(str(h5ad_path))
 
+    # Prepare first_adata with schema
     first_adata = anndata.read_h5ad(filename=h5ad_paths[0])
-
-    schema_var_df = pd.DataFrame(
-        data={"feature_name": ["g0", "g1"]},
-        index=all_features,
-    )
-    schema = IngestSchema(
-        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False)],
-        var_schema=ExperimentVarSchema.from_dataframe(var_df=schema_var_df),
-        x_validation_type="count_matrix",
-    )
+    sanitize_first_adata_for_schema(adata=first_adata, ingest_schema=schema)
 
     experiment_uri = str(tmp_path / "experiment")
 

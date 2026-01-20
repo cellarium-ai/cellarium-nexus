@@ -61,7 +61,7 @@ def test_sanitize_for_ingest_produces_soma_compatible_adata(
 def test_sanitize_first_adata_for_schema_replaces_var_from_schema(
     tmp_path,
 ) -> None:
-    """Verify var is replaced entirely from schema var DataFrame."""
+    """Verify var is replaced entirely from schema var index (no columns)."""
     n_obs = 5
 
     X = sp.csr_matrix(np.array([[1, 0, 2], [0, 3, 0], [4, 0, 0], [0, 0, 5], [1, 1, 0]], dtype=np.int32))
@@ -77,9 +77,8 @@ def test_sanitize_first_adata_for_schema_replaces_var_from_schema(
 
     adata = anndata.AnnData(X=X, obs=obs, var=var)
 
-    # Schema has more features than adata - var will be replaced entirely
+    # Schema has more features than adata - var will be replaced with schema index only
     schema_var_df = pd.DataFrame(
-        data={"feature_name": ["gene_0", "gene_1", "gene_2", "gene_3", "gene_4"]},
         index=["ENSG0001", "ENSG0002", "ENSG0003", "ENSG0004", "ENSG0005"],
     )
     schema = IngestSchema(
@@ -90,9 +89,10 @@ def test_sanitize_first_adata_for_schema_replaces_var_from_schema(
 
     sanitize_first_adata_for_schema(adata=adata, ingest_schema=schema)
 
-    # Verify var now has all 5 features from schema
+    # Verify var now has all 5 features from schema (no columns)
     assert adata.n_vars == 5
     assert list(adata.var.index) == ["ENSG0001", "ENSG0002", "ENSG0003", "ENSG0004", "ENSG0005"]
+    assert len(adata.var.columns) == 0
 
     # Verify X shape expanded
     assert adata.X.shape == (5, 5)  # type: ignore[union-attr]
@@ -117,38 +117,39 @@ def test_sanitize_first_adata_for_schema_enables_multi_file_registration(
     # Create first adata with subset of features
     X1 = sp.csr_matrix(np.array([[1, 0, 2], [0, 3, 0], [4, 0, 0], [0, 0, 5], [1, 1, 0]], dtype=np.int32))
     obs1 = pd.DataFrame(data={"cell_type": ["a", "b", "c", "d", "e"]}, index=[f"cell1_{i}" for i in range(n_obs)])
-    var1 = pd.DataFrame(data={"feature_length": [100, 200, 300]}, index=["ENSG0001", "ENSG0002", "ENSG0003"])
+    var1 = pd.DataFrame(index=["ENSG0001", "ENSG0002", "ENSG0003"])  # No columns
     adata1 = anndata.AnnData(X=X1, obs=obs1, var=var1)
 
     # Create second adata with different subset of features
     X2 = sp.csr_matrix(np.array([[2, 1], [0, 4], [3, 0]], dtype=np.int32))
     obs2 = pd.DataFrame(data={"cell_type": ["x", "y", "z"]}, index=[f"cell2_{i}" for i in range(3)])
-    var2 = pd.DataFrame(data={"feature_length": [400, 500]}, index=["ENSG0004", "ENSG0005"])
+    var2 = pd.DataFrame(index=["ENSG0004", "ENSG0005"])  # No columns
     adata2 = anndata.AnnData(X=X2, obs=obs2, var=var2)
 
-    # Save to h5ad
+    # Sanitize and save to h5ad
+    sanitize_for_ingest(adata=adata1)
+    sanitize_for_ingest(adata=adata2)
     h5ad_path1 = tmp_path / "file1.h5ad"
     h5ad_path2 = tmp_path / "file2.h5ad"
     adata1.write_h5ad(filename=h5ad_path1)
     adata2.write_h5ad(filename=h5ad_path2)
 
-    # Schema defines canonical var DataFrame - columns come from schema
-    schema_var_df = pd.DataFrame(
-        data={"feature_length": [100, 200, 300, 400, 500]},
-        index=all_features,
-    )
+    # Schema defines canonical var - no columns, only feature IDs
+    schema_var_df = pd.DataFrame(index=all_features)
     schema = IngestSchema(
         obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False)],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=schema_var_df),
         x_validation_type="count_matrix",
     )
 
-    # Sanitize first adata for schema creation
-    sanitize_first_adata_for_schema(adata=adata1, ingest_schema=schema)
+    # Load and sanitize first adata for schema creation
+    first_adata = anndata.read_h5ad(filename=h5ad_path1)
+    sanitize_first_adata_for_schema(adata=first_adata, ingest_schema=schema)
 
     # Verify first adata has all features now (from schema)
-    assert adata1.n_vars == 5
-    assert list(adata1.var.index) == all_features
+    assert first_adata.n_vars == 5
+    assert list(first_adata.var.index) == all_features
+    assert len(first_adata.var.columns) == 0
 
     # Create SOMA experiment from sanitized first adata
     experiment_uri = str(tmp_path / "experiment")

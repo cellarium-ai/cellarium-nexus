@@ -6,6 +6,7 @@ and prepare data for TileDB SOMA ingestion.
 """
 
 import numpy as np
+import pandas as pd
 import scipy.sparse as sp
 from anndata import AnnData
 
@@ -111,17 +112,17 @@ def _strip_var_columns(*, adata: AnnData) -> None:
 
 def _replace_var_with_schema(*, adata: AnnData, ingest_schema: IngestSchema) -> None:
     """
-    Replace AnnData var with schema var DataFrame and reorder/expand X in-place.
+    Replace AnnData var with schema var index and reorder/expand X in-place.
 
-    Extract feature IDs from input AnnData, validate they are in schema,
-    then replace var with schema var DataFrame. Expand X to include all
-    schema features (zero-fill missing), and reorder to match schema order.
+    Extract feature IDs from input AnnData, then replace var with a DataFrame
+    containing only the schema feature IDs as index (no columns). Expand X to
+    include all schema features (zero-fill missing), and reorder to match
+    schema order.
 
     :param adata: The AnnData object to modify. Modified in-place.
-    :param ingest_schema: Schema containing the full var DataFrame.
+    :param ingest_schema: Schema containing the feature IDs.
     """
-    schema_var_df = ingest_schema.var_schema.to_dataframe()
-    schema_features = list(schema_var_df.index)
+    schema_features = ingest_schema.var_schema.get_feature_ids()
     input_features = list(adata.var_names)
 
     # Build mapping from schema feature to column index
@@ -167,7 +168,8 @@ def _replace_var_with_schema(*, adata: AnnData, ingest_schema: IngestSchema) -> 
                 new_idx = schema_feature_to_idx[feature]
                 new_X[:, new_idx] = adata.X[:, old_idx]  # type: ignore[index]
 
-    # Update adata in-place
+    # Update adata in-place with var containing only the index (no columns)
+    schema_var_df = pd.DataFrame(index=schema_features)
     adata._init_as_actual(
         X=new_X,
         obs=adata.obs,
@@ -188,7 +190,7 @@ def sanitize_for_ingest(*, adata: AnnData) -> None:
 
     Remove unsupported slots (obsm, varm, uns, obsp, varp, layers, raw),
     strip var columns (keeping only index), and reset index names to
-    prepare for SOMA registration.
+    prepare for SOMA ingestion.
 
     :param adata: The AnnData object to sanitize.
     """

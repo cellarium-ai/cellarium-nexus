@@ -335,19 +335,15 @@ def test_sanitize_for_ingest_handles_minimal_adata() -> None:
 
 @pytest.fixture()
 def ingest_schema_with_full_features():
-    """Create an IngestSchema with full feature set and var columns."""
+    """Create an IngestSchema with full feature set (no var columns)."""
     from cellarium.nexus.shared.schemas.omics_datastore import (
         ExperimentVarSchema,
         IngestSchema,
         ObsSchemaDescriptor,
     )
 
-    # Create schema var DataFrame with all features
+    # Create schema var DataFrame with all features - no columns, only index
     var_df = pd.DataFrame(
-        data={
-            "gene_name": ["gene_0", "gene_1", "gene_2", "gene_3", "gene_4"],
-            "feature_length": [100, 200, 300, 400, 500],
-        },
         index=["ENSG0000", "ENSG0001", "ENSG0002", "ENSG0003", "ENSG0004"],
     )
     return IngestSchema(
@@ -370,8 +366,7 @@ def adata_with_partial_features() -> anndata.AnnData:
         index=pd.Index(["obs_0", "obs_1", "obs_2"]),
     )
     var = pd.DataFrame(
-        data={"gene_name": ["gene_0", "gene_1"], "var_id": ["ENSG0001", "ENSG0003"]},
-        index=pd.Index(["ENSG0001", "ENSG0003"]),
+        index=pd.Index(["ENSG0001", "ENSG0003"]),  # No columns
     )
 
     return anndata.AnnData(X=X, obs=obs, var=var)
@@ -404,23 +399,26 @@ def test_sanitize_first_adata_for_schema_replaces_var_from_schema(
     assert adata_with_partial_features.X.shape == (original_n_obs, 5)
 
 
-def test_sanitize_first_adata_for_schema_uses_schema_var_columns(
+def test_sanitize_first_adata_for_schema_uses_schema_var_index(
     adata_with_partial_features: anndata.AnnData,
     ingest_schema_with_full_features,
 ) -> None:
-    """Verify var columns come from schema DataFrame."""
+    """Verify var index comes from schema DataFrame (no columns)."""
     sanitization.sanitize_first_adata_for_schema(
         adata=adata_with_partial_features,
         ingest_schema=ingest_schema_with_full_features,
     )
 
-    # Both var columns should be present (from schema)
-    assert "gene_name" in adata_with_partial_features.var.columns
-    assert "feature_length" in adata_with_partial_features.var.columns
-
-    # Values should come from schema
-    assert adata_with_partial_features.var.loc["ENSG0000", "gene_name"] == "gene_0"
-    assert adata_with_partial_features.var.loc["ENSG0000", "feature_length"] == 100
+    # Var should have no columns (only index)
+    assert len(adata_with_partial_features.var.columns) == 0
+    # Index should match schema
+    assert list(adata_with_partial_features.var.index) == [
+        "ENSG0000",
+        "ENSG0001",
+        "ENSG0002",
+        "ENSG0003",
+        "ENSG0004",
+    ]
 
 
 def test_sanitize_first_adata_for_schema_zero_fills_x_for_missing(
@@ -482,11 +480,7 @@ def test_sanitize_first_adata_for_schema_no_op_when_all_features_present(
         index=pd.Index(["obs_0", "obs_1", "obs_2"]),
     )
     var = pd.DataFrame(
-        data={
-            "gene_name": ["g0", "g1", "g2", "g3", "g4"],
-            "var_id": ["ENSG0000", "ENSG0001", "ENSG0002", "ENSG0003", "ENSG0004"],
-        },
-        index=pd.Index(["ENSG0000", "ENSG0001", "ENSG0002", "ENSG0003", "ENSG0004"]),
+        index=pd.Index(["ENSG0000", "ENSG0001", "ENSG0002", "ENSG0003", "ENSG0004"]),  # No columns
     )
     adata = anndata.AnnData(X=X, obs=obs, var=var)
 
@@ -500,6 +494,7 @@ def test_sanitize_first_adata_for_schema_no_op_when_all_features_present(
     # Shape should be unchanged
     assert adata.X.shape == original_shape
     assert adata.n_vars == 5
+    assert len(adata.var.columns) == 0
 
 
 def test_sanitize_first_adata_for_schema_calls_sanitize_for_ingest(
@@ -512,9 +507,8 @@ def test_sanitize_first_adata_for_schema_calls_sanitize_for_ingest(
         ObsSchemaDescriptor,
     )
 
-    # Create schema var DataFrame matching the adata_with_all_slots fixture
+    # Create schema var DataFrame matching the adata_with_all_slots fixture (no columns)
     var_df = pd.DataFrame(
-        data={"gene_name": ["g0", "g1", "g2", "g3"]},
         index=["ENSG0000", "ENSG0001", "ENSG0002", "ENSG0003"],
     )
     ingest_schema = IngestSchema(
@@ -536,3 +530,5 @@ def test_sanitize_first_adata_for_schema_calls_sanitize_for_ingest(
     assert len(adata_with_all_slots.varp) == 0
     assert len(adata_with_all_slots.layers) == 0
     assert adata_with_all_slots.raw is None
+    # Var should have no columns
+    assert len(adata_with_all_slots.var.columns) == 0
