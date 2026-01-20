@@ -94,6 +94,21 @@ def _reset_index_names(*, adata: AnnData) -> None:
     adata.var.index.name = None
 
 
+def _strip_var_columns(*, adata: AnnData) -> None:
+    """
+    Remove all var columns, keeping only the index.
+
+    Strip all columns from var DataFrame to ensure only the user-provided
+    schema defines var metadata. This prevents column mismatches during
+    SOMA registration when h5ad files have different var column schemas.
+
+    :param adata: The AnnData object to sanitize.
+    """
+    import pandas as pd
+
+    adata.var = pd.DataFrame(index=adata.var.index)
+
+
 def _replace_var_with_schema(*, adata: AnnData, ingest_schema: IngestSchema) -> None:
     """
     Replace AnnData var with schema var DataFrame and reorder/expand X in-place.
@@ -171,8 +186,9 @@ def sanitize_for_ingest(*, adata: AnnData) -> None:
     """
     Sanitize AnnData for TileDB SOMA ingest in-place.
 
-    Remove unsupported slots (obsm, varm, uns, obsp, varp, layers, raw)
-    and reset index names to prepare for SOMA registration.
+    Remove unsupported slots (obsm, varm, uns, obsp, varp, layers, raw),
+    strip var columns (keeping only index), and reset index names to
+    prepare for SOMA registration.
 
     :param adata: The AnnData object to sanitize.
     """
@@ -183,6 +199,7 @@ def sanitize_for_ingest(*, adata: AnnData) -> None:
     _remove_varp(adata=adata)
     _remove_layers(adata=adata)
     _remove_raw(adata=adata)
+    _strip_var_columns(adata=adata)
     _reset_index_names(adata=adata)
 
 

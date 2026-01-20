@@ -230,11 +230,35 @@ def test_reset_index_names_handles_no_names() -> None:
     assert adata.var.index.name is None
 
 
+# Tests for _strip_var_columns
+
+
+def test_strip_var_columns_removes_all_columns(adata_with_all_slots: anndata.AnnData) -> None:
+    """Verify all var columns are removed, index preserved."""
+    assert len(adata_with_all_slots.var.columns) > 0
+    original_index = list(adata_with_all_slots.var.index)
+
+    sanitization._strip_var_columns(adata=adata_with_all_slots)
+
+    assert len(adata_with_all_slots.var.columns) == 0
+    assert list(adata_with_all_slots.var.index) == original_index
+
+
+def test_strip_var_columns_handles_empty() -> None:
+    """Verify function handles AnnData with no var columns."""
+    adata = anndata.AnnData(X=sp.csr_matrix((3, 2)))
+    assert len(adata.var.columns) == 0
+
+    sanitization._strip_var_columns(adata=adata)
+
+    assert len(adata.var.columns) == 0
+
+
 # Tests for sanitize_for_ingest
 
 
 def test_sanitize_for_ingest_removes_all_unsupported_slots(adata_with_all_slots: anndata.AnnData) -> None:
-    """Verify all unsupported slots are removed."""
+    """Verify all unsupported slots are removed and var columns stripped."""
     # Verify slots are populated before sanitization
     assert len(adata_with_all_slots.obsm) > 0
     assert len(adata_with_all_slots.varm) > 0
@@ -245,6 +269,7 @@ def test_sanitize_for_ingest_removes_all_unsupported_slots(adata_with_all_slots:
     assert adata_with_all_slots.raw is not None
     assert adata_with_all_slots.obs.index.name is not None
     assert adata_with_all_slots.var.index.name is not None
+    assert len(adata_with_all_slots.var.columns) > 0
 
     sanitization.sanitize_for_ingest(adata=adata_with_all_slots)
 
@@ -258,13 +283,15 @@ def test_sanitize_for_ingest_removes_all_unsupported_slots(adata_with_all_slots:
     assert adata_with_all_slots.raw is None
     assert adata_with_all_slots.obs.index.name is None
     assert adata_with_all_slots.var.index.name is None
+    # Verify var columns are stripped
+    assert len(adata_with_all_slots.var.columns) == 0
 
 
-def test_sanitize_for_ingest_preserves_x_obs_var(adata_with_all_slots: anndata.AnnData) -> None:
-    """Verify X, obs, and var are preserved after sanitization."""
+def test_sanitize_for_ingest_preserves_x_obs_strips_var_columns(adata_with_all_slots: anndata.AnnData) -> None:
+    """Verify X and obs are preserved, var columns are stripped after sanitization."""
     original_x_shape = adata_with_all_slots.X.shape
     original_obs_columns = list(adata_with_all_slots.obs.columns)
-    original_var_columns = list(adata_with_all_slots.var.columns)
+    original_var_index = list(adata_with_all_slots.var.index)
     original_n_obs = adata_with_all_slots.n_obs
     original_n_vars = adata_with_all_slots.n_vars
 
@@ -272,7 +299,9 @@ def test_sanitize_for_ingest_preserves_x_obs_var(adata_with_all_slots: anndata.A
 
     assert adata_with_all_slots.X.shape == original_x_shape
     assert list(adata_with_all_slots.obs.columns) == original_obs_columns
-    assert list(adata_with_all_slots.var.columns) == original_var_columns
+    # Var columns should be stripped, only index preserved
+    assert list(adata_with_all_slots.var.columns) == []
+    assert list(adata_with_all_slots.var.index) == original_var_index
     assert adata_with_all_slots.n_obs == original_n_obs
     assert adata_with_all_slots.n_vars == original_n_vars
 
