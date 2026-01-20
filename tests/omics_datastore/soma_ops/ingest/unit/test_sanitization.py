@@ -308,24 +308,24 @@ def test_sanitize_for_ingest_handles_minimal_adata() -> None:
 def ingest_schema_with_full_features():
     """Create an IngestSchema with full feature set and var columns."""
     from cellarium.nexus.shared.schemas.omics_datastore import (
-        ExperimentVarFeatures,
+        ExperimentVarSchema,
         IngestSchema,
         ObsSchemaDescriptor,
-        VarSchemaDescriptor,
     )
 
+    # Create schema var DataFrame with all features
+    var_df = pd.DataFrame(
+        data={
+            "gene_name": ["gene_0", "gene_1", "gene_2", "gene_3", "gene_4"],
+            "feature_length": [100, 200, 300, 400, 500],
+        },
+        index=["ENSG0000", "ENSG0001", "ENSG0002", "ENSG0003", "ENSG0004"],
+    )
     return IngestSchema(
         obs_columns=[
             ObsSchemaDescriptor(name="cell_type", dtype="str"),
         ],
-        var_columns=[
-            VarSchemaDescriptor(name="gene_name", dtype="str"),
-            VarSchemaDescriptor(name="feature_length", dtype="int"),
-        ],
-        var_features=ExperimentVarFeatures(
-            features=["ENSG0000", "ENSG0001", "ENSG0002", "ENSG0003", "ENSG0004"],
-            is_subset=True,
-        ),
+        var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
         x_validation_type="count_matrix",
     )
 
@@ -348,11 +348,11 @@ def adata_with_partial_features() -> anndata.AnnData:
     return anndata.AnnData(X=X, obs=obs, var=var)
 
 
-def test_sanitize_first_adata_for_schema_expands_features(
+def test_sanitize_first_adata_for_schema_replaces_var_from_schema(
     adata_with_partial_features: anndata.AnnData,
     ingest_schema_with_full_features,
 ) -> None:
-    """Verify that missing features are added to var and X."""
+    """Verify that var is replaced entirely from schema."""
     original_n_obs = adata_with_partial_features.n_obs
 
     sanitization.sanitize_first_adata_for_schema(
@@ -360,7 +360,7 @@ def test_sanitize_first_adata_for_schema_expands_features(
         ingest_schema=ingest_schema_with_full_features,
     )
 
-    # Should now have all features
+    # Should now have all features from schema
     assert adata_with_partial_features.n_vars == 5
     assert list(adata_with_partial_features.var_names) == [
         "ENSG0000",
@@ -375,24 +375,23 @@ def test_sanitize_first_adata_for_schema_expands_features(
     assert adata_with_partial_features.X.shape == (original_n_obs, 5)
 
 
-def test_sanitize_first_adata_for_schema_adds_var_columns(
+def test_sanitize_first_adata_for_schema_uses_schema_var_columns(
     adata_with_partial_features: anndata.AnnData,
     ingest_schema_with_full_features,
 ) -> None:
-    """Verify var columns are added with default value 0."""
+    """Verify var columns come from schema DataFrame."""
     sanitization.sanitize_first_adata_for_schema(
         adata=adata_with_partial_features,
         ingest_schema=ingest_schema_with_full_features,
     )
 
-    # Both var columns should be present
+    # Both var columns should be present (from schema)
     assert "gene_name" in adata_with_partial_features.var.columns
     assert "feature_length" in adata_with_partial_features.var.columns
 
-    # Missing features should have 0 for the new var columns
-    missing_feature_row = adata_with_partial_features.var.loc["ENSG0000"]
-    assert missing_feature_row["gene_name"] == 0
-    assert missing_feature_row["feature_length"] == 0
+    # Values should come from schema
+    assert adata_with_partial_features.var.loc["ENSG0000", "gene_name"] == "gene_0"
+    assert adata_with_partial_features.var.loc["ENSG0000", "feature_length"] == 100
 
 
 def test_sanitize_first_adata_for_schema_zero_fills_x_for_missing(
@@ -479,20 +478,19 @@ def test_sanitize_first_adata_for_schema_calls_sanitize_for_ingest(
 ) -> None:
     """Verify standard sanitization is also applied."""
     from cellarium.nexus.shared.schemas.omics_datastore import (
-        ExperimentVarFeatures,
+        ExperimentVarSchema,
         IngestSchema,
         ObsSchemaDescriptor,
-        VarSchemaDescriptor,
     )
 
-    # Use features that match the adata_with_all_slots fixture
+    # Create schema var DataFrame matching the adata_with_all_slots fixture
+    var_df = pd.DataFrame(
+        data={"gene_name": ["g0", "g1", "g2", "g3"]},
+        index=["ENSG0000", "ENSG0001", "ENSG0002", "ENSG0003"],
+    )
     ingest_schema = IngestSchema(
         obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str")],
-        var_columns=[VarSchemaDescriptor(name="gene_name", dtype="str")],
-        var_features=ExperimentVarFeatures(
-            features=["ENSG0000", "ENSG0001", "ENSG0002", "ENSG0003"],
-            is_subset=True,
-        ),
+        var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
         x_validation_type="count_matrix",
     )
 

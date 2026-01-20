@@ -6,9 +6,8 @@ and prepare data for TileDB SOMA ingestion.
 """
 
 import numpy as np
-import pandas as pd
 import scipy.sparse as sp
-from anndata import AnnData, concat
+from anndata import AnnData
 
 from cellarium.nexus.shared.schemas.omics_datastore import IngestSchema
 
@@ -95,72 +94,76 @@ def _reset_index_names(*, adata: AnnData) -> None:
     adata.var.index.name = None
 
 
-def _expand_to_full_feature_schema(*, adata: AnnData, ingest_schema: IngestSchema) -> None:
+def _replace_var_with_schema(*, adata: AnnData, ingest_schema: IngestSchema) -> None:
     """
-    Expand AnnData var to include all features from the ingest schema in-place.
+    Replace AnnData var with schema var DataFrame and reorder/expand X in-place.
 
-    Add missing features with zero-filled X rows and var columns defaulted to 0.
-    Reorder features to match the schema feature order.
+    Extract feature IDs from input AnnData, validate they are in schema,
+    then replace var with schema var DataFrame. Expand X to include all
+    schema features (zero-fill missing), and reorder to match schema order.
 
-    :param adata: The AnnData object to expand. Modified in-place.
-    :param ingest_schema: Schema containing the full feature set and var columns.
+    :param adata: The AnnData object to modify. Modified in-place.
+    :param ingest_schema: Schema containing the full var DataFrame.
     """
-    all_features = ingest_schema.var_features.features
-    current_features = set(adata.var_names)
-    missing_features = [f for f in all_features if f not in current_features]
+    schema_var_df = ingest_schema.var_schema.to_dataframe()
+    schema_features = list(schema_var_df.index)
+    input_features = list(adata.var_names)
 
-    # Ensure existing var has all required columns (default to 0 if missing)
-    for var_col in ingest_schema.var_columns:
-        if var_col.name not in adata.var.columns:
-            adata.var[var_col.name] = 0
+    # Build mapping from schema feature to column index
+    schema_feature_to_idx = {f: i for i, f in enumerate(schema_features)}
 
-    if missing_features:
-        n_cells = adata.n_obs
-        n_missing = len(missing_features)
+    n_cells = adata.n_obs
+    n_schema_features = len(schema_features)
 
-        # Create var DataFrame for missing features with columns defaulted to 0
-        missing_var_data: dict[str, list] = {"var_id": missing_features}
-        for var_col in ingest_schema.var_columns:
-            missing_var_data[var_col.name] = [0] * n_missing
+    # Determine X dtype
+    x_dtype = adata.X.dtype if adata.X is not None else np.float32  # type: ignore[union-attr]
 
-        missing_var_df = pd.DataFrame(missing_var_data)
-        missing_var_df = missing_var_df.set_index("var_id")
-        missing_var_df.index.name = None
+    # Create new X matrix with schema dimensions
+    if sp.issparse(adata.X):
+        # Build COO data for new sparse matrix
+        old_X = adata.X.tocoo()  # type: ignore[union-attr]
 
-        # Create zero X matrix for missing features
-        x_dtype = adata.X.dtype if adata.X is not None else np.float32  # type: ignore[union-attr]
-        if sp.issparse(adata.X):
-            missing_x = sp.csr_matrix((n_cells, n_missing), dtype=x_dtype)
-        else:
-            missing_x = np.zeros((n_cells, n_missing), dtype=x_dtype)
+        # Map old column indices to new column indices
+        old_to_new_col = {}
+        for old_idx, feature in enumerate(input_features):
+            if feature in schema_feature_to_idx:
+                old_to_new_col[old_idx] = schema_feature_to_idx[feature]
 
-        # Create AnnData for missing features
-        missing_adata = AnnData(
-            X=missing_x,
-            obs=adata.obs.copy(),
-            var=missing_var_df,
+        # Filter and remap
+        new_rows = []
+        new_cols = []
+        new_data = []
+        for i, (row, col, val) in enumerate(zip(old_X.row, old_X.col, old_X.data)):
+            if col in old_to_new_col:
+                new_rows.append(row)
+                new_cols.append(old_to_new_col[col])
+                new_data.append(val)
+
+        new_X = sp.csr_matrix(
+            (new_data, (new_rows, new_cols)),
+            shape=(n_cells, n_schema_features),
+            dtype=x_dtype,
         )
-
-        # Concatenate along var axis
-        combined = concat([adata, missing_adata], axis=1, merge="first")
     else:
-        combined = adata
-
-    # Reorder to match schema feature order
-    combined = combined[:, all_features].copy()  # type: ignore[index]
+        # Dense matrix
+        new_X = np.zeros((n_cells, n_schema_features), dtype=x_dtype)
+        for old_idx, feature in enumerate(input_features):
+            if feature in schema_feature_to_idx:
+                new_idx = schema_feature_to_idx[feature]
+                new_X[:, new_idx] = adata.X[:, old_idx]  # type: ignore[index]
 
     # Update adata in-place
     adata._init_as_actual(
-        X=combined.X,
-        obs=combined.obs,
-        var=combined.var,
-        uns=combined.uns,
-        obsm=combined.obsm,
-        varm=combined.varm,
-        obsp=combined.obsp,
-        varp=combined.varp,
-        layers=combined.layers,
-        raw=combined.raw,
+        X=new_X,
+        obs=adata.obs,
+        var=schema_var_df,
+        uns={},
+        obsm={},
+        varm={},
+        obsp={},
+        varp={},
+        layers={},
+        raw=None,
     )
 
 
@@ -187,13 +190,12 @@ def sanitize_first_adata_for_schema(*, adata: AnnData, ingest_schema: IngestSche
     """
     Sanitize the first AnnData for SOMA schema creation in-place.
 
-    Perform standard sanitization, then expand the var DataFrame to include
-    all features from the ingest schema. Missing features are added with
-    zero-filled X rows and var columns defaulted to 0. Features are reordered
-    to match the schema feature order.
+    Perform standard sanitization, then replace var DataFrame entirely with
+    the schema var DataFrame. X matrix is expanded to include all schema
+    features (zero-fill missing) and reordered to match schema feature order.
 
     :param adata: The AnnData object to sanitize. Modified in-place.
-    :param ingest_schema: Schema containing the full feature set and var columns.
+    :param ingest_schema: Schema containing the full var DataFrame.
     """
     sanitize_for_ingest(adata=adata)
-    _expand_to_full_feature_schema(adata=adata, ingest_schema=ingest_schema)
+    _replace_var_with_schema(adata=adata, ingest_schema=ingest_schema)

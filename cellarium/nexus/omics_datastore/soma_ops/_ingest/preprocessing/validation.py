@@ -15,7 +15,7 @@ import scipy.sparse as sp
 from anndata import AnnData
 
 from cellarium.nexus.omics_datastore.soma_ops.exceptions import SomaValidationError
-from cellarium.nexus.shared.schemas.omics_datastore import ExperimentVarFeatures, IngestSchema, ObsSchemaDescriptor
+from cellarium.nexus.shared.schemas.omics_datastore import ExperimentVarSchema, IngestSchema, ObsSchemaDescriptor
 
 # Type alias for X matrix
 XMatrix = sp.spmatrix | np.ndarray[Any, Any]
@@ -100,15 +100,16 @@ def validate_obs(*, obs_df: pd.DataFrame, obs_columns: list[ObsSchemaDescriptor]
     return errors
 
 
-def validate_var(*, var_df: pd.DataFrame, var_schema: ExperimentVarFeatures) -> list[str]:
+def validate_var(*, var_df: pd.DataFrame, var_schema: ExperimentVarSchema) -> list[str]:
     """
     Validate var DataFrame against schema.
 
-    Check that var index is string type, all features in var index are in schema,
-    and if is_subset=False, require exact match.
+    Check that var index is string type and all features in var index are
+    present in the schema. Extra features not in schema are always rejected.
+    If is_subset=False, also verify that all schema features are present.
 
     :param var_df: The var DataFrame from AnnData.
-    :param var_schema: The var schema to validate against.
+    :param var_schema: The experiment var schema to validate against.
 
     :returns: List of all validation error messages.
     """
@@ -120,22 +121,21 @@ def validate_var(*, var_df: pd.DataFrame, var_schema: ExperimentVarFeatures) -> 
 
     # Get input features from var index
     input_features = set(var_df.index)
-    schema_features = set(var_schema.features)
+    schema_features = set(var_schema.get_feature_ids())
 
-    # Check all input features are in schema
+    # Check all input features are in schema (reject extra features always)
     unknown_features = input_features - schema_features
     if unknown_features:
         sample = list(unknown_features)[:5]
         errors.append(f"var: Found {len(unknown_features)} feature(s) not in schema. " f"Examples: {sample}")
 
-    # If not a subset, require exact match
+    # If is_subset=False, all schema features must be present
     if not var_schema.is_subset:
         missing_features = schema_features - input_features
         if missing_features:
             sample = list(missing_features)[:5]
             errors.append(
-                f"var: Schema requires exact feature match but {len(missing_features)} feature(s) "
-                f"are missing. Examples: {sample}"
+                f"var: Missing {len(missing_features)} required feature(s) from schema. " f"Examples: {sample}"
             )
 
     return errors
@@ -345,7 +345,7 @@ def validate_for_ingest(*, adata: AnnData, schema: IngestSchema) -> None:
     errors = []
 
     errors.extend(validate_obs(obs_df=adata.obs, obs_columns=schema.obs_columns))
-    errors.extend(validate_var(var_df=adata.var, var_schema=schema.var_features))
+    errors.extend(validate_var(var_df=adata.var, var_schema=schema.var_schema))
     errors.extend(
         validate_x(X=adata.X, validation_type=schema.x_validation_type, n_obs=adata.n_obs, n_vars=adata.n_vars)
     )
