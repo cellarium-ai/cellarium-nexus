@@ -14,6 +14,7 @@ import pandas as pd
 import scipy.sparse as sp
 from anndata import AnnData
 
+from cellarium.nexus.omics_datastore.soma_ops._ingest.preprocessing.constants import PANDAS_NULLABLE_DTYPES
 from cellarium.nexus.omics_datastore.soma_ops.exceptions import SomaValidationError
 from cellarium.nexus.shared.schemas.omics_datastore import ExperimentVarSchema, IngestSchema, ObsSchemaDescriptor
 
@@ -32,7 +33,10 @@ def _try_cast_column(*, series: pd.Series[Any], target_dtype: Any) -> tuple[bool
     :returns: Tuple of (success, error_message). If success is True, error_message is None.
     """
     try:
-        series.astype(target_dtype)  # type: ignore[arg-type]
+        # Use nullable dtype for compatibility check if available (e.g. "int32" -> "Int32")
+        # so that NaNs in nullable columns don't cause cast failure.
+        cast_dtype = PANDAS_NULLABLE_DTYPES.get(target_dtype, target_dtype)
+        series.astype(cast_dtype)  # type: ignore[arg-type]
         return True, None
     except (ValueError, TypeError) as e:
         return False, str(e)

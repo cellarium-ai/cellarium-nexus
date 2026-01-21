@@ -5,6 +5,11 @@ import pytest
 import scipy.sparse as sp
 
 from cellarium.nexus.omics_datastore.soma_ops._ingest.preprocessing import sanitization
+from cellarium.nexus.shared.schemas.omics_datastore import (
+    ExperimentVarSchema,
+    IngestSchema,
+    ObsSchemaDescriptor,
+)
 
 
 @pytest.fixture()
@@ -230,34 +235,76 @@ def test_reset_index_names_handles_no_names() -> None:
     assert adata.var.index.name is None
 
 
-# Tests for _strip_var_columns
+@pytest.fixture()
+def basic_ingest_schema():
+    """Create an IngestSchema matching adata_with_all_slots fixture."""
+
+    # Create schema var DataFrame matching adata_with_all_slots (4 features)
+    var_df = pd.DataFrame(index=[f"ENSG{j:04d}" for j in range(4)])
+    return IngestSchema(
+        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str")],
+        var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
+        x_validation_type="count_matrix",
+    )
 
 
-def test_strip_var_columns_removes_all_columns(adata_with_all_slots: anndata.AnnData) -> None:
-    """Verify all var columns are removed, index preserved."""
-    assert len(adata_with_all_slots.var.columns) > 0
-    original_index = list(adata_with_all_slots.var.index)
-
-    sanitization._strip_var_columns(adata=adata_with_all_slots)
-
-    assert len(adata_with_all_slots.var.columns) == 0
-    assert list(adata_with_all_slots.var.index) == original_index
+# Tests for _sanitize_var_metadata_with_schema
 
 
-def test_strip_var_columns_handles_empty() -> None:
-    """Verify function handles AnnData with no var columns."""
-    adata = anndata.AnnData(X=sp.csr_matrix((3, 2)))
-    assert len(adata.var.columns) == 0
+def test_sanitize_var_metadata_with_schema_updates_columns() -> None:
+    """Verify var columns are updated from schema, index preserved."""
 
-    sanitization._strip_var_columns(adata=adata)
+    # Create schema with extra columns
+    var_df = pd.DataFrame(data={"gene_symbol": ["A", "B", "C", "D"]}, index=[f"ENSG{j:04d}" for j in range(4)])
+    ingest_schema = IngestSchema(
+        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str")],
+        var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
+        x_validation_type="count_matrix",
+    )
 
-    assert len(adata.var.columns) == 0
+    # Adata with different columns
+    adata = anndata.AnnData(
+        X=sp.csr_matrix((5, 4)),
+        var=pd.DataFrame(data={"old_col": range(4)}, index=[f"ENSG{j:04d}" for j in range(4)]),
+    )
+
+    sanitization._sanitize_var_metadata_with_schema(adata=adata, ingest_schema=ingest_schema)
+
+    assert list(adata.var.columns) == ["gene_symbol"]
+    assert list(adata.var["gene_symbol"]) == ["A", "B", "C", "D"]
+
+
+def test_sanitize_var_metadata_with_schema_handles_subset() -> None:
+    """Verify function handles AnnData with subset of features."""
+    from cellarium.nexus.shared.schemas.omics_datastore import (
+        ExperimentVarSchema,
+        IngestSchema,
+    )
+
+    var_df = pd.DataFrame(data={"gene_symbol": ["A", "B", "C"]}, index=["g1", "g2", "g3"])
+    ingest_schema = IngestSchema(
+        obs_columns=[],
+        var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
+        x_validation_type="count_matrix",
+    )
+
+    adata = anndata.AnnData(
+        X=sp.csr_matrix((1, 2)),
+        var=pd.DataFrame(index=["g1", "g3"]),
+    )
+
+    sanitization._sanitize_var_metadata_with_schema(adata=adata, ingest_schema=ingest_schema)
+
+    assert list(adata.var.index) == ["g1", "g3"]
+    assert list(adata.var["gene_symbol"]) == ["A", "C"]
 
 
 # Tests for sanitize_for_ingest
 
 
-def test_sanitize_for_ingest_removes_all_unsupported_slots(adata_with_all_slots: anndata.AnnData) -> None:
+def test_sanitize_for_ingest_removes_all_unsupported_slots(
+    adata_with_all_slots: anndata.AnnData, basic_ingest_schema
+) -> None:
     """Verify all unsupported slots are removed and var columns stripped."""
     # Verify slots are populated before sanitization
     assert len(adata_with_all_slots.obsm) > 0
@@ -271,7 +318,7 @@ def test_sanitize_for_ingest_removes_all_unsupported_slots(adata_with_all_slots:
     assert adata_with_all_slots.var.index.name is not None
     assert len(adata_with_all_slots.var.columns) > 0
 
-    sanitization.sanitize_for_ingest(adata=adata_with_all_slots)
+    sanitization.sanitize_for_ingest(adata=adata_with_all_slots, ingest_schema=basic_ingest_schema)
 
     # Verify all unsupported slots are removed
     assert len(adata_with_all_slots.obsm) == 0
@@ -287,18 +334,20 @@ def test_sanitize_for_ingest_removes_all_unsupported_slots(adata_with_all_slots:
     assert len(adata_with_all_slots.var.columns) == 0
 
 
-def test_sanitize_for_ingest_preserves_x_obs_strips_var_columns(adata_with_all_slots: anndata.AnnData) -> None:
-    """Verify X and obs are preserved, var columns are stripped after sanitization."""
+def test_sanitize_for_ingest_preserves_x_and_filters_obs(
+    adata_with_all_slots: anndata.AnnData, basic_ingest_schema
+) -> None:
+    """Verify X is preserved and obs is filtered to schema columns."""
     original_x_shape = adata_with_all_slots.X.shape
-    original_obs_columns = list(adata_with_all_slots.obs.columns)
     original_var_index = list(adata_with_all_slots.var.index)
     original_n_obs = adata_with_all_slots.n_obs
     original_n_vars = adata_with_all_slots.n_vars
 
-    sanitization.sanitize_for_ingest(adata=adata_with_all_slots)
+    sanitization.sanitize_for_ingest(adata=adata_with_all_slots, ingest_schema=basic_ingest_schema)
 
     assert adata_with_all_slots.X.shape == original_x_shape
-    assert list(adata_with_all_slots.obs.columns) == original_obs_columns
+    # Obs columns should be filtered to schema columns only
+    assert list(adata_with_all_slots.obs.columns) == ["cell_type"]
     # Var columns should be stripped, only index preserved
     assert list(adata_with_all_slots.var.columns) == []
     assert list(adata_with_all_slots.var.index) == original_var_index
@@ -306,20 +355,33 @@ def test_sanitize_for_ingest_preserves_x_obs_strips_var_columns(adata_with_all_s
     assert adata_with_all_slots.n_vars == original_n_vars
 
 
-def test_sanitize_for_ingest_operates_in_place(adata_with_all_slots: anndata.AnnData) -> None:
+def test_sanitize_for_ingest_operates_in_place(adata_with_all_slots: anndata.AnnData, basic_ingest_schema) -> None:
     """Verify sanitization operates in-place on the same object."""
     original_id = id(adata_with_all_slots)
 
-    sanitization.sanitize_for_ingest(adata=adata_with_all_slots)
+    sanitization.sanitize_for_ingest(adata=adata_with_all_slots, ingest_schema=basic_ingest_schema)
 
     assert id(adata_with_all_slots) == original_id
 
 
 def test_sanitize_for_ingest_handles_minimal_adata() -> None:
     """Verify sanitization handles minimal AnnData with only X."""
+    from cellarium.nexus.shared.schemas.omics_datastore import (
+        ExperimentVarSchema,
+        IngestSchema,
+    )
+
     adata = anndata.AnnData(X=sp.csr_matrix((3, 2)))
 
-    sanitization.sanitize_for_ingest(adata=adata)
+    # Create minimal schema matching the adata dimensions
+    var_df = pd.DataFrame(index=["0", "1"])
+    ingest_schema = IngestSchema(
+        obs_columns=[],
+        var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
+        x_validation_type="count_matrix",
+    )
+
+    sanitization.sanitize_for_ingest(adata=adata, ingest_schema=ingest_schema)
 
     assert len(adata.obsm) == 0
     assert len(adata.varm) == 0
@@ -330,17 +392,112 @@ def test_sanitize_for_ingest_handles_minimal_adata() -> None:
     assert adata.raw is None
 
 
+# Tests for _sanitize_obs_with_schema
+
+
+def test_sanitize_obs_with_schema_filters_columns() -> None:
+    """Verify obs columns are filtered to only those in schema."""
+
+    adata = anndata.AnnData(X=sp.csr_matrix((3, 2)))
+    adata.obs = pd.DataFrame(
+        {"cell_type": ["A", "B", "C"], "extra_col": [1, 2, 3], "another_col": ["x", "y", "z"]},
+        index=pd.Index(["c0", "c1", "c2"]),
+    )
+
+    var_df = pd.DataFrame(index=["0", "1"])
+    ingest_schema = IngestSchema(
+        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str")],
+        var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
+        x_validation_type="count_matrix",
+    )
+
+    sanitization._sanitize_obs_with_schema(adata=adata, ingest_schema=ingest_schema)
+
+    assert list(adata.obs.columns) == ["cell_type"]
+    assert list(adata.obs["cell_type"]) == ["A", "B", "C"]
+
+
+def test_sanitize_obs_with_schema_casts_dtypes() -> None:
+    """Verify obs columns are cast to target dtypes."""
+
+    adata = anndata.AnnData(X=sp.csr_matrix((3, 2)))
+    # Create obs with integer values that should be cast to string
+    adata.obs = pd.DataFrame(
+        {"count": [1, 2, 3]},
+        index=pd.Index(["c0", "c1", "c2"]),
+    )
+
+    var_df = pd.DataFrame(index=["0", "1"])
+    ingest_schema = IngestSchema(
+        obs_columns=[ObsSchemaDescriptor(name="count", dtype="str")],
+        var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
+        x_validation_type="count_matrix",
+    )
+
+    sanitization._sanitize_obs_with_schema(adata=adata, ingest_schema=ingest_schema)
+
+    assert adata.obs["count"].dtype == "object"  # string dtype in pandas
+    assert list(adata.obs["count"]) == ["1", "2", "3"]
+
+
+def test_sanitize_obs_with_schema_fills_nullable_missing_columns() -> None:
+    """Verify missing nullable columns are filled with NA."""
+
+    adata = anndata.AnnData(X=sp.csr_matrix((3, 2)))
+    adata.obs = pd.DataFrame(
+        {"cell_type": ["A", "B", "C"]},
+        index=pd.Index(["c0", "c1", "c2"]),
+    )
+
+    var_df = pd.DataFrame(index=["0", "1"])
+    ingest_schema = IngestSchema(
+        obs_columns=[
+            ObsSchemaDescriptor(name="cell_type", dtype="str"),
+            ObsSchemaDescriptor(name="missing_col", dtype="str", nullable=True),
+        ],
+        var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
+        x_validation_type="count_matrix",
+    )
+
+    sanitization._sanitize_obs_with_schema(adata=adata, ingest_schema=ingest_schema)
+
+    assert list(adata.obs.columns) == ["cell_type", "missing_col"]
+    assert adata.obs["missing_col"].isna().all()
+
+
+def test_sanitize_obs_with_schema_preserves_column_order() -> None:
+    """Verify columns are ordered according to schema."""
+
+    adata = anndata.AnnData(X=sp.csr_matrix((3, 2)))
+    # Create obs with columns in different order than schema
+    adata.obs = pd.DataFrame(
+        {"z_col": ["x", "y", "z"], "a_col": [1, 2, 3], "m_col": ["A", "B", "C"]},
+        index=pd.Index(["c0", "c1", "c2"]),
+    )
+
+    var_df = pd.DataFrame(index=["0", "1"])
+    ingest_schema = IngestSchema(
+        obs_columns=[
+            ObsSchemaDescriptor(name="a_col", dtype="int64"),
+            ObsSchemaDescriptor(name="m_col", dtype="str"),
+            ObsSchemaDescriptor(name="z_col", dtype="str"),
+        ],
+        var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
+        x_validation_type="count_matrix",
+    )
+
+    sanitization._sanitize_obs_with_schema(adata=adata, ingest_schema=ingest_schema)
+
+    # Columns should be in schema order
+    assert list(adata.obs.columns) == ["a_col", "m_col", "z_col"]
+
+
 # Tests for sanitize_first_adata_for_schema
 
 
 @pytest.fixture()
 def ingest_schema_with_full_features():
     """Create an IngestSchema with full feature set (no var columns)."""
-    from cellarium.nexus.shared.schemas.omics_datastore import (
-        ExperimentVarSchema,
-        IngestSchema,
-        ObsSchemaDescriptor,
-    )
 
     # Create schema var DataFrame with all features - no columns, only index
     var_df = pd.DataFrame(
@@ -501,11 +658,6 @@ def test_sanitize_first_adata_for_schema_calls_sanitize_for_ingest(
     adata_with_all_slots: anndata.AnnData,
 ) -> None:
     """Verify standard sanitization is also applied."""
-    from cellarium.nexus.shared.schemas.omics_datastore import (
-        ExperimentVarSchema,
-        IngestSchema,
-        ObsSchemaDescriptor,
-    )
 
     # Create schema var DataFrame matching the adata_with_all_slots fixture (no columns)
     var_df = pd.DataFrame(
@@ -532,3 +684,85 @@ def test_sanitize_first_adata_for_schema_calls_sanitize_for_ingest(
     assert adata_with_all_slots.raw is None
     # Var should have no columns
     assert len(adata_with_all_slots.var.columns) == 0
+
+
+def test_sanitize_obs_with_schema_fills_nullable_missing_columns_numeric() -> None:
+    """Verify missing nullable columns (numeric/bool) are filled with NA."""
+
+    adata = anndata.AnnData(X=sp.csr_matrix((3, 2)))
+    adata.obs = pd.DataFrame(
+        {"cell_type": ["A", "B", "C"]},
+        index=pd.Index(["c0", "c1", "c2"]),
+    )
+
+    var_df = pd.DataFrame(index=["0", "1"])
+    ingest_schema = IngestSchema(
+        obs_columns=[
+            ObsSchemaDescriptor(name="cell_type", dtype="str"),
+            ObsSchemaDescriptor(name="int_col", dtype="int32", nullable=True),
+            ObsSchemaDescriptor(name="float_col", dtype="float32", nullable=True),
+            ObsSchemaDescriptor(name="bool_col", dtype="bool", nullable=True),
+        ],
+        var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
+        x_validation_type="count_matrix",
+    )
+
+    sanitization._sanitize_obs_with_schema(adata=adata, ingest_schema=ingest_schema)
+
+    # Check int column (should be Int32 or similar nullable)
+    assert "int_col" in adata.obs.columns
+    assert str(adata.obs["int_col"].dtype) == "Int32"
+    assert adata.obs["int_col"].isna().all()
+
+    # Check float column
+    assert "float_col" in adata.obs.columns
+    assert str(adata.obs["float_col"].dtype) == "Float32"
+    assert adata.obs["float_col"].isna().all()
+
+    # Check bool column (should be boolean)
+    assert "bool_col" in adata.obs.columns
+    assert str(adata.obs["bool_col"].dtype) == "boolean"
+    assert adata.obs["bool_col"].isna().all()
+
+
+def test_sanitize_obs_existing_nullable_with_nans() -> None:
+    """Verify existing nullable columns with NAs are safely cast to nullable types."""
+
+    # Initial DataFrame with mixed values including NAs/None
+    adata = anndata.AnnData(X=sp.csr_matrix((3, 2)))
+    adata.obs = pd.DataFrame(
+        {
+            "cell_type": ["A", "B", "C"],
+            # Mix of float/nan, simulating reading from file where int column became float due to NaNs
+            "total_mrna_umis": [100.0, np.nan, 200.0],
+            "disease": ["d1", None, "d2"],
+        },
+        index=pd.Index(["c0", "c1", "c2"]),
+    )
+
+    var_df = pd.DataFrame(index=["0", "1"])
+    ingest_schema = IngestSchema(
+        obs_columns=[
+            ObsSchemaDescriptor(name="cell_type", dtype="str"),
+            # Schema expects int32. If we cast blindly to 'int32', the NaN would fail.
+            # Fix should cast this to 'Int32' instead.
+            ObsSchemaDescriptor(name="total_mrna_umis", dtype="int32", nullable=True),
+            ObsSchemaDescriptor(name="disease", dtype="str", nullable=True),
+        ],
+        var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
+        x_validation_type="count_matrix",
+    )
+
+    sanitization.sanitize_for_ingest(adata=adata, ingest_schema=ingest_schema)
+
+    # Verify mrna column is Int32 and preserves NA
+    assert str(adata.obs["total_mrna_umis"].dtype) == "Int32"
+    assert adata.obs["total_mrna_umis"].iloc[0] == 100
+    assert pd.isna(adata.obs["total_mrna_umis"].iloc[1])
+    assert adata.obs["total_mrna_umis"].iloc[2] == 200
+
+    # Verify disease column is string/object and preserves NA
+    # Note: 'str' dtype might be 'string' (Pandas nullable) or object depending on impl details,
+    # but as long as it handles None it is fine. Our mapping uses 'string'.
+    assert str(adata.obs["disease"].dtype) == "string"
+    assert adata.obs["disease"].iloc[1] is pd.NA

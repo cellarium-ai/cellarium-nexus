@@ -491,3 +491,36 @@ def test_validate_for_ingest_collects_all_errors(
     assert any("cell_type" in e for e in errors)  # obs error
     assert any("not in schema" in e.lower() for e in errors)  # var error
     assert any("NaN" in e or "negative" in e.lower() for e in errors)  # X errors
+
+
+def test_validate_obs_allows_nullable_int_with_nans() -> None:
+    """Verify validation passes for a nullable int column containing NaNs."""
+
+    # DataFrame with an Int32 column containing NAs
+    # Note: We simulate the state after sanitization where missing nullable cols become NAs
+    adata = anndata.AnnData(X=sp.csr_matrix((3, 2)))
+    adata.obs = pd.DataFrame(
+        {
+            "cell_type": ["A", "B", "C"],
+            # Create actual nullable int series with NA
+            "total_mrna_umis": pd.Series([100, pd.NA, 200], dtype="Int32"),
+            "is_primary_data": pd.Series([True, False, pd.NA], dtype="boolean"),
+        },
+        index=pd.Index(["c0", "c1", "c2"]),
+    )
+
+    var_df = pd.DataFrame(index=["0", "1"])
+    ingest_schema = IngestSchema(
+        obs_columns=[
+            ObsSchemaDescriptor(name="cell_type", dtype="str"),
+            # Schema asks for int32 (NumPy), but data has Int32 (Pandas) with NAs.
+            # This should pass validation thanks to the fix.
+            ObsSchemaDescriptor(name="total_mrna_umis", dtype="int32", nullable=True),
+            ObsSchemaDescriptor(name="is_primary_data", dtype="bool", nullable=True),
+        ],
+        var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
+        x_validation_type="count_matrix",
+    )
+
+    # Should not raise SomaValidationError
+    validation.validate_for_ingest(adata=adata, schema=ingest_schema)

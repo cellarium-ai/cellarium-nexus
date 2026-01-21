@@ -42,16 +42,16 @@ def test_prepare_ingest_plan_creates_valid_metadata(
     var = pd.DataFrame(index=all_features)  # No columns, only index
     adata = anndata.AnnData(X=X, obs=obs, var=var)
 
-    # Sanitize and save h5ad
-    sanitize_for_ingest(adata=adata)
-    h5ad_path = tmp_path / "test.h5ad"
-    adata.write_h5ad(filename=h5ad_path)
-
     schema = IngestSchema(
         obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False)],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=var),
         x_validation_type="count_matrix",
     )
+
+    # Sanitize and save h5ad
+    sanitize_for_ingest(adata=adata, ingest_schema=schema)
+    h5ad_path = tmp_path / "test.h5ad"
+    adata.write_h5ad(filename=h5ad_path)
 
     experiment_uri = str(tmp_path / "experiment")
 
@@ -89,23 +89,23 @@ def test_prepare_ingest_plan_computes_correct_partitions_for_multiple_files(
     all_features = ["ENSG0001", "ENSG0002", "ENSG0003"]
     h5ad_paths = []
 
-    # Create 5 h5ad files
-    for i in range(5):
-        X = sp.csr_matrix(np.array([[1, 0, 2], [0, 3, 0]], dtype=np.int32))
-        obs = pd.DataFrame(data={"cell_type": ["a", "b"]}, index=[f"cell_{i}_{j}" for j in range(2)])
-        var = pd.DataFrame(index=all_features)  # No columns, only index
-        adata = anndata.AnnData(X=X, obs=obs, var=var)
-        sanitize_for_ingest(adata=adata)
-        h5ad_path = tmp_path / f"file_{i}.h5ad"
-        adata.write_h5ad(filename=h5ad_path)
-        h5ad_paths.append(str(h5ad_path))
-
     schema_var_df = pd.DataFrame(index=all_features)  # No columns, only index
     schema = IngestSchema(
         obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False)],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=schema_var_df),
         x_validation_type="count_matrix",
     )
+
+    # Create 5 h5ad files
+    for i in range(5):
+        X = sp.csr_matrix(np.array([[1, 0, 2], [0, 3, 0]], dtype=np.int32))
+        obs = pd.DataFrame(data={"cell_type": ["a", "b"]}, index=[f"cell_{i}_{j}" for j in range(2)])
+        var = pd.DataFrame(index=all_features)  # No columns, only index
+        adata = anndata.AnnData(X=X, obs=obs, var=var)
+        sanitize_for_ingest(adata=adata, ingest_schema=schema)
+        h5ad_path = tmp_path / f"file_{i}.h5ad"
+        adata.write_h5ad(filename=h5ad_path)
+        h5ad_paths.append(str(h5ad_path))
 
     experiment_uri = str(tmp_path / "experiment")
 
@@ -153,7 +153,7 @@ def test_ingest_h5ads_partition_writes_data_to_soma(
     )
 
     # Sanitize and save h5ad file
-    sanitize_for_ingest(adata=adata)
+    sanitize_for_ingest(adata=adata, ingest_schema=schema)
     h5ad_path = tmp_path / "test.h5ad"
     adata.write_h5ad(filename=h5ad_path)
 
@@ -219,7 +219,7 @@ def test_ingest_h5ads_partition_appends_data_across_multiple_partitions(
         )
         var = pd.DataFrame(index=all_features)  # No columns, only index
         adata = anndata.AnnData(X=X, obs=obs, var=var)
-        sanitize_for_ingest(adata=adata)
+        sanitize_for_ingest(adata=adata, ingest_schema=schema)
         h5ad_path = tmp_path / f"file_{i}.h5ad"
         adata.write_h5ad(filename=h5ad_path)
         h5ad_paths.append(str(h5ad_path))

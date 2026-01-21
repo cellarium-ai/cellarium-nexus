@@ -36,7 +36,14 @@ def test_sanitize_for_ingest_produces_soma_compatible_adata(
     adata.obsm["X_pca"] = np.random.rand(adata.n_obs, 10)
     adata.layers["counts"] = adata.X.copy()  # type: ignore[union-attr]
 
-    sanitize_for_ingest(adata=adata)
+    # Create schema matching the adata
+    schema = IngestSchema(
+        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str")],
+        var_schema=ExperimentVarSchema.from_dataframe(var_df=pd.DataFrame(index=adata.var.index)),
+        x_validation_type="count_matrix",
+    )
+
+    sanitize_for_ingest(adata=adata, ingest_schema=schema)
 
     # Should be able to create SOMA experiment from sanitized adata
     tiledbsoma.io.from_anndata(
@@ -114,6 +121,14 @@ def test_sanitize_first_adata_for_schema_enables_multi_file_registration(
     n_obs = 5
     all_features = ["ENSG0001", "ENSG0002", "ENSG0003", "ENSG0004", "ENSG0005"]
 
+    # Schema defines canonical var - no columns, only feature IDs
+    schema_var_df = pd.DataFrame(index=all_features)
+    schema = IngestSchema(
+        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False)],
+        var_schema=ExperimentVarSchema.from_dataframe(var_df=schema_var_df),
+        x_validation_type="count_matrix",
+    )
+
     # Create first adata with subset of features
     X1 = sp.csr_matrix(np.array([[1, 0, 2], [0, 3, 0], [4, 0, 0], [0, 0, 5], [1, 1, 0]], dtype=np.int32))
     obs1 = pd.DataFrame(data={"cell_type": ["a", "b", "c", "d", "e"]}, index=[f"cell1_{i}" for i in range(n_obs)])
@@ -127,20 +142,12 @@ def test_sanitize_first_adata_for_schema_enables_multi_file_registration(
     adata2 = anndata.AnnData(X=X2, obs=obs2, var=var2)
 
     # Sanitize and save to h5ad
-    sanitize_for_ingest(adata=adata1)
-    sanitize_for_ingest(adata=adata2)
+    sanitize_for_ingest(adata=adata1, ingest_schema=schema)
+    sanitize_for_ingest(adata=adata2, ingest_schema=schema)
     h5ad_path1 = tmp_path / "file1.h5ad"
     h5ad_path2 = tmp_path / "file2.h5ad"
     adata1.write_h5ad(filename=h5ad_path1)
     adata2.write_h5ad(filename=h5ad_path2)
-
-    # Schema defines canonical var - no columns, only feature IDs
-    schema_var_df = pd.DataFrame(index=all_features)
-    schema = IngestSchema(
-        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False)],
-        var_schema=ExperimentVarSchema.from_dataframe(var_df=schema_var_df),
-        x_validation_type="count_matrix",
-    )
 
     # Load and sanitize first adata for schema creation
     first_adata = anndata.read_h5ad(filename=h5ad_path1)

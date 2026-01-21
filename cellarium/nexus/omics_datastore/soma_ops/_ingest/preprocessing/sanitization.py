@@ -10,6 +10,7 @@ import pandas as pd
 import scipy.sparse as sp
 from anndata import AnnData
 
+from cellarium.nexus.omics_datastore.soma_ops._ingest.preprocessing.constants import PANDAS_NULLABLE_DTYPES
 from cellarium.nexus.shared.schemas.omics_datastore import IngestSchema
 
 
@@ -95,32 +96,75 @@ def _reset_index_names(*, adata: AnnData) -> None:
     adata.var.index.name = None
 
 
-def _strip_var_columns(*, adata: AnnData) -> None:
+def _sanitize_var_metadata_with_schema(*, adata: AnnData, ingest_schema: IngestSchema) -> None:
     """
-    Remove all var columns, keeping only the index.
+    Sanitize var DataFrame metadata according to schema in-place.
 
-    Strip all columns from var DataFrame to ensure only the user-provided
-    schema defines var metadata. This prevents column mismatches during
-    SOMA registration when h5ad files have different var column schemas.
+    Replace var DataFrame with the subset of schema features that match
+    the AnnData's features. This ensures var columns and their types
+    match the SOMA experiment schema for the existing features.
 
     :param adata: The AnnData object to sanitize.
+    :param ingest_schema: Schema containing the full var DataFrame.
     """
-    import pandas as pd
+    schema_var_df = ingest_schema.var_schema.to_dataframe()
+    # Align schema var to adata features (preserving adata order)
+    # Validation ensures all adata features exist in schema
+    adata.var = schema_var_df.reindex(adata.var.index)
 
-    adata.var = pd.DataFrame(index=adata.var.index)
+
+def _sanitize_obs_with_schema(*, adata: AnnData, ingest_schema: IngestSchema) -> None:
+    """
+    Sanitize obs DataFrame according to schema in-place.
+
+    Filter obs columns to only those defined in schema and cast each column
+    to its target dtype. Columns not in schema are dropped. Missing nullable
+    columns are filled with NA values.
+
+    :param adata: The AnnData object to sanitize.
+    :param ingest_schema: Schema containing obs column descriptors.
+    """
+    obs_columns = ingest_schema.obs_columns
+    schema_column_names = [col.name for col in obs_columns]
+
+    # Build new obs DataFrame with only schema columns
+    new_obs_data: dict[str, pd.Series] = {}
+    for col_schema in obs_columns:
+        col_name = col_schema.name
+        if col_name in adata.obs.columns:
+            # Cast to target dtype
+            if col_schema.nullable:
+                dtype = PANDAS_NULLABLE_DTYPES.get(col_schema.dtype, col_schema.dtype)
+                new_obs_data[col_name] = adata.obs[col_name].astype(dtype)
+            else:
+                new_obs_data[col_name] = adata.obs[col_name].astype(col_schema.dtype)
+        elif col_schema.nullable:
+            # Create column with NA values for nullable missing columns
+            dtype = PANDAS_NULLABLE_DTYPES.get(col_schema.dtype, col_schema.dtype)
+            new_obs_data[col_name] = pd.Series(
+                [pd.NA] * adata.n_obs,
+                index=adata.obs.index,
+                dtype=dtype,
+            )
+        # Non-nullable missing columns are skipped - validation should catch this
+
+    # Replace obs with sanitized DataFrame, preserving index
+    new_obs = pd.DataFrame(new_obs_data, index=adata.obs.index)
+    # Ensure column order matches schema order
+    new_obs = new_obs[[col for col in schema_column_names if col in new_obs.columns]]
+    adata.obs = new_obs
 
 
 def _replace_var_with_schema(*, adata: AnnData, ingest_schema: IngestSchema) -> None:
     """
-    Replace AnnData var with schema var index and reorder/expand X in-place.
+    Replace AnnData var with schema var DataFrame and reorder/expand X in-place.
 
-    Extract feature IDs from input AnnData, then replace var with a DataFrame
-    containing only the schema feature IDs as index (no columns). Expand X to
-    include all schema features (zero-fill missing), and reorder to match
-    schema order.
+    Extract feature IDs from input AnnData, then replace var with the full
+    schema var DataFrame (including all columns). Expand X to include all
+    schema features (zero-fill missing), and reorder to match schema order.
 
     :param adata: The AnnData object to modify. Modified in-place.
-    :param ingest_schema: Schema containing the feature IDs.
+    :param ingest_schema: Schema containing the full var DataFrame.
     """
     schema_features = ingest_schema.var_schema.get_feature_ids()
     input_features = list(adata.var_names)
@@ -168,8 +212,8 @@ def _replace_var_with_schema(*, adata: AnnData, ingest_schema: IngestSchema) -> 
                 new_idx = schema_feature_to_idx[feature]
                 new_X[:, new_idx] = adata.X[:, old_idx]  # type: ignore[index]
 
-    # Update adata in-place with var containing only the index (no columns)
-    schema_var_df = pd.DataFrame(index=schema_features)
+    # Update adata in-place with var from schema (includes all columns)
+    schema_var_df = ingest_schema.var_schema.to_dataframe()
     adata._init_as_actual(
         X=new_X,
         obs=adata.obs,
@@ -184,15 +228,16 @@ def _replace_var_with_schema(*, adata: AnnData, ingest_schema: IngestSchema) -> 
     )
 
 
-def sanitize_for_ingest(*, adata: AnnData) -> None:
+def sanitize_for_ingest(*, adata: AnnData, ingest_schema: IngestSchema) -> None:
     """
     Sanitize AnnData for TileDB SOMA ingest in-place.
 
     Remove unsupported slots (obsm, varm, uns, obsp, varp, layers, raw),
-    strip var columns (keeping only index), and reset index names to
-    prepare for SOMA ingestion.
+    sanitize obs/var columns according to schema, and reset index names
+    to prepare for SOMA ingestion.
 
     :param adata: The AnnData object to sanitize.
+    :param ingest_schema: Schema containing obs column descriptors for filtering and casting.
     """
     _remove_obsm(adata=adata)
     _remove_varm(adata=adata)
@@ -201,7 +246,8 @@ def sanitize_for_ingest(*, adata: AnnData) -> None:
     _remove_varp(adata=adata)
     _remove_layers(adata=adata)
     _remove_raw(adata=adata)
-    _strip_var_columns(adata=adata)
+    _sanitize_var_metadata_with_schema(adata=adata, ingest_schema=ingest_schema)
+    _sanitize_obs_with_schema(adata=adata, ingest_schema=ingest_schema)
     _reset_index_names(adata=adata)
 
 
@@ -209,12 +255,13 @@ def sanitize_first_adata_for_schema(*, adata: AnnData, ingest_schema: IngestSche
     """
     Sanitize the first AnnData for SOMA schema creation in-place.
 
-    Perform standard sanitization, then replace var DataFrame entirely with
-    the schema var DataFrame. X matrix is expanded to include all schema
-    features (zero-fill missing) and reordered to match schema feature order.
+    Perform standard sanitization (including obs sanitization according to schema),
+    then replace var DataFrame entirely with the schema var DataFrame. X matrix is
+    expanded to include all schema features (zero-fill missing) and reordered to
+    match schema feature order.
 
     :param adata: The AnnData object to sanitize. Modified in-place.
-    :param ingest_schema: Schema containing the full var DataFrame.
+    :param ingest_schema: Schema containing the full var DataFrame and obs column descriptors.
     """
-    sanitize_for_ingest(adata=adata)
+    sanitize_for_ingest(adata=adata, ingest_schema=ingest_schema)
     _replace_var_with_schema(adata=adata, ingest_schema=ingest_schema)

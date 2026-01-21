@@ -68,12 +68,12 @@ def validate_and_sanitize_for_ingest(*, adata: AnnData, ingest_schema: IngestSch
     Validate and sanitize an AnnData object for ingestion.
 
     :param adata: AnnData object to validate and sanitize.
-    :param ingest_schema: Schema to validate the AnnData against.
+    :param ingest_schema: Schema to validate and sanitize the AnnData against.
     """
     logger.info("Validating AnnData for ingest")
     validate_for_ingest(adata=adata, schema=ingest_schema)
     logger.info("Sanitizing AnnData for ingest")
-    sanitize_for_ingest(adata=adata)
+    sanitize_for_ingest(adata=adata, ingest_schema=ingest_schema)
 
 
 def prepare_for_ingest(
