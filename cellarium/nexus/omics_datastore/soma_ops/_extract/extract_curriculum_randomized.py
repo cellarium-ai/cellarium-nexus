@@ -6,6 +6,8 @@ This module provides functions to extract data from SOMA experiments into AnnDat
 
 import logging
 import multiprocessing
+import shutil
+import tempfile
 import warnings
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
@@ -575,3 +577,83 @@ def shuffle_extracted_chunks(
     _shuffle_state.clear()
 
     logger.info(f"Successfully shuffled {total_cells} cells into {num_bins} extracts")
+
+
+def run_extract_randomized(
+    *,
+    curriculum_metadata: RandomizedCurriculumMetadata,
+    output_dir: Path,
+    partition_index: int = 0,
+    max_ranges_per_partition: int | None = None,
+    output_format: Literal["zarr", "h5ad"] = "h5ad",
+    temp_dir: Path | None = None,
+    max_workers_extract: int | None = None,
+    max_workers_shuffle: int | None = None,
+    cleanup_temp: bool = True,
+    verbose: bool = False,
+) -> None:
+    """
+    Orchestrate the randomized extraction process.
+
+    Two-stage process for true cell randomization:
+    1. Extract contiguous ranges to temp directory in Zarr format (fast SOMA reads)
+    2. Shuffle cells across final output chunks (true randomization)
+
+    :param curriculum_metadata: SOMA curriculum metadata with all data specification.
+    :param output_dir: Final output directory for shuffled chunks.
+    :param partition_index: Index used for slicing ranges and output chunk indexes.
+    :param max_ranges_per_partition: Partition block size.
+    :param output_format: Output format - "zarr" or "h5ad".
+    :param temp_dir: Temporary directory for contiguous extracts.
+    :param max_workers_extract: Maximum parallel workers for extraction.
+    :param max_workers_shuffle: Maximum parallel workers for shuffling.
+    :param cleanup_temp: Whether to delete temp directory after shuffling.
+    :param verbose: If False, suppress INFO level logging in parallel workers.
+
+    :raise SomaExtractError: If SOMA reads fail
+    :raise IOError: If file operations fail
+    :raise ValueError: If output_format is invalid
+    """
+    # Stage 1: Extract contiguous ranges to temp directory
+    if temp_dir is None:
+        temp_dir = Path(tempfile.mkdtemp(prefix="soma_extract_temp_"))
+        logger.info(f"Created temporary directory: {temp_dir}")
+    else:
+        temp_dir.mkdir(parents=True, exist_ok=True)
+
+    try:
+        logger.info("Stage 1: Extracting contiguous ranges to Zarr format...")
+        extract_ranges(
+            curriculum_metadata=curriculum_metadata,
+            output_dir=temp_dir,
+            partition_index=partition_index,
+            max_ranges_per_partition=max_ranges_per_partition,
+            output_format="zarr",
+            max_workers=max_workers_extract,
+            verbose=verbose,
+        )
+
+        # Stage 2: Shuffle cells across extracts (feature filtering applied here)
+        logger.info("Stage 2: Shuffling cells across extracts...")
+        max_output_chunks_per_partition = (
+            int(max_ranges_per_partition * curriculum_metadata.range_size / curriculum_metadata.extract_bin_size)
+            if max_ranges_per_partition is not None
+            else None
+        )
+
+        shuffle_extracted_chunks(
+            curriculum_metadata=curriculum_metadata,
+            input_dir=temp_dir,
+            output_dir=output_dir,
+            partition_index=partition_index,
+            max_output_chunks_per_partition=max_output_chunks_per_partition,
+            max_workers=max_workers_shuffle,
+        )
+
+        logger.info("Extract and shuffle operation completed successfully")
+
+    finally:
+        # Cleanup temp files
+        if cleanup_temp and temp_dir.exists():
+            logger.info(f"Cleaning up temporary directory: {temp_dir}")
+            shutil.rmtree(temp_dir)

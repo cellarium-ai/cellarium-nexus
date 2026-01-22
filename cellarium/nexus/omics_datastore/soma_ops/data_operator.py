@@ -5,18 +5,11 @@ This module provides the main operator class for interacting with SOMA experimen
 """
 
 import logging
-import shutil
-import tempfile
 from pathlib import Path
 from typing import Any, Literal
 
-import pyarrow as pa
-import tiledbsoma
-
 from cellarium.nexus.omics_datastore.protocols import DataOperatorProtocol
-from cellarium.nexus.omics_datastore.soma_ops import _extract
-from cellarium.nexus.omics_datastore.soma_ops.exceptions import SomaReadError
-from cellarium.nexus.omics_datastore.soma_ops.filters import build_soma_value_filter
+from cellarium.nexus.omics_datastore.soma_ops import _extract, _queries
 from cellarium.nexus.shared.schemas.omics_datastore import (
     GroupedCurriculumMetadata,
     RandomizedCurriculumMetadata,
@@ -64,28 +57,10 @@ class TileDBSOMADataOperator(DataOperatorProtocol):
 
         :return: Total number of matching cells
         """
-        try:
-            value_filter = build_soma_value_filter(filters=filter_statements)
-
-            logger.info(f"Counting cells with filter: {value_filter if value_filter else 'no filter'}")
-
-            with tiledbsoma.open(self.experiment_uri, mode="r") as exp:
-                # Read only soma_joinid column with the filter
-                obs_query = exp.obs.read(
-                    column_names=["soma_joinid"],
-                    value_filter=value_filter if value_filter else None,
-                )
-
-                # Get the count
-                obs_df = obs_query.concat().to_pandas()
-                count = len(obs_df)
-
-                logger.info(f"Found {count} cells matching the filter")
-                return count
-
-        except Exception as e:
-            logger.error(f"Failed to count cells: {e}")
-            raise SomaReadError("SOMA cell count operation failed") from e
+        return _queries.count_obs(
+            experiment_uri=self.experiment_uri,
+            filter_statements=filter_statements,
+        )
 
     def get_categorical_obs_columns(self, *, threshold: int, exclude: list[str] | None = None) -> set[str]:
         """
@@ -98,37 +73,10 @@ class TileDBSOMADataOperator(DataOperatorProtocol):
 
         :return: Set of column names that are categorical
         """
-        try:
-            exclude_set = set(exclude or [])
-
-            with tiledbsoma.open(self.experiment_uri, mode="r") as exp:
-                obs_schema = exp.obs.schema
-
-                # Get string-like columns from schema (plain, large, or dictionary-encoded strings)
-                string_columns = set()
-                for field in obs_schema:
-                    if field.name in exclude_set:
-                        continue
-
-                    ftype = field.type
-                    is_string_like = bool(
-                        pa.types.is_string(ftype)
-                        # or pa.types.is_large_string(ftype)
-                        or (pa.types.is_dictionary(ftype) and pa.types.is_string(ftype.value_type))
-                    )
-
-                    logger.debug(f"Field {field.name}: type={ftype}, is_string_like={is_string_like}")
-
-                    if is_string_like:
-                        string_columns.add(field.name)
-
-                logger.info(f"Found {len(string_columns)} string-like columns in SOMA obs: {string_columns}")
-
-                return string_columns
-
-        except Exception as e:
-            logger.error(f"Failed to get categorical obs columns: {e}")
-            raise SomaReadError("SOMA categorical columns operation failed") from e
+        return _queries.get_obs_string_columns(
+            experiment_uri=self.experiment_uri,
+            exclude=exclude,
+        )
 
     def get_distinct_obs_values(self, *, column_name: str) -> list[str]:
         """
@@ -140,20 +88,10 @@ class TileDBSOMADataOperator(DataOperatorProtocol):
 
         :return: List of distinct values
         """
-        try:
-            with tiledbsoma.open(self.experiment_uri, mode="r") as exp:
-                obs_query = exp.obs.read(column_names=[column_name])
-                obs_df = obs_query.concat().to_pandas()
-
-                # Get unique values, drop nulls, convert to string
-                unique_values = obs_df[column_name].dropna().unique()
-                result = [str(v) for v in unique_values]
-
-                return result
-
-        except Exception as e:
-            logger.error(f"Failed to get distinct obs values: {e}")
-            raise SomaReadError("SOMA distinct values operation failed") from e
+        return _queries.get_obs_distinct_values(
+            experiment_uri=self.experiment_uri,
+            column_name=column_name,
+        )
 
     def prepare_curriculum_metadata(
         self,
@@ -195,39 +133,20 @@ class TileDBSOMADataOperator(DataOperatorProtocol):
 
         :return: RandomizedCurriculumMetadata or GroupedCurriculumMetadata
         """
-        if extract_bin_keys:
-            # Grouped extraction mode
-            if bin_size is None:
-                raise ValueError("bin_size is required for grouped extraction")
-            return _extract.prepare_grouped_curriculum(
-                experiment_uri=self.experiment_uri,
-                filters=filters,
-                extract_bin_keys=extract_bin_keys,
-                bin_size=bin_size,
-                var_filter_column=var_filter_column,
-                var_filter_values=var_filter_values,
-                obs_columns=obs_columns,
-                var_columns=var_columns,
-                x_layer=x_layer,
-            )
-        else:
-            # Randomized extraction mode
-            if range_size is None:
-                raise ValueError("range_size is required for randomized extraction")
-            if extract_bin_size is None:
-                raise ValueError("extract_bin_size is required for randomized extraction")
-            return _extract.prepare_extract_curriculum(
-                experiment_uri=self.experiment_uri,
-                filters=filters,
-                range_size=range_size,
-                extract_bin_size=extract_bin_size,
-                shuffle_ranges=shuffle_ranges,
-                var_filter_column=var_filter_column,
-                var_filter_values=var_filter_values,
-                obs_columns=obs_columns,
-                var_columns=var_columns,
-                x_layer=x_layer,
-            )
+        return _extract.plan_curriculum(
+            experiment_uri=self.experiment_uri,
+            filters=filters,
+            range_size=range_size,
+            extract_bin_size=extract_bin_size,
+            shuffle_ranges=shuffle_ranges,
+            var_filter_column=var_filter_column,
+            var_filter_values=var_filter_values,
+            obs_columns=obs_columns,
+            var_columns=var_columns,
+            x_layer=x_layer,
+            extract_bin_keys=extract_bin_keys,
+            bin_size=bin_size,
+        )
 
     def extract_randomized(
         self,
@@ -270,50 +189,18 @@ class TileDBSOMADataOperator(DataOperatorProtocol):
         :raise IOError: If file operations fail
         :raise ValueError: If output_format is invalid
         """
-        # Stage 1: Extract contiguous ranges to temp directory
-        if temp_dir is None:
-            temp_dir = Path(tempfile.mkdtemp(prefix="soma_extract_temp_"))
-            logger.info(f"Created temporary directory: {temp_dir}")
-        else:
-            temp_dir.mkdir(parents=True, exist_ok=True)
-
-        try:
-            logger.info("Stage 1: Extracting contiguous ranges to Zarr format...")
-            _extract.extract_ranges(
-                curriculum_metadata=curriculum_metadata,
-                output_dir=temp_dir,
-                partition_index=partition_index,
-                max_ranges_per_partition=max_ranges_per_partition,
-                output_format="zarr",
-                max_workers=max_workers_extract,
-                verbose=verbose,
-            )
-
-            # Stage 2: Shuffle cells across extracts (feature filtering applied here)
-            # Consolidation runs in subprocess internally for memory release
-            logger.info("Stage 2: Shuffling cells across extracts...")
-            max_output_chunks_per_partition = (
-                int(max_ranges_per_partition * curriculum_metadata.range_size / curriculum_metadata.extract_bin_size)
-                if max_ranges_per_partition is not None
-                else None
-            )
-
-            _extract.shuffle_extracted_chunks(
-                curriculum_metadata=curriculum_metadata,
-                input_dir=temp_dir,
-                output_dir=output_dir,
-                partition_index=partition_index,
-                max_output_chunks_per_partition=max_output_chunks_per_partition,
-                max_workers=max_workers_shuffle,
-            )
-
-            logger.info("Extract and shuffle operation completed successfully")
-
-        finally:
-            # Cleanup temp files
-            if cleanup_temp and temp_dir.exists():
-                logger.info(f"Cleaning up temporary directory: {temp_dir}")
-                shutil.rmtree(temp_dir)
+        _extract.run_extract_randomized(
+            curriculum_metadata=curriculum_metadata,
+            output_dir=output_dir,
+            partition_index=partition_index,
+            max_ranges_per_partition=max_ranges_per_partition,
+            output_format=output_format,
+            temp_dir=temp_dir,
+            max_workers_extract=max_workers_extract,
+            max_workers_shuffle=max_workers_shuffle,
+            cleanup_temp=cleanup_temp,
+            verbose=verbose,
+        )
 
     def extract_grouped(
         self,
