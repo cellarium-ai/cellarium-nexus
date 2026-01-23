@@ -716,7 +716,7 @@ def test_sanitize_obs_with_schema_fills_nullable_missing_columns_numeric() -> No
 
     # Check float column
     assert "float_col" in adata.obs.columns
-    assert str(adata.obs["float_col"].dtype) == "Float32"
+    assert str(adata.obs["float_col"].dtype) == "float32"
     assert adata.obs["float_col"].isna().all()
 
     # Check bool column (should be boolean)

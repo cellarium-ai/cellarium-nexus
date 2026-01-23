@@ -131,18 +131,28 @@ def _sanitize_obs_with_schema(*, adata: AnnData, ingest_schema: IngestSchema) ->
     new_obs_data: dict[str, pd.Series] = {}
     for col_schema in obs_columns:
         col_name = col_schema.name
+
+        # Determine target dtype
+        # For nullable integers/booleans, we MUST use PANDAS_NULLABLE_DTYPES (e.g. Int64) to support NA.
+        # For nullable floats, we skip PANDAS_NULLABLE_DTYPES (Float64) and use standard numpy floats
+        # (float32/64) because:
+        # 1. Numpy floats support NaN natively.
+        # 2. AnnData HDF5 writer does not support Pandas FloatingArray extension types.
+        is_float = col_schema.dtype in ("float32", "float64")
+
+        if col_schema.nullable and not is_float:
+            dtype = PANDAS_NULLABLE_DTYPES.get(col_schema.dtype, col_schema.dtype)
+        else:
+            dtype = col_schema.dtype
+
         if col_name in adata.obs.columns:
             # Cast to target dtype
-            if col_schema.nullable:
-                dtype = PANDAS_NULLABLE_DTYPES.get(col_schema.dtype, col_schema.dtype)
-                new_obs_data[col_name] = adata.obs[col_name].astype(dtype)
-            else:
-                new_obs_data[col_name] = adata.obs[col_name].astype(col_schema.dtype)
+            new_obs_data[col_name] = adata.obs[col_name].astype(dtype)
         elif col_schema.nullable:
             # Create column with NA values for nullable missing columns
-            dtype = PANDAS_NULLABLE_DTYPES.get(col_schema.dtype, col_schema.dtype)
+            fill_value = np.nan if is_float else pd.NA
             new_obs_data[col_name] = pd.Series(
-                [pd.NA] * adata.n_obs,
+                [fill_value] * adata.n_obs,
                 index=adata.obs.index,
                 dtype=dtype,
             )
@@ -152,6 +162,7 @@ def _sanitize_obs_with_schema(*, adata: AnnData, ingest_schema: IngestSchema) ->
     new_obs = pd.DataFrame(new_obs_data, index=adata.obs.index)
     # Ensure column order matches schema order
     new_obs = new_obs[[col for col in schema_column_names if col in new_obs.columns]]
+
     adata.obs = new_obs
 
 
