@@ -43,7 +43,7 @@ def test_prepare_ingest_plan_creates_valid_metadata(
     adata = anndata.AnnData(X=X, obs=obs, var=var)
 
     schema = IngestSchema(
-        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False)],
+        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="string", nullable=False)],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=var),
         x_validation_type="count_matrix",
     )
@@ -91,7 +91,7 @@ def test_prepare_ingest_plan_computes_correct_partitions_for_multiple_files(
 
     schema_var_df = pd.DataFrame(index=all_features)  # No columns, only index
     schema = IngestSchema(
-        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False)],
+        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="string", nullable=False)],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=schema_var_df),
         x_validation_type="count_matrix",
     )
@@ -147,7 +147,7 @@ def test_ingest_h5ads_partition_writes_data_to_soma(
     adata = anndata.AnnData(X=X, obs=obs, var=var)
 
     schema = IngestSchema(
-        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False)],
+        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="string", nullable=False)],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=var),
         x_validation_type="count_matrix",
     )
@@ -205,7 +205,7 @@ def test_ingest_h5ads_partition_appends_data_across_multiple_partitions(
 
     schema_var_df = pd.DataFrame(index=all_features)  # No columns, only index
     schema = IngestSchema(
-        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False)],
+        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="string", nullable=False)],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=schema_var_df),
         x_validation_type="count_matrix",
     )

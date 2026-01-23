@@ -60,7 +60,7 @@ def test_validate_for_ingest_unknown_var_features_raises(
     )
     schema = IngestSchema(
         obs_columns=[
-            ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False),
+            ObsSchemaDescriptor(name="cell_type", dtype="string", nullable=False),
         ],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
         x_validation_type="count_matrix",
@@ -95,7 +95,7 @@ def test_validate_for_ingest_negative_values_in_count_matrix_raises(
         index=["ENSG0001", "ENSG0002", "ENSG0003"],
     )
     schema = IngestSchema(
-        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False)],
+        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="string", nullable=False)],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
         x_validation_type="count_matrix",
     )
@@ -131,7 +131,7 @@ def test_validate_for_ingest_feature_matrix_allows_negative_values(
         index=["ENSG0001", "ENSG0002", "ENSG0003"],
     )
     schema = IngestSchema(
-        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False)],
+        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="string", nullable=False)],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
         x_validation_type="feature_matrix",
     )

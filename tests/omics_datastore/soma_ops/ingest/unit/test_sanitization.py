@@ -242,7 +242,7 @@ def basic_ingest_schema():
     # Create schema var DataFrame matching adata_with_all_slots (4 features)
     var_df = pd.DataFrame(index=[f"ENSG{j:04d}" for j in range(4)])
     return IngestSchema(
-        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str")],
+        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="string")],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
         x_validation_type="count_matrix",
     )
@@ -257,7 +257,7 @@ def test_sanitize_var_metadata_with_schema_updates_columns() -> None:
     # Create schema with extra columns
     var_df = pd.DataFrame(data={"gene_symbol": ["A", "B", "C", "D"]}, index=[f"ENSG{j:04d}" for j in range(4)])
     ingest_schema = IngestSchema(
-        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str")],
+        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="string")],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
         x_validation_type="count_matrix",
     )
@@ -406,7 +406,7 @@ def test_sanitize_obs_with_schema_filters_columns() -> None:
 
     var_df = pd.DataFrame(index=["0", "1"])
     ingest_schema = IngestSchema(
-        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str")],
+        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="string")],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
         x_validation_type="count_matrix",
     )
@@ -429,14 +429,15 @@ def test_sanitize_obs_with_schema_casts_dtypes() -> None:
 
     var_df = pd.DataFrame(index=["0", "1"])
     ingest_schema = IngestSchema(
-        obs_columns=[ObsSchemaDescriptor(name="count", dtype="str")],
+        obs_columns=[ObsSchemaDescriptor(name="count", dtype="string")],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
         x_validation_type="count_matrix",
     )
 
     sanitization._sanitize_obs_with_schema(adata=adata, ingest_schema=ingest_schema)
 
-    assert adata.obs["count"].dtype == "object"  # string dtype in pandas
+    # Accept either 'object' or Pandas 'string' dtype
+    assert str(adata.obs["count"].dtype) in ("object", "string")
     assert list(adata.obs["count"]) == ["1", "2", "3"]
 
 
@@ -452,8 +453,8 @@ def test_sanitize_obs_with_schema_fills_nullable_missing_columns() -> None:
     var_df = pd.DataFrame(index=["0", "1"])
     ingest_schema = IngestSchema(
         obs_columns=[
-            ObsSchemaDescriptor(name="cell_type", dtype="str"),
-            ObsSchemaDescriptor(name="missing_col", dtype="str", nullable=True),
+            ObsSchemaDescriptor(name="cell_type", dtype="string"),
+            ObsSchemaDescriptor(name="missing_col", dtype="string", nullable=True),
         ],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
         x_validation_type="count_matrix",
@@ -479,8 +480,8 @@ def test_sanitize_obs_with_schema_preserves_column_order() -> None:
     ingest_schema = IngestSchema(
         obs_columns=[
             ObsSchemaDescriptor(name="a_col", dtype="int64"),
-            ObsSchemaDescriptor(name="m_col", dtype="str"),
-            ObsSchemaDescriptor(name="z_col", dtype="str"),
+            ObsSchemaDescriptor(name="m_col", dtype="string"),
+            ObsSchemaDescriptor(name="z_col", dtype="string"),
         ],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
         x_validation_type="count_matrix",
@@ -505,7 +506,7 @@ def ingest_schema_with_full_features():
     )
     return IngestSchema(
         obs_columns=[
-            ObsSchemaDescriptor(name="cell_type", dtype="str"),
+            ObsSchemaDescriptor(name="cell_type", dtype="string"),
         ],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
         x_validation_type="count_matrix",
@@ -664,7 +665,7 @@ def test_sanitize_first_adata_for_schema_calls_sanitize_for_ingest(
         index=["ENSG0000", "ENSG0001", "ENSG0002", "ENSG0003"],
     )
     ingest_schema = IngestSchema(
-        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="str")],
+        obs_columns=[ObsSchemaDescriptor(name="cell_type", dtype="string")],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
         x_validation_type="count_matrix",
     )
@@ -698,7 +699,7 @@ def test_sanitize_obs_with_schema_fills_nullable_missing_columns_numeric() -> No
     var_df = pd.DataFrame(index=["0", "1"])
     ingest_schema = IngestSchema(
         obs_columns=[
-            ObsSchemaDescriptor(name="cell_type", dtype="str"),
+            ObsSchemaDescriptor(name="cell_type", dtype="string"),
             ObsSchemaDescriptor(name="int_col", dtype="int32", nullable=True),
             ObsSchemaDescriptor(name="float_col", dtype="float32", nullable=True),
             ObsSchemaDescriptor(name="bool_col", dtype="bool", nullable=True),
@@ -743,11 +744,11 @@ def test_sanitize_obs_existing_nullable_with_nans() -> None:
     var_df = pd.DataFrame(index=["0", "1"])
     ingest_schema = IngestSchema(
         obs_columns=[
-            ObsSchemaDescriptor(name="cell_type", dtype="str"),
+            ObsSchemaDescriptor(name="cell_type", dtype="string"),
             # Schema expects int32. If we cast blindly to 'int32', the NaN would fail.
             # Fix should cast this to 'Int32' instead.
             ObsSchemaDescriptor(name="total_mrna_umis", dtype="int32", nullable=True),
-            ObsSchemaDescriptor(name="disease", dtype="str", nullable=True),
+            ObsSchemaDescriptor(name="disease", dtype="string", nullable=True),
         ],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
         x_validation_type="count_matrix",

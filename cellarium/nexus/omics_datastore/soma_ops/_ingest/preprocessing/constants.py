@@ -9,12 +9,9 @@ PANDAS_NULLABLE_DTYPES: Final[dict[str, str]] = {
     "int16": "Int16",
     "int32": "Int32",
     "int64": "Int64",
-    "uint8": "UInt8",
-    "uint16": "UInt16",
-    "uint32": "UInt32",
-    "uint64": "UInt64",
     "float32": "Float32",
     "float64": "Float64",
-    "str": "string",
     "string": "string",
+    "category": "category",
 }
+STRING_NULL_FILL_VALUE = "unknown"

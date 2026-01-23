@@ -21,24 +21,12 @@ SomaDtype = Literal[
     "int16",
     "int32",
     "int64",
-    # Unsigned integers
-    "uint8",
-    "uint16",
-    "uint32",
-    "uint64",
     # Floating point
     "float32",
     "float64",
     # String types
-    "str",
     "string",
-    # Categorical
     "category",
-    # Timestamps
-    "datetime64[s]",
-    "datetime64[ms]",
-    "datetime64[us]",
-    "datetime64[ns]",
 ]
 
 

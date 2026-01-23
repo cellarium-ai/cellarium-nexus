@@ -172,8 +172,8 @@ def small_ingest_schema() -> IngestSchema:
     )
     return IngestSchema(
         obs_columns=[
-            ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False),
-            ObsSchemaDescriptor(name="tissue", dtype="str", nullable=True),
+            ObsSchemaDescriptor(name="cell_type", dtype="string", nullable=False),
+            ObsSchemaDescriptor(name="tissue", dtype="string", nullable=True),
         ],
         var_schema=ExperimentVarSchema.from_dataframe(var_df=var_df),
         x_validation_type="count_matrix",

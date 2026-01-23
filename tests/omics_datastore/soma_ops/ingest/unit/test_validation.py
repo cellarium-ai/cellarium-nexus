@@ -19,8 +19,8 @@ def obs_columns() -> list[ObsSchemaDescriptor]:
     :return: List of ObsDescriptor objects.
     """
     return [
-        ObsSchemaDescriptor(name="cell_type", dtype="str", nullable=False),
-        ObsSchemaDescriptor(name="sample_id", dtype="str", nullable=False),
+        ObsSchemaDescriptor(name="cell_type", dtype="string", nullable=False),
+        ObsSchemaDescriptor(name="sample_id", dtype="string", nullable=False),
         ObsSchemaDescriptor(name="age", dtype="int64", nullable=True),
         ObsSchemaDescriptor(name="score", dtype="float64", nullable=True),
     ]
@@ -512,7 +512,7 @@ def test_validate_obs_allows_nullable_int_with_nans() -> None:
     var_df = pd.DataFrame(index=["0", "1"])
     ingest_schema = IngestSchema(
         obs_columns=[
-            ObsSchemaDescriptor(name="cell_type", dtype="str"),
+            ObsSchemaDescriptor(name="cell_type", dtype="string"),
             # Schema asks for int32 (NumPy), but data has Int32 (Pandas) with NAs.
             # This should pass validation thanks to the fix.
             ObsSchemaDescriptor(name="total_mrna_umis", dtype="int32", nullable=True),

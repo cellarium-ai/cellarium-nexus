@@ -10,7 +10,7 @@ import pandas as pd
 import scipy.sparse as sp
 from anndata import AnnData
 
-from cellarium.nexus.omics_datastore.soma_ops._ingest.preprocessing.constants import PANDAS_NULLABLE_DTYPES
+from cellarium.nexus.omics_datastore.soma_ops._ingest.preprocessing import constants
 from cellarium.nexus.shared.schemas.omics_datastore import IngestSchema
 
 
@@ -141,22 +141,47 @@ def _sanitize_obs_with_schema(*, adata: AnnData, ingest_schema: IngestSchema) ->
         is_float = col_schema.dtype in ("float32", "float64")
 
         if col_schema.nullable and not is_float:
-            dtype = PANDAS_NULLABLE_DTYPES.get(col_schema.dtype, col_schema.dtype)
+            dtype = constants.PANDAS_NULLABLE_DTYPES.get(col_schema.dtype, col_schema.dtype)
         else:
             dtype = col_schema.dtype
 
+        # Detect pandas nullable string dtype; handle specially because pandas' StringDtype
+        # stores pd.NA which h5py/h5ad writer cannot implicitly convert to variable-length
+        # HDF5 strings. Treat schema dtype 'string' as a string column even if
+        # `PANDAS_NULLABLE_DTYPES` maps it to 'object', so we coerce values to Python
+        # `str` and fill missing values with empty string.
+        is_string = col_schema.dtype == "string" or (str(dtype) == "string") or isinstance(dtype, pd.StringDtype)
+
         if col_name in adata.obs.columns:
-            # Cast to target dtype
-            new_obs_data[col_name] = adata.obs[col_name].astype(dtype)
+            # Cast to target dtype using keyword-style call.
+            series = adata.obs[col_name].astype(dtype=dtype)
+            # Convert pandas nullable string extension to plain Python strings for h5py compatibility.
+            if is_string:
+                # Replace missing pandas NA with numpy nan (so pandas.isna remains True),
+                # then ensure every non-missing element is a Python str. Using np.nan
+                # prevents h5py from encountering pandas' pd.NA which can't be implicitly
+                # converted to HDF5 vlen strings.
+                series = series.where(series.notna(), np.nan)
+                series = series.map(lambda v: np.nan if pd.isna(v) else str(v)).astype(object)
+            new_obs_data[col_name] = series
         elif col_schema.nullable:
-            # Create column with NA values for nullable missing columns
-            fill_value = np.nan if is_float else pd.NA
+            # Create column with NA/fill values for nullable missing columns
+            if is_float:
+                fill_value = np.nan
+                series_dtype = dtype
+            elif is_string:
+                fill_value = constants.STRING_NULL_FILL_VALUE
+                series_dtype = object
+            else:
+                fill_value = pd.NA
+                series_dtype = dtype
+
             new_obs_data[col_name] = pd.Series(
-                [fill_value] * adata.n_obs,
+                data=[fill_value] * adata.n_obs,
                 index=adata.obs.index,
-                dtype=dtype,
+                dtype=series_dtype,
             )
-        # Non-nullable missing columns are skipped - validation should catch this
+        # Non-nullable missing columns are skipped - validation was supposed to catch them and raise error to the user.
 
     # Replace obs with sanitized DataFrame, preserving index
     new_obs = pd.DataFrame(new_obs_data, index=adata.obs.index)
