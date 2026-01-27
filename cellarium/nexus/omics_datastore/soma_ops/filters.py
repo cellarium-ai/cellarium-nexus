@@ -97,7 +97,7 @@ def _build_condition(column: str, operator: str, value: object) -> str:
     elif operator == "not_in":
         if not isinstance(value, list):
             raise SomaFilterError(f"Operator 'not_in' requires a list value, got {type(value).__name__}")
-        return f"not ({column} in {_format_literal(value)})"
+        return f"({column} not in {_format_literal(value)})"
     elif operator == "gt":
         return f"({column} > {_format_literal(value)})"
     elif operator == "gte":

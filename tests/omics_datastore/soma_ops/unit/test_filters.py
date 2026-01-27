@@ -63,7 +63,7 @@ def test_build_soma_value_filter_boolean_values(filters: dict[str, object], expe
     "filters,expected",
     [
         ({"cell_type__in": ["T Cell", "B Cell"]}, '(cell_type in ["T Cell", "B Cell"])'),
-        ({"cell_type__not_in": ["T Cell", "B Cell"]}, 'not (cell_type in ["T Cell", "B Cell"])'),
+        ({"cell_type__not_in": ["T Cell", "B Cell"]}, '(cell_type not in ["T Cell", "B Cell"])'),
         ({"donor_id__in": [1, 2, 3]}, "(donor_id in [1, 2, 3])"),
     ],
 )
