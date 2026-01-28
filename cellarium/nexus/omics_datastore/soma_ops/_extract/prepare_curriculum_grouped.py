@@ -10,7 +10,7 @@ import logging
 import tiledbsoma
 
 from cellarium.nexus.omics_datastore.soma_ops import exceptions
-from cellarium.nexus.omics_datastore.soma_ops.curriculum_randomized import read_var_joinids
+from cellarium.nexus.omics_datastore.soma_ops._extract.prepare_curriculum_randomized import read_var_joinids
 from cellarium.nexus.omics_datastore.soma_ops.filters import build_soma_value_filter
 from cellarium.nexus.shared.schemas.omics_datastore import GroupedBin, GroupedCurriculumMetadata
 

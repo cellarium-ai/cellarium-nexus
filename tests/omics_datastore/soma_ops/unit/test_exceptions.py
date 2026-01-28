@@ -82,12 +82,9 @@ def test_all_exceptions_exported_in_init() -> None:
 
 def test_main_exports_in_init() -> None:
     """
-    Verify main classes and functions are exported from soma_ops.__init__.
+    Verify main classes are exported from soma_ops.__init__.
     """
     assert hasattr(soma_ops, "TileDBSOMADataOperator")
-    assert hasattr(soma_ops, "build_soma_value_filter")
-    assert hasattr(soma_ops, "prepare_extract_curriculum")
-    assert hasattr(soma_ops, "shuffle_extracted_chunks")
 
 
 def test_all_list_contains_expected_names() -> None:
@@ -96,11 +93,6 @@ def test_all_list_contains_expected_names() -> None:
     """
     expected_names = {
         "TileDBSOMADataOperator",
-        "build_soma_value_filter",
-        "prepare_extract_curriculum",
-        "prepare_grouped_curriculum",
-        "shuffle_extracted_chunks",
-        "extract_grouped_bins",
         "SomaOperationError",
         "SomaReadError",
         "SomaWriteError",

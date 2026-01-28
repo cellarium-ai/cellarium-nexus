@@ -1,10 +1,18 @@
+import shutil
+import tempfile
 from pathlib import Path
 
 import pandas as pd
 import pytest
+import tiledbsoma
 
 from cellarium.nexus.omics_datastore.soma_ops import SomaReadError
 from cellarium.nexus.omics_datastore.soma_ops import data_operator as data_operator_module
+from cellarium.nexus.omics_datastore.soma_ops import filters as filters_module
+from cellarium.nexus.omics_datastore.soma_ops._extract import (
+    extract_curriculum_randomized,
+    planning,
+)
 from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, RandomizedCurriculumMetadata
 
 
@@ -61,8 +69,6 @@ def test_count_cells_happy_path(monkeypatch: pytest.MonkeyPatch) -> None:
         assert mode == "r"
         return _FakeExp()
 
-    import tiledbsoma
-
     monkeypatch.setattr(tiledbsoma, "open", _fake_open)
 
     # Execute
@@ -80,7 +86,6 @@ def test_count_cells_empty_filter(monkeypatch: pytest.MonkeyPatch) -> None:
     operator = data_operator_module.TileDBSOMADataOperator(experiment_uri="gs://bucket/soma")
 
     # Mock build_soma_value_filter
-    from cellarium.nexus.omics_datastore.soma_ops import filters as filters_module
 
     monkeypatch.setattr(filters_module, "build_soma_value_filter", lambda filters: "")
 
@@ -112,8 +117,6 @@ def test_count_cells_empty_filter(monkeypatch: pytest.MonkeyPatch) -> None:
     def _fake_open(uri: str, mode: str) -> _FakeExp:
         return _FakeExp()
 
-    import tiledbsoma
-
     monkeypatch.setattr(tiledbsoma, "open", _fake_open)
 
     # Execute
@@ -130,15 +133,12 @@ def test_count_cells_error_handling(monkeypatch: pytest.MonkeyPatch) -> None:
     operator = data_operator_module.TileDBSOMADataOperator(experiment_uri="gs://bucket/soma")
 
     # Mock build_soma_value_filter
-    from cellarium.nexus.omics_datastore.soma_ops import filters as filters_module
 
     monkeypatch.setattr(filters_module, "build_soma_value_filter", lambda filters: "")
 
     # Mock tiledbsoma.open to raise
     def _fake_open(uri: str, mode: str) -> object:
         raise RuntimeError("SOMA connection failed")
-
-    import tiledbsoma
 
     monkeypatch.setattr(tiledbsoma, "open", _fake_open)
 
@@ -153,7 +153,7 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
     """
     operator = data_operator_module.TileDBSOMADataOperator(experiment_uri="gs://bucket/soma")
 
-    # Mock plan_soma_extract at the data_operator module level
+    # Mock plan_soma_extract at the _extract module level
     plan_calls = []
 
     def _fake_plan_soma_extract(
@@ -201,7 +201,7 @@ def test_compute_extract_plan_delegates_to_planning(monkeypatch: pytest.MonkeyPa
             x_layer=x_layer,
         )
 
-    monkeypatch.setattr(data_operator_module, "prepare_extract_curriculum", _fake_plan_soma_extract)
+    monkeypatch.setattr(planning, "prepare_extract_curriculum", _fake_plan_soma_extract)
 
     # Execute
     filters = {"tissue__eq": "lung"}
@@ -247,7 +247,7 @@ def test_extract_randomized_with_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_p
     """
     operator = data_operator_module.TileDBSOMADataOperator(experiment_uri="gs://bucket/soma")
 
-    # Mock extract_ranges and shuffle_extracted_chunks at data_operator module level
+    # Mock extract_ranges and shuffle_extracted_chunks at _extract module level
     extract_calls = []
     shuffle_calls = []
 
@@ -257,11 +257,10 @@ def test_extract_randomized_with_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_p
     def _fake_shuffle(**kwargs: object) -> None:
         shuffle_calls.append(kwargs)
 
-    monkeypatch.setattr(data_operator_module, "extract_ranges", _fake_extract_ranges)
-    monkeypatch.setattr(data_operator_module, "shuffle_extracted_chunks", _fake_shuffle)
+    monkeypatch.setattr(extract_curriculum_randomized, "extract_ranges", _fake_extract_ranges)
+    monkeypatch.setattr(extract_curriculum_randomized, "shuffle_extracted_chunks", _fake_shuffle)
 
     # Mock shutil.rmtree
-    import shutil
 
     rmtree_calls = []
 
@@ -326,7 +325,7 @@ def test_extract_randomized_auto_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_p
     """
     operator = data_operator_module.TileDBSOMADataOperator(experiment_uri="gs://bucket/soma")
 
-    # Mock extract_ranges and shuffle_extracted_chunks at data_operator module level
+    # Mock extract_ranges and shuffle_extracted_chunks at _extract module level
     extract_calls = []
     shuffle_calls = []
 
@@ -336,11 +335,10 @@ def test_extract_randomized_auto_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_p
     def _fake_shuffle(**kwargs: object) -> None:
         shuffle_calls.append(kwargs)
 
-    monkeypatch.setattr(data_operator_module, "extract_ranges", _fake_extract_ranges)
-    monkeypatch.setattr(data_operator_module, "shuffle_extracted_chunks", _fake_shuffle)
+    monkeypatch.setattr(extract_curriculum_randomized, "extract_ranges", _fake_extract_ranges)
+    monkeypatch.setattr(extract_curriculum_randomized, "shuffle_extracted_chunks", _fake_shuffle)
 
     # Mock tempfile.mkdtemp
-    import tempfile
 
     mkdtemp_calls = []
 
@@ -353,7 +351,6 @@ def test_extract_randomized_auto_temp_dir(monkeypatch: pytest.MonkeyPatch, tmp_p
     monkeypatch.setattr(tempfile, "mkdtemp", _fake_mkdtemp)
 
     # Mock shutil.rmtree
-    import shutil
 
     rmtree_calls = []
 
@@ -405,18 +402,17 @@ def test_extract_randomized_no_cleanup(monkeypatch: pytest.MonkeyPatch, tmp_path
     """
     operator = data_operator_module.TileDBSOMADataOperator(experiment_uri="gs://bucket/soma")
 
-    # Mock extract_ranges and shuffle_extracted_chunks at data_operator module level
+    # Mock extract_ranges and shuffle_extracted_chunks at _extract module level
     def _fake_extract_ranges(**kwargs: object) -> None:
         pass
 
     def _fake_shuffle(**kwargs: object) -> None:
         pass
 
-    monkeypatch.setattr(data_operator_module, "extract_ranges", _fake_extract_ranges)
-    monkeypatch.setattr(data_operator_module, "shuffle_extracted_chunks", _fake_shuffle)
+    monkeypatch.setattr(extract_curriculum_randomized, "extract_ranges", _fake_extract_ranges)
+    monkeypatch.setattr(extract_curriculum_randomized, "shuffle_extracted_chunks", _fake_shuffle)
 
     # Mock shutil.rmtree
-    import shutil
 
     rmtree_calls = []
 

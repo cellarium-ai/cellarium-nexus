@@ -8,7 +8,8 @@ import pandas as pd
 import pytest
 import scipy.sparse as sp
 
-from cellarium.nexus.omics_datastore.soma_ops import SomaExtractError, extract_grouped
+from cellarium.nexus.omics_datastore.soma_ops import SomaExtractError
+from cellarium.nexus.omics_datastore.soma_ops._extract import extract_curriculum_grouped
 from cellarium.nexus.shared.schemas.omics_datastore import GroupedBin, GroupedCurriculumMetadata
 from tests.omics_datastore.soma_ops.conftest import FakeAnnData, FakeExecutor, FakeFuture, FakeSomaExperiment
 
@@ -61,7 +62,7 @@ def test_extract_grouped_bin_to_anndata_happy_path(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr("anndata.AnnData", fake_anndata_constructor)
 
-    extract_grouped.extract_grouped_bin_to_anndata(
+    extract_curriculum_grouped.extract_grouped_bin_to_anndata(
         experiment_uri=experiment_uri,
         grouped_bin=grouped_bin,
         output_path=output_path,
@@ -105,7 +106,7 @@ def test_extract_grouped_bin_to_anndata_empty_obs(monkeypatch: pytest.MonkeyPatc
 
     monkeypatch.setattr("anndata.AnnData", fake_anndata_constructor)
 
-    extract_grouped.extract_grouped_bin_to_anndata(
+    extract_curriculum_grouped.extract_grouped_bin_to_anndata(
         experiment_uri=experiment_uri,
         grouped_bin=grouped_bin,
         output_path=output_path,
@@ -134,7 +135,7 @@ def test_extract_grouped_bin_to_anndata_error_handling(monkeypatch: pytest.Monke
     monkeypatch.setattr("tiledbsoma.open", fake_open)
 
     with pytest.raises(SomaExtractError):
-        extract_grouped.extract_grouped_bin_to_anndata(
+        extract_curriculum_grouped.extract_grouped_bin_to_anndata(
             experiment_uri=experiment_uri,
             grouped_bin=grouped_bin,
             output_path=output_path,
@@ -149,7 +150,7 @@ def test_extract_grouped_bin_worker(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     def fake_extract(**kwargs: object) -> None:
         extract_calls.append(kwargs)
 
-    monkeypatch.setattr(extract_grouped, "extract_grouped_bin_to_anndata", fake_extract)
+    monkeypatch.setattr(extract_curriculum_grouped, "extract_grouped_bin_to_anndata", fake_extract)
 
     bin_idx = 0
     global_bin_idx = 5
@@ -163,7 +164,7 @@ def test_extract_grouped_bin_worker(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     )
     output_path = tmp_path / "output.h5ad"
 
-    result = extract_grouped._extract_grouped_bin_worker(
+    result = extract_curriculum_grouped._extract_grouped_bin_worker(
         bin_idx=bin_idx,
         global_bin_idx=global_bin_idx,
         experiment_uri=experiment_uri,
@@ -207,7 +208,7 @@ def test_extract_grouped_bins_empty_grouped_bins_raises_error(tmp_path: Path) ->
 
     # With empty grouped_bins, the function raises ValueError due to block_size=0
     with pytest.raises(ValueError, match="block_size must be positive"):
-        extract_grouped.extract_grouped_bins(
+        extract_curriculum_grouped.extract_grouped_bins(
             curriculum_metadata=curriculum_metadata,
             output_dir=tmp_path,
         )
@@ -253,17 +254,17 @@ def test_extract_grouped_bins_happy_path(monkeypatch: pytest.MonkeyPatch, tmp_pa
         output_path.touch()
         return bin_idx, global_bin_idx, str(output_path)
 
-    monkeypatch.setattr(extract_grouped, "_extract_grouped_bin_worker", fake_worker)
+    monkeypatch.setattr(extract_curriculum_grouped, "_extract_grouped_bin_worker", fake_worker)
 
     executor = FakeExecutor(max_workers=2, worker_fn=fake_worker)
-    monkeypatch.setattr(extract_grouped, "ProcessPoolExecutor", lambda **kwargs: executor)
+    monkeypatch.setattr(extract_curriculum_grouped, "ProcessPoolExecutor", lambda **kwargs: executor)
 
     def fake_as_completed(futures: dict[object, int]) -> list[object]:
         return list(futures.keys())
 
-    monkeypatch.setattr(extract_grouped, "as_completed", fake_as_completed)
+    monkeypatch.setattr(extract_curriculum_grouped, "as_completed", fake_as_completed)
 
-    extract_grouped.extract_grouped_bins(
+    extract_curriculum_grouped.extract_grouped_bins(
         curriculum_metadata=curriculum_metadata,
         output_dir=output_dir,
         max_workers=2,
@@ -314,18 +315,18 @@ def test_extract_grouped_bins_with_partition_index(monkeypatch: pytest.MonkeyPat
         output_path.touch()
         return bin_idx, global_bin_idx, str(output_path)
 
-    monkeypatch.setattr(extract_grouped, "_extract_grouped_bin_worker", fake_worker)
+    monkeypatch.setattr(extract_curriculum_grouped, "_extract_grouped_bin_worker", fake_worker)
 
     executor = FakeExecutor(max_workers=2, worker_fn=fake_worker)
-    monkeypatch.setattr(extract_grouped, "ProcessPoolExecutor", lambda **kwargs: executor)
+    monkeypatch.setattr(extract_curriculum_grouped, "ProcessPoolExecutor", lambda **kwargs: executor)
 
     def fake_as_completed(futures: dict[object, int]) -> list[object]:
         return list(futures.keys())
 
-    monkeypatch.setattr(extract_grouped, "as_completed", fake_as_completed)
+    monkeypatch.setattr(extract_curriculum_grouped, "as_completed", fake_as_completed)
 
     # Process partition 1 with 4 bins per partition (bins 4-7)
-    extract_grouped.extract_grouped_bins(
+    extract_curriculum_grouped.extract_grouped_bins(
         curriculum_metadata=curriculum_metadata,
         output_dir=output_dir,
         partition_index=1,
@@ -374,15 +375,15 @@ def test_extract_grouped_bins_failure_handling(monkeypatch: pytest.MonkeyPatch, 
             return future
 
     executor = FailingExecutor(max_workers=2)
-    monkeypatch.setattr(extract_grouped, "ProcessPoolExecutor", lambda **kwargs: executor)
+    monkeypatch.setattr(extract_curriculum_grouped, "ProcessPoolExecutor", lambda **kwargs: executor)
 
     def fake_as_completed(futures: dict[object, int]) -> list[object]:
         return list(futures.keys())
 
-    monkeypatch.setattr(extract_grouped, "as_completed", fake_as_completed)
+    monkeypatch.setattr(extract_curriculum_grouped, "as_completed", fake_as_completed)
 
     with pytest.raises(SomaExtractError):
-        extract_grouped.extract_grouped_bins(
+        extract_curriculum_grouped.extract_grouped_bins(
             curriculum_metadata=curriculum_metadata,
             output_dir=output_dir,
         )
@@ -408,7 +409,7 @@ def test_extract_grouped_bins_empty_partition(monkeypatch: pytest.MonkeyPatch, t
     output_dir = tmp_path / "output"
 
     # Partition 5 with 2 bins per partition -> no bins to process (only 1 bin total)
-    extract_grouped.extract_grouped_bins(
+    extract_curriculum_grouped.extract_grouped_bins(
         curriculum_metadata=curriculum_metadata,
         output_dir=output_dir,
         partition_index=5,

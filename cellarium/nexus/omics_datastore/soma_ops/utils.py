@@ -1,18 +1,28 @@
+"""
+Shared utilities for SOMA operations.
+"""
+
+
 def get_block_slice(
+    *,
     total_items: int,
     partition_index: int,
     block_size: int,
 ) -> tuple[int, int]:
     """
     Calculate [start, end) slice for a fixed-size block.
+
     Each partition gets at most `block_size` items.
     All full blocks are size `block_size`, the last block gets the remainder.
 
-    :param total_items: Total number of items in the sequence
-    :param partition_index: Zero-based partition index
-    :param block_size: Target number of items per partition (e.g. 500)
+    :param total_items: Total number of items in the sequence.
+    :param partition_index: Zero-based partition index.
+    :param block_size: Target number of items per partition (e.g. 500).
 
-    :return: (start, end) slice indexes for this partition
+    :raises ValueError: If block_size is not positive, total_items is negative,
+        or partition_index is negative.
+
+    :returns: (start, end) slice indexes for this partition.
     """
     if block_size <= 0:
         raise ValueError(f"block_size must be positive, got {block_size}")

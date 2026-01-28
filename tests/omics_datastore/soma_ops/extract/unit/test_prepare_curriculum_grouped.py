@@ -8,8 +8,8 @@ import pytest
 from cellarium.nexus.omics_datastore.soma_ops import (
     SomaPrepareCurriculumMetadataError,
     SomaReadError,
-    curriculum_grouped,
 )
+from cellarium.nexus.omics_datastore.soma_ops._extract import prepare_curriculum_grouped
 from tests.omics_datastore.soma_ops.conftest import FakeSomaExperiment
 
 # --- Tests for _build_group_filter ---
@@ -17,25 +17,25 @@ from tests.omics_datastore.soma_ops.conftest import FakeSomaExperiment
 
 def test_build_group_filter_single_string_column() -> None:
     """Verify filter for single string column."""
-    result = curriculum_grouped._build_group_filter(["tissue"], ("lung",))
+    result = prepare_curriculum_grouped._build_group_filter(["tissue"], ("lung",))
     assert result == 'tissue == "lung"'
 
 
 def test_build_group_filter_multiple_columns() -> None:
     """Verify filter for multiple columns."""
-    result = curriculum_grouped._build_group_filter(["tissue", "donor"], ("lung", "D1"))
+    result = prepare_curriculum_grouped._build_group_filter(["tissue", "donor"], ("lung", "D1"))
     assert result == 'tissue == "lung" and donor == "D1"'
 
 
 def test_build_group_filter_numeric_value() -> None:
     """Verify filter handles numeric values without quotes."""
-    result = curriculum_grouped._build_group_filter(["age"], (30,))
+    result = prepare_curriculum_grouped._build_group_filter(["age"], (30,))
     assert result == "age == 30"
 
 
 def test_build_group_filter_escapes_quotes() -> None:
     """Verify filter escapes quotes in string values."""
-    result = curriculum_grouped._build_group_filter(["name"], ('O"Brien',))
+    result = prepare_curriculum_grouped._build_group_filter(["name"], ('O"Brien',))
     assert result == 'name == "O\\"Brien"'
 
 
@@ -46,7 +46,7 @@ def test_build_group_filter_escapes_quotes() -> None:
 def test_prepare_grouped_curriculum_invalid_bin_size(bin_size: int) -> None:
     """Verify non-positive bin_size raises ValueError."""
     with pytest.raises(ValueError, match="bin_size must be positive"):
-        curriculum_grouped.prepare_grouped_curriculum(
+        prepare_curriculum_grouped.prepare_grouped_curriculum(
             experiment_uri="gs://bucket/soma",
             filters=None,
             extract_bin_keys=["tissue"],
@@ -57,7 +57,7 @@ def test_prepare_grouped_curriculum_invalid_bin_size(bin_size: int) -> None:
 def test_prepare_grouped_curriculum_empty_extract_bin_keys() -> None:
     """Verify empty extract_bin_keys raises ValueError."""
     with pytest.raises(ValueError, match="extract_bin_keys cannot be empty"):
-        curriculum_grouped.prepare_grouped_curriculum(
+        prepare_curriculum_grouped.prepare_grouped_curriculum(
             experiment_uri="gs://bucket/soma",
             filters=None,
             extract_bin_keys=[],
@@ -75,7 +75,7 @@ def test_prepare_grouped_curriculum_no_cells_raises_error(monkeypatch: pytest.Mo
     monkeypatch.setattr("tiledbsoma.open", fake_open)
 
     with pytest.raises(SomaPrepareCurriculumMetadataError, match="No cells found"):
-        curriculum_grouped.prepare_grouped_curriculum(
+        prepare_curriculum_grouped.prepare_grouped_curriculum(
             experiment_uri="gs://bucket/soma",
             filters=None,
             extract_bin_keys=["tissue"],
@@ -92,7 +92,7 @@ def test_prepare_grouped_curriculum_soma_read_error(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr("tiledbsoma.open", fake_open)
 
     with pytest.raises(SomaReadError):
-        curriculum_grouped.prepare_grouped_curriculum(
+        prepare_curriculum_grouped.prepare_grouped_curriculum(
             experiment_uri="gs://bucket/soma",
             filters=None,
             extract_bin_keys=["tissue"],
@@ -117,7 +117,7 @@ def test_prepare_grouped_curriculum_single_group_single_bin(monkeypatch: pytest.
 
     monkeypatch.setattr("tiledbsoma.open", fake_open)
 
-    result = curriculum_grouped.prepare_grouped_curriculum(
+    result = prepare_curriculum_grouped.prepare_grouped_curriculum(
         experiment_uri="gs://bucket/soma",
         filters=None,
         extract_bin_keys=["tissue"],
@@ -146,7 +146,7 @@ def test_prepare_grouped_curriculum_single_group_multiple_bins(monkeypatch: pyte
 
     monkeypatch.setattr("tiledbsoma.open", fake_open)
 
-    result = curriculum_grouped.prepare_grouped_curriculum(
+    result = prepare_curriculum_grouped.prepare_grouped_curriculum(
         experiment_uri="gs://bucket/soma",
         filters=None,
         extract_bin_keys=["tissue"],
@@ -186,7 +186,7 @@ def test_prepare_grouped_curriculum_multiple_groups(monkeypatch: pytest.MonkeyPa
 
     monkeypatch.setattr("tiledbsoma.open", fake_open)
 
-    result = curriculum_grouped.prepare_grouped_curriculum(
+    result = prepare_curriculum_grouped.prepare_grouped_curriculum(
         experiment_uri="gs://bucket/soma",
         filters=None,
         extract_bin_keys=["tissue"],
@@ -219,7 +219,7 @@ def test_prepare_grouped_curriculum_multiple_grouping_columns(monkeypatch: pytes
 
     monkeypatch.setattr("tiledbsoma.open", fake_open)
 
-    result = curriculum_grouped.prepare_grouped_curriculum(
+    result = prepare_curriculum_grouped.prepare_grouped_curriculum(
         experiment_uri="gs://bucket/soma",
         filters=None,
         extract_bin_keys=["tissue", "donor"],
@@ -252,7 +252,7 @@ def test_prepare_grouped_curriculum_group_filter_format(monkeypatch: pytest.Monk
 
     monkeypatch.setattr("tiledbsoma.open", fake_open)
 
-    result = curriculum_grouped.prepare_grouped_curriculum(
+    result = prepare_curriculum_grouped.prepare_grouped_curriculum(
         experiment_uri="gs://bucket/soma",
         filters=None,
         extract_bin_keys=["tissue"],
@@ -278,7 +278,7 @@ def test_prepare_grouped_curriculum_metadata_fields(monkeypatch: pytest.MonkeyPa
 
     monkeypatch.setattr("tiledbsoma.open", fake_open)
 
-    result = curriculum_grouped.prepare_grouped_curriculum(
+    result = prepare_curriculum_grouped.prepare_grouped_curriculum(
         experiment_uri="gs://bucket/soma",
         filters={"tissue__eq": "lung"},
         extract_bin_keys=["tissue"],

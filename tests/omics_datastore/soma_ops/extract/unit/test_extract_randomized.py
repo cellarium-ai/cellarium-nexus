@@ -6,7 +6,7 @@ import pytest
 import scipy.sparse as sp
 
 from cellarium.nexus.omics_datastore.soma_ops import SomaExtractError
-from cellarium.nexus.omics_datastore.soma_ops import extract_randomized as extract
+from cellarium.nexus.omics_datastore.soma_ops._extract import extract_curriculum_randomized
 from cellarium.nexus.shared.schemas.omics_datastore import IdContiguousRange, RandomizedCurriculumMetadata
 from tests.omics_datastore.soma_ops.conftest import FakeAnnData, FakeExecutor, FakeFuture, FakeSomaExperiment
 
@@ -61,7 +61,7 @@ def test_extract_range_to_anndata_happy_path(monkeypatch: pytest.MonkeyPatch, tm
     monkeypatch.setattr("anndata.AnnData", fake_anndata_constructor)
 
     # Execute
-    extract.extract_range_to_anndata(
+    extract_curriculum_randomized.extract_range_to_anndata(
         experiment_uri=experiment_uri,
         value_filter=value_filter,
         joinid_range=joinid_range,
@@ -114,7 +114,7 @@ def test_extract_range_to_anndata_empty_obs(monkeypatch: pytest.MonkeyPatch, tmp
     monkeypatch.setattr("anndata.AnnData", fake_anndata_constructor)
 
     # Execute
-    extract.extract_range_to_anndata(
+    extract_curriculum_randomized.extract_range_to_anndata(
         experiment_uri=experiment_uri,
         value_filter=value_filter,
         joinid_range=joinid_range,
@@ -142,7 +142,7 @@ def test_extract_range_to_anndata_error_handling(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr("tiledbsoma.open", fake_open)
 
     with pytest.raises(SomaExtractError):
-        extract.extract_range_to_anndata(
+        extract_curriculum_randomized.extract_range_to_anndata(
             experiment_uri=experiment_uri,
             value_filter=value_filter,
             joinid_range=joinid_range,
@@ -160,7 +160,7 @@ def test_extract_range_worker(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     def fake_extract(**kwargs: object) -> None:
         extract_calls.append(kwargs)
 
-    monkeypatch.setattr(extract, "extract_range_to_anndata", fake_extract)
+    monkeypatch.setattr(extract_curriculum_randomized, "extract_range_to_anndata", fake_extract)
 
     idx = 5
     experiment_uri = "gs://bucket/soma"
@@ -171,7 +171,7 @@ def test_extract_range_worker(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     var_columns = ["symbol"]
     x_layer = "raw"
 
-    result = extract._extract_range_worker(
+    result = extract_curriculum_randomized._extract_range_worker(
         idx=idx,
         experiment_uri=experiment_uri,
         value_filter=value_filter,
@@ -244,20 +244,20 @@ def test_extract_ranges_happy_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
             output_path.touch()
         return idx, str(output_path)
 
-    monkeypatch.setattr(extract, "_extract_range_worker", fake_worker)
+    monkeypatch.setattr(extract_curriculum_randomized, "_extract_range_worker", fake_worker)
 
     # Mock ProcessPoolExecutor to run synchronously
     executor = FakeExecutor(max_workers=2, worker_fn=fake_worker)
-    monkeypatch.setattr(extract, "ProcessPoolExecutor", lambda **kwargs: executor)
+    monkeypatch.setattr(extract_curriculum_randomized, "ProcessPoolExecutor", lambda **kwargs: executor)
 
     # Mock as_completed to return futures
     def fake_as_completed(futures: dict[object, int]) -> list[object]:
         return list(futures.keys())
 
-    monkeypatch.setattr(extract, "as_completed", fake_as_completed)
+    monkeypatch.setattr(extract_curriculum_randomized, "as_completed", fake_as_completed)
 
     # Execute
-    extract.extract_ranges(
+    extract_curriculum_randomized.extract_ranges(
         curriculum_metadata=curriculum_metadata,
         output_dir=output_dir,
         max_workers=2,
@@ -310,17 +310,17 @@ def test_extract_ranges_failure_handling(monkeypatch: pytest.MonkeyPatch, tmp_pa
             return future
 
     executor = FailingExecutor(max_workers=2)
-    monkeypatch.setattr(extract, "ProcessPoolExecutor", lambda **kwargs: executor)
+    monkeypatch.setattr(extract_curriculum_randomized, "ProcessPoolExecutor", lambda **kwargs: executor)
 
     # Mock as_completed to return futures
     def fake_as_completed(futures: dict[object, int]) -> list[object]:
         return list(futures.keys())
 
-    monkeypatch.setattr(extract, "as_completed", fake_as_completed)
+    monkeypatch.setattr(extract_curriculum_randomized, "as_completed", fake_as_completed)
 
     # Execute and expect error
     with pytest.raises(SomaExtractError):
-        extract.extract_ranges(
+        extract_curriculum_randomized.extract_ranges(
             curriculum_metadata=curriculum_metadata,
             output_dir=output_dir,
         )
@@ -335,7 +335,7 @@ def test_consolidate_zarr_extracts_no_files(tmp_path: Path) -> None:
     output_path = tmp_path / "consolidated.zarr"
 
     with pytest.raises(ValueError):
-        extract.consolidate_zarr_extracts(
+        extract_curriculum_randomized.consolidate_zarr_extracts(
             input_dir=input_dir,
             output_path=output_path,
         )
@@ -362,7 +362,7 @@ def test_shuffle_extracted_chunks_no_input_files(tmp_path: Path) -> None:
         extract_bin_indexes=[0],
     )
     with pytest.raises(ValueError):
-        extract.shuffle_extracted_chunks(
+        extract_curriculum_randomized.shuffle_extracted_chunks(
             curriculum_metadata=curriculum_metadata,
             input_dir=input_dir,
             output_dir=output_dir,
@@ -386,7 +386,7 @@ def test_shuffle_extracted_chunks_happy_path(monkeypatch: pytest.MonkeyPatch, tm
         # Just create the output path marker
         output_path.mkdir(parents=True, exist_ok=True)
 
-    monkeypatch.setattr(extract, "consolidate_zarr_extracts", fake_consolidate)
+    monkeypatch.setattr(extract_curriculum_randomized, "consolidate_zarr_extracts", fake_consolidate)
 
     # Mock anndata.read_zarr to return fake consolidated data
     def fake_read_zarr(path: str) -> FakeAnnData:
@@ -417,14 +417,16 @@ def test_shuffle_extracted_chunks_happy_path(monkeypatch: pytest.MonkeyPatch, tm
             results = []
             for chunk_idx in chunk_indexes:
                 # Create output file for each chunk using _shuffle_state
-                extract_bin_idx = extract._shuffle_state["extract_bin_indexes"][chunk_idx]
-                out_path = extract._shuffle_state["output_dir"] / f"extract_{extract_bin_idx:06d}.h5ad"
+                extract_bin_idx = extract_curriculum_randomized._shuffle_state["extract_bin_indexes"][chunk_idx]
+                out_path = (
+                    extract_curriculum_randomized._shuffle_state["output_dir"] / f"extract_{extract_bin_idx:06d}.h5ad"
+                )
                 out_path.parent.mkdir(parents=True, exist_ok=True)
                 out_path.touch()
                 results.append(chunk_idx)
             return results
 
-    monkeypatch.setattr(extract, "ProcessPoolExecutor", lambda **kwargs: FakeMapExecutor())
+    monkeypatch.setattr(extract_curriculum_randomized, "ProcessPoolExecutor", lambda **kwargs: FakeMapExecutor())
 
     # 6 total cells, chunk_size=4 -> 2 extract bins
     curriculum_metadata = RandomizedCurriculumMetadata(
@@ -441,7 +443,7 @@ def test_shuffle_extracted_chunks_happy_path(monkeypatch: pytest.MonkeyPatch, tm
     )
 
     # Execute
-    extract.shuffle_extracted_chunks(
+    extract_curriculum_randomized.shuffle_extracted_chunks(
         curriculum_metadata=curriculum_metadata,
         input_dir=input_dir,
         output_dir=output_dir,
