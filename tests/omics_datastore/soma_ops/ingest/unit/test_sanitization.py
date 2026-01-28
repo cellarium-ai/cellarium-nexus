@@ -436,13 +436,12 @@ def test_sanitize_obs_with_schema_casts_dtypes() -> None:
 
     sanitization._sanitize_obs_with_schema(adata=adata, ingest_schema=ingest_schema)
 
-    # Accept either 'object' or Pandas 'string' dtype
-    assert str(adata.obs["count"].dtype) in ("object", "string")
+    assert str(adata.obs["count"].dtype) == "object"
     assert list(adata.obs["count"]) == ["1", "2", "3"]
 
 
 def test_sanitize_obs_with_schema_fills_nullable_missing_columns() -> None:
-    """Verify missing nullable columns are filled with NA."""
+    """Verify missing nullable string columns are filled with unknown."""
 
     adata = anndata.AnnData(X=sp.csr_matrix((3, 2)))
     adata.obs = pd.DataFrame(
@@ -463,7 +462,8 @@ def test_sanitize_obs_with_schema_fills_nullable_missing_columns() -> None:
     sanitization._sanitize_obs_with_schema(adata=adata, ingest_schema=ingest_schema)
 
     assert list(adata.obs.columns) == ["cell_type", "missing_col"]
-    assert adata.obs["missing_col"].isna().all()
+    assert str(adata.obs["missing_col"].dtype) == "object"
+    assert (adata.obs["missing_col"] == sanitization.constants.STRING_NULL_FILL_VALUE).all()
 
 
 def test_sanitize_obs_with_schema_preserves_column_order() -> None:
@@ -762,8 +762,6 @@ def test_sanitize_obs_existing_nullable_with_nans() -> None:
     assert pd.isna(adata.obs["total_mrna_umis"].iloc[1])
     assert adata.obs["total_mrna_umis"].iloc[2] == 200
 
-    # Verify disease column is string/object and preserves NA
-    # Note: 'str' dtype might be 'string' (Pandas nullable) or object depending on impl details,
-    # but as long as it handles None it is fine. Our mapping uses 'string'.
-    assert str(adata.obs["disease"].dtype) == "string"
-    assert adata.obs["disease"].iloc[1] is pd.NA
+    # Verify disease column is string/object and fills missing values with unknown
+    assert str(adata.obs["disease"].dtype) == "object"
+    assert adata.obs["disease"].iloc[1] == sanitization.constants.STRING_NULL_FILL_VALUE

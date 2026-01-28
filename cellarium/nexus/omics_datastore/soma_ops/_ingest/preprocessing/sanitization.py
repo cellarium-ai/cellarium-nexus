@@ -119,7 +119,8 @@ def _sanitize_obs_with_schema(*, adata: AnnData, ingest_schema: IngestSchema) ->
 
     Filter obs columns to only those defined in schema and cast each column
     to its target dtype. Columns not in schema are dropped. Missing nullable
-    columns are filled with NA values.
+    string columns are filled with "unknown"; other nullable columns are
+    filled with NA values.
 
     :param adata: The AnnData object to sanitize.
     :param ingest_schema: Schema containing obs column descriptors.
@@ -145,24 +146,18 @@ def _sanitize_obs_with_schema(*, adata: AnnData, ingest_schema: IngestSchema) ->
         else:
             dtype = col_schema.dtype
 
-        # Detect pandas nullable string dtype; handle specially because pandas' StringDtype
-        # stores pd.NA which h5py/h5ad writer cannot implicitly convert to variable-length
-        # HDF5 strings. Treat schema dtype 'string' as a string column even if
-        # `PANDAS_NULLABLE_DTYPES` maps it to 'object', so we coerce values to Python
-        # `str` and fill missing values with empty string.
+        # Detect pandas nullable string dtype; handle specially for H5AD compatibility.
         is_string = col_schema.dtype == "string" or (str(dtype) == "string") or isinstance(dtype, pd.StringDtype)
 
         if col_name in adata.obs.columns:
             # Cast to target dtype using keyword-style call.
             series = adata.obs[col_name].astype(dtype=dtype)
-            # Convert pandas nullable string extension to plain Python strings for h5py compatibility.
             if is_string:
-                # Replace missing pandas NA with numpy nan (so pandas.isna remains True),
-                # then ensure every non-missing element is a Python str. Using np.nan
-                # prevents h5py from encountering pandas' pd.NA which can't be implicitly
-                # converted to HDF5 vlen strings.
+                # Convert to Python strings for H5AD writer compatibility.
                 series = series.where(series.notna(), np.nan)
                 series = series.map(lambda v: np.nan if pd.isna(v) else str(v)).astype(object)
+                if col_schema.nullable:
+                    series = series.fillna(constants.STRING_NULL_FILL_VALUE)
             new_obs_data[col_name] = series
         elif col_schema.nullable:
             # Create column with NA/fill values for nullable missing columns
