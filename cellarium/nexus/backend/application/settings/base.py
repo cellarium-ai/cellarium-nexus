@@ -239,6 +239,11 @@ UNFOLD = {
                         "link": reverse_lazy("admin:ingest_management_columnmapping_changelist"),
                     },
                     {
+                        "title": _("SOMA Ingest Schemas"),
+                        "icon": "schema",
+                        "link": reverse_lazy("admin:ingest_management_somaingestschema_changelist"),
+                    },
+                    {
                         "title": _("Validation Reports"),
                         "icon": "fact_check",
                         "link": reverse_lazy("admin:ingest_management_validationreport_changelist"),
