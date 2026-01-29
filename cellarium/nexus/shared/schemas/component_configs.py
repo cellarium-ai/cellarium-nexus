@@ -2,7 +2,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-from cellarium.nexus.shared.schemas.omics_datastore import FeatureSchema
+from cellarium.nexus.shared.schemas.omics_datastore import FeatureSchema, IngestSchema
 
 
 class CreateIngestFilesConfig(BaseModel):
@@ -87,3 +87,33 @@ class SomaOpsExtract(BaseModel):
 
     # Grouped-specific params
     max_bins_per_partition: int | None = None
+
+
+class SomaValidateSanitizeConfig(BaseModel):
+    """Configuration for validating and sanitizing SOMA ingest inputs."""
+
+    experiment_uri: str
+    input_h5ad_uris: list[str]
+    output_h5ad_uris: list[str]
+    ingest_schema: IngestSchema
+    max_bytes_per_file: int | None = None
+
+
+class SomaIngestPlanConfig(BaseModel):
+    """Configuration for preparing a SOMA ingest plan."""
+
+    experiment_uri: str
+    measurement_name: str
+    ingest_schema: IngestSchema
+    ingest_batch_size: int
+    h5ad_uris: list[str]
+    ingest_plan_gcs_path: str
+    first_adata_gcs_path: str | None = None
+
+
+class SomaIngestPartitionConfig(BaseModel):
+    """Configuration for ingesting a SOMA partition."""
+
+    experiment_uri: str
+    ingest_plan_gcs_path: str
+    partition_index: int
