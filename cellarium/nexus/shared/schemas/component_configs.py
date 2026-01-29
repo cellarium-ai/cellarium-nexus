@@ -12,11 +12,13 @@ class CreateIngestFilesConfig(BaseModel):
     input_file_path: str
     bucket_name: str
     bucket_stage_dir: str
-    tag: str
+    tag: str | None = None
     max_input_data_size: int
     column_mapping: dict[str, Any] | None = None
     validation_methods: list[str] | None = None
     uns_keys_to_keep: list[str] | None = None
+    ingest_id: int | None = None
+    ingest_file_id: int | None = None
 
 
 class IngestFilesConfig(BaseModel):

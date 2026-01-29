@@ -22,8 +22,8 @@ def test_submit_ingest_pipeline_creates_configs_and_calls_submit(
     # Arrange input dataframe (two files, with tags)
     df = pd.DataFrame(
         [
-            {"gcs_file_path": "gs://bucket/data/a1.h5ad", "tag": "t1"},
-            {"gcs_file_path": "gs://bucket/data/b2.h5ad", "tag": "t2"},
+            {"gcs_file_path": "gs://bucket/data/a1.h5ad", "tag": "t1", "ingest_id": 10, "ingest_file_id": 101},
+            {"gcs_file_path": "gs://bucket/data/b2.h5ad", "tag": "t2", "ingest_id": 10, "ingest_file_id": 102},
         ]
     )
 
@@ -66,6 +66,8 @@ def test_submit_ingest_pipeline_creates_configs_and_calls_submit(
         assert cfg.bigquery_dataset == default_dataset.name
         assert cfg.input_file_path == row["gcs_file_path"]
         assert cfg.tag == row["tag"]
+        assert cfg.ingest_id == row["ingest_id"]
+        assert cfg.ingest_file_id == row["ingest_file_id"]
         assert cfg.column_mapping == {"donor_id": "donor_id"}
         assert cfg.validation_methods == ["validate_shapes"]
         # Unique stage dirs, ending with filename stem prefix

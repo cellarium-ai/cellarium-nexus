@@ -50,6 +50,8 @@ def submit_ingest_pipeline(
         stage_dir = f"{base_stage_dir}/{secrets.token_hex(8)}_{file_name_without_ext[:10]}"
 
         tag = row["tag"] if "tag" in df_ingest_file_info.columns else None
+        ingest_id = row["ingest_id"] if "ingest_id" in df_ingest_file_info.columns else None
+        ingest_file_id = row["ingest_file_id"] if "ingest_file_id" in df_ingest_file_info.columns else None
 
         # Create combined config for this task
         create_ingest_files_configs.append(
@@ -65,6 +67,8 @@ def submit_ingest_pipeline(
                 max_input_data_size=settings.INGEST_INPUT_FILE_MAX_SIZE,
                 validation_methods=validation_methods,
                 uns_keys_to_keep=settings.INGEST_UNS_KEYS_TO_KEEP,
+                ingest_id=ingest_id,
+                ingest_file_id=ingest_file_id,
             )
         )
 

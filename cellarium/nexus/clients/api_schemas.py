@@ -7,9 +7,12 @@ from pydantic import BaseModel
 class IngestInfoAPISchema(BaseModel):
     id: int
     nexus_uuid: str
-    bigquery_dataset: str
+    omics_dataset: str | None = None
+    ingest_id: int | None = None
     ingest_start_timestamp: datetime
     ingest_finish_timestamp: datetime | None = None
+    gcs_file_path: str | None = None
+    tag: str | None = None
     metadata_extra: dict[str, Any] | None = None
     status: str | None = None
 

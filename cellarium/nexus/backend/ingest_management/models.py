@@ -9,17 +9,26 @@ from cellarium.nexus.backend.ingest_management.utils.column_mapping_utils import
     get_var_column_choices,
 )
 
+STATUS_STARTED = "STARTED"
+STATUS_SUCCEEDED = "SUCCEEDED"
+STATUS_FAILED = "FAILED"
+STATUS_CHOICES = [
+    (STATUS_STARTED, "Started"),
+    (STATUS_SUCCEEDED, "Succeeded"),
+    (STATUS_FAILED, "Failed"),
+]
+
 
 def default_empty_list():
     return []
 
 
-class IngestInfo(models.Model):
-    STATUS_STARTED = "STARTED"
-    STATUS_SUCCEEDED = "SUCCEEDED"
-    STATUS_FAILED = "FAILED"
-    STATUS_CHOICES = [(STATUS_STARTED, "Started"), (STATUS_SUCCEEDED, "Succeeded"), (STATUS_FAILED, "Failed")]
-    nexus_uuid = models.UUIDField(default=uuid.uuid4, verbose_name=_("nexus uuid"), unique=True)
+class Ingest(models.Model):
+    STATUS_STARTED = STATUS_STARTED
+    STATUS_SUCCEEDED = STATUS_SUCCEEDED
+    STATUS_FAILED = STATUS_FAILED
+    STATUS_CHOICES = STATUS_CHOICES
+
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_STARTED, verbose_name=_("status"))
     omics_dataset = models.ForeignKey(
         to="cell_management.OmicsDataset",
@@ -27,6 +36,50 @@ class IngestInfo(models.Model):
         related_name="ingest_management_ingests",
         verbose_name=_("omics dataset"),
     )
+    metadata_extra = models.JSONField(verbose_name=_("metadata extra"), null=True, blank=True)
+    ingest_start_timestamp = models.DateTimeField(
+        verbose_name=_("ingest start timestamp"), auto_now_add=True, editable=False
+    )
+    ingest_finish_timestamp = models.DateTimeField(verbose_name=_("ingest finish timestamp"), null=True, blank=True)
+    gencode_version = models.PositiveSmallIntegerField(verbose_name=_("gencode version"), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("ingest")
+        verbose_name_plural = _("ingests")
+        ordering = ["-ingest_start_timestamp"]
+        app_label = "ingest_management"
+
+    def __str__(self):
+        return f"Ingest {str(self.id)}"
+
+
+class IngestInfo(models.Model):
+    STATUS_STARTED = STATUS_STARTED
+    STATUS_SUCCEEDED = STATUS_SUCCEEDED
+    STATUS_FAILED = STATUS_FAILED
+    STATUS_CHOICES = STATUS_CHOICES
+
+    ingest = models.ForeignKey(
+        to="ingest_management.Ingest",
+        on_delete=models.CASCADE,
+        related_name="files",
+        verbose_name=_("ingest"),
+    )
+    nexus_uuid = models.UUIDField(default=uuid.uuid4, verbose_name=_("nexus uuid"), unique=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_STARTED, verbose_name=_("status"))
+    omics_dataset = models.ForeignKey(
+        to="cell_management.OmicsDataset",
+        on_delete=models.CASCADE,
+        related_name="ingest_management_ingest_files",
+        verbose_name=_("omics dataset"),
+    )
+    gcs_file_path = models.CharField(
+        max_length=1024,
+        verbose_name=_("gcs file path"),
+        null=True,
+        blank=True,
+    )
+    tag = models.CharField(max_length=255, verbose_name=_("tag"), null=True, blank=True)
     metadata_extra = models.JSONField(verbose_name=_("metadata extra"), null=True, blank=True)
     ingest_start_timestamp = models.DateTimeField(
         verbose_name=_("ingest start timestamp"), auto_now_add=True, editable=False
@@ -40,12 +93,12 @@ class IngestInfo(models.Model):
     )
 
     class Meta:
-        verbose_name = _("ingest info")
-        verbose_name_plural = _("ingest info objects")
+        verbose_name = _("ingest file")
+        verbose_name_plural = _("ingest files")
         app_label = "ingest_management"
 
     def __str__(self):
-        return f"Ingest {str(self.id)} info"
+        return f"Ingest file {str(self.id)}"
 
 
 class ColumnMapping(models.Model):
