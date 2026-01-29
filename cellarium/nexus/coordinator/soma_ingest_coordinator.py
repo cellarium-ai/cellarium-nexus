@@ -4,17 +4,14 @@ Coordinate TileDB SOMA ingest workflows for Nexus.
 
 from __future__ import annotations
 
-import json
 import logging
-import tempfile
-from pathlib import Path
 
 import anndata
 
 from cellarium.nexus.omics_datastore.soma_ops import TileDBSOMAIngestor
 from cellarium.nexus.omics_datastore.soma_ops.utils import get_block_slice
 from cellarium.nexus.shared.schemas.omics_datastore import IngestPlanMetadata, IngestSchema
-from cellarium.nexus.shared.utils import gcp
+from cellarium.nexus.shared.utils import WorkspaceFileManager, gcp
 
 logger = logging.getLogger(__name__)
 
@@ -79,9 +76,10 @@ class SomaIngestCoordinator:
         if not input_h5ad_uris:
             return []
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_dir_path = Path(temp_dir)
+        first_bucket, _ = self._parse_gcs_uri(input_h5ad_uris[0])
+        workspace_manager = WorkspaceFileManager(bucket_name=first_bucket)
 
+        with workspace_manager.temp_workspace() as workspace:
             for idx, (input_uri, output_uri) in enumerate(zip(input_h5ad_uris, output_h5ad_uris)):
                 logger.info(f"Validating and sanitizing {input_uri} -> {output_uri}")
 
@@ -93,23 +91,23 @@ class SomaIngestCoordinator:
                     if size_bytes > max_bytes_per_file:
                         raise ValueError(f"Input file {input_uri} is {size_bytes} bytes, exceeds {max_bytes_per_file}")
 
-                local_input = temp_dir_path / f"input_{idx}.h5ad"
-                local_output = temp_dir_path / f"sanitized_{idx}.h5ad"
+                local_input = workspace["input"] / f"input_{idx}.h5ad"
+                local_output = workspace["output"] / f"sanitized_{idx}.h5ad"
 
-                gcp.download_file_from_bucket(
-                    bucket_name=input_bucket,
-                    source_blob_name=input_path,
-                    destination_file_name=local_input,
+                input_manager = WorkspaceFileManager(bucket_name=input_bucket)
+                input_manager.download_file_from_bucket(
+                    remote_path=input_path,
+                    local_path=local_input,
                 )
 
                 adata = anndata.read_h5ad(filename=local_input)
                 self.ingestor.validate_and_sanitize_for_ingest(adata=adata, ingest_schema=ingest_schema)
                 adata.write_h5ad(filename=local_output)
 
-                gcp.upload_file_to_bucket(
-                    local_file_path=str(local_output),
-                    bucket_name=output_bucket,
-                    blob_name=output_path,
+                output_manager = WorkspaceFileManager(bucket_name=output_bucket)
+                output_manager.upload_file_to_bucket(
+                    local_path=local_output,
+                    remote_path=output_path,
                 )
 
         return output_h5ad_uris
@@ -140,12 +138,12 @@ class SomaIngestCoordinator:
         if first_adata_gcs_path:
             logger.info(f"Loading first AnnData from {first_adata_gcs_path}")
             bucket_name, blob_path = self._parse_gcs_uri(first_adata_gcs_path)
-            with tempfile.TemporaryDirectory() as temp_dir:
-                local_path = Path(temp_dir) / "first_adata.h5ad"
-                gcp.download_file_from_bucket(
-                    bucket_name=bucket_name,
-                    source_blob_name=blob_path,
-                    destination_file_name=local_path,
+            workspace_manager = WorkspaceFileManager(bucket_name=bucket_name)
+            with workspace_manager.temp_workspace() as workspace:
+                local_path = workspace["input"] / "first_adata.h5ad"
+                workspace_manager.download_file_from_bucket(
+                    remote_path=blob_path,
+                    local_path=local_path,
                 )
                 # Take the first 10 cells to avoid loading the entire dataset into memory.
                 # The ingestor only needs anndata for using it as a schema to create the experiment
@@ -170,9 +168,11 @@ class SomaIngestCoordinator:
         :return: Full GCS URI to the stored plan
         """
         bucket_name, blob_path = self._parse_gcs_uri(ingest_plan_gcs_path)
-        content = json.dumps(ingest_plan.model_dump(), indent=2)
-        gcp.upload_string_as_blob(content=content, bucket_name=bucket_name, blob_name=blob_path)
-        return f"gs://{bucket_name}/{blob_path}"
+        workspace_manager = WorkspaceFileManager(bucket_name=bucket_name)
+        return workspace_manager.save_json_to_bucket(
+            data=ingest_plan.model_dump(),
+            remote_path=blob_path,
+        )
 
     def load_ingest_plan_from_gcs(self, *, ingest_plan_gcs_path: str) -> IngestPlanMetadata:
         """
@@ -183,8 +183,8 @@ class SomaIngestCoordinator:
         :return: IngestPlanMetadata
         """
         bucket_name, blob_path = self._parse_gcs_uri(ingest_plan_gcs_path)
-        content = gcp.download_blob_as_string(bucket_name=bucket_name, blob_name=blob_path)
-        data = json.loads(content)
+        workspace_manager = WorkspaceFileManager(bucket_name=bucket_name)
+        data = workspace_manager.load_json_from_bucket(remote_path=blob_path)
         return IngestPlanMetadata.model_validate(obj=data)
 
     def ingest_partition(
@@ -215,17 +215,18 @@ class SomaIngestCoordinator:
             logger.info(f"Partition {partition_index} has no files to ingest")
             return
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_dir_path = Path(temp_dir)
+        first_bucket, _ = self._parse_gcs_uri(partition_uris[0])
+        workspace_manager = WorkspaceFileManager(bucket_name=first_bucket)
+        with workspace_manager.temp_workspace() as workspace:
             local_paths: list[str] = []
 
             for idx, uri in enumerate(partition_uris):
                 bucket_name, blob_path = self._parse_gcs_uri(uri)
-                local_path = temp_dir_path / f"ingest_{partition_index}_{idx}.h5ad"
-                gcp.download_file_from_bucket(
-                    bucket_name=bucket_name,
-                    source_blob_name=blob_path,
-                    destination_file_name=local_path,
+                local_path = workspace["input"] / f"ingest_{partition_index}_{idx}.h5ad"
+                bucket_manager = WorkspaceFileManager(bucket_name=bucket_name)
+                bucket_manager.download_file_from_bucket(
+                    remote_path=blob_path,
+                    local_path=local_path,
                 )
                 local_paths.append(str(local_path))
 
