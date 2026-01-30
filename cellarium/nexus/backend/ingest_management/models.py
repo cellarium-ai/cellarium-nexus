@@ -259,14 +259,8 @@ class SomaVarSchema(models.Model):
     Model for storing SOMA var schema definitions as Parquet files.
     """
 
-    omics_dataset = models.ForeignKey(
-        to="cell_management.OmicsDataset",
-        on_delete=models.CASCADE,
-        related_name="ingest_management_soma_var_schemas",
-        verbose_name=_("omics dataset"),
-    )
     ingest_schema = models.OneToOneField(
-        "SomaIngestSchema",
+        "IngestSchema",
         on_delete=models.CASCADE,
         related_name="var_schema",
         verbose_name=_("ingest schema"),
@@ -303,9 +297,9 @@ class SomaVarSchema(models.Model):
         return f"{self.ingest_schema}"
 
 
-class SomaIngestSchema(models.Model):
+class IngestSchema(models.Model):
     """
-    Model for storing SOMA ingest schemas.
+    Model for storing ingest schemas.
     """
 
     class XValidationType(models.TextChoices):
@@ -314,12 +308,6 @@ class SomaIngestSchema(models.Model):
 
     name = models.CharField(max_length=255, verbose_name=_("name"), unique=True)
     description = models.TextField(verbose_name=_("description"), null=True, blank=True)
-    omics_dataset = models.ForeignKey(
-        to="cell_management.OmicsDataset",
-        on_delete=models.CASCADE,
-        related_name="ingest_management_soma_ingest_schemas",
-        verbose_name=_("omics dataset"),
-    )
     x_validation_type = models.CharField(
         max_length=32,
         choices=XValidationType.choices,
@@ -330,8 +318,8 @@ class SomaIngestSchema(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name=_("updated at"))
 
     class Meta:
-        verbose_name = _("SOMA ingest schema")
-        verbose_name_plural = _("SOMA ingest schemas")
+        verbose_name = _("ingest schema")
+        verbose_name_plural = _("ingest schemas")
         ordering = ["-updated_at"]
         app_label = "ingest_management"
 
@@ -356,7 +344,7 @@ class SomaObsColumnSchema(models.Model):
         CATEGORY = "category", _("category")
 
     ingest_schema = models.ForeignKey(
-        SomaIngestSchema,
+        IngestSchema,
         on_delete=models.CASCADE,
         related_name="obs_columns",
         verbose_name=_("ingest schema"),

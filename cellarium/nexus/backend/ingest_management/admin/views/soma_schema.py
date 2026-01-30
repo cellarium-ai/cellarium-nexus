@@ -66,19 +66,19 @@ class SomaObsColumnSchemaInline(TabularInline):
     verbose_name_plural = _("SOMA obs columns")
 
 
-@admin.register(models.SomaIngestSchema)
-class SomaIngestSchemaAdmin(ModelAdmin):
-    list_display = ("name", "omics_dataset", "x_validation_type", "obs_column_count", "updated_at")
+@admin.register(models.IngestSchema)
+class IngestSchemaAdmin(ModelAdmin):
+    list_display = ("name", "x_validation_type", "obs_column_count", "updated_at")
     search_fields = ("name",)
-    list_filter = ("omics_dataset", "x_validation_type")
+    list_filter = ("x_validation_type",)
     readonly_fields = ("created_at", "updated_at")
     inlines = [SomaVarSchemaInline, SomaObsColumnSchemaInline]
     fieldsets = (
-        (None, {"fields": ("name", "description", "omics_dataset", "x_validation_type")}),
+        (None, {"fields": ("name", "description", "x_validation_type")}),
         (_("Timestamps"), {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
     )
 
-    def obs_column_count(self, obj: models.SomaIngestSchema) -> int:
+    def obs_column_count(self, obj: models.IngestSchema) -> int:
         return obj.obs_columns.count()
 
     obs_column_count.short_description = _("Obs columns")
@@ -94,7 +94,6 @@ class SomaIngestSchemaAdmin(ModelAdmin):
                 continue
 
             instance.ingest_schema = parent
-            instance.omics_dataset = parent.omics_dataset
 
             parsed_df = getattr(inline_form, "_parsed_df", None)
             if parsed_df is not None:
@@ -116,18 +115,17 @@ class SomaIngestSchemaAdmin(ModelAdmin):
 
     def get_fieldsets(self, request: HttpRequest, obj=None):
         if obj is None:
-            return ((None, {"fields": ("name", "description", "omics_dataset", "x_validation_type")}),)
+            return ((None, {"fields": ("name", "description", "x_validation_type")}),)
         return super().get_fieldsets(request, obj)
 
 
 @admin.register(models.SomaVarSchema)
 class SomaVarSchemaAdmin(ModelAdmin):
-    list_display = ("ingest_schema", "omics_dataset", "is_subset", "feature_count", "updated_at")
+    list_display = ("ingest_schema", "is_subset", "feature_count", "updated_at")
     search_fields = ("ingest_schema__name",)
-    list_filter = ("omics_dataset", "is_subset")
+    list_filter = ("is_subset",)
     readonly_fields = ("var_parquet_file", "feature_count", "var_columns", "created_at", "updated_at")
     fields = (
-        "omics_dataset",
         "ingest_schema",
         "is_subset",
         "var_parquet_file",
