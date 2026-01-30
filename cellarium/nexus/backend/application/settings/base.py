@@ -231,12 +231,17 @@ UNFOLD = {
                     {
                         "title": _("Data Ingests"),
                         "icon": "upload_file",
-                        "link": reverse_lazy("admin:ingest_management_ingestinfo_changelist"),
+                        "link": reverse_lazy("admin:ingest_management_ingest_changelist"),
                     },
                     {
                         "title": _("Column Mappers"),
                         "icon": "table_rows",
                         "link": reverse_lazy("admin:ingest_management_columnmapping_changelist"),
+                    },
+                    {
+                        "title": _("Ingest Schemas"),
+                        "icon": "schema",
+                        "link": reverse_lazy("admin:ingest_management_ingestschema_changelist"),
                     },
                     {
                         "title": _("Validation Reports"),

@@ -29,6 +29,25 @@ class VarColumnMappingInline(TabularInline):
     fields = ("input_column", "schema_column")
 
 
+class IngestFileInline(TabularInline):
+    model = models.IngestInfo
+    extra = 0
+    can_delete = False
+    show_change_link = True
+    verbose_name = _("Ingest File")
+    verbose_name_plural = _("Ingest Files")
+    fields = (
+        "id",
+        "gcs_file_path",
+        "tag",
+        "status",
+        "nexus_uuid",
+        "ingest_start_timestamp",
+        "ingest_finish_timestamp",
+    )
+    readonly_fields = fields
+
+
 @admin.register(models.ColumnMapping)
 class ColumnMappingAdmin(ModelAdmin):
     list_display = ("name", "description", "created_at", "updated_at")
@@ -41,12 +60,12 @@ class ColumnMappingAdmin(ModelAdmin):
     )
 
 
-@admin.register(models.IngestInfo)
-class IngestInfoAdmin(ModelAdmin):
+@admin.register(models.Ingest)
+class IngestAdmin(ModelAdmin):
     """
-    Admin interface for managing ingest file information.
+    Admin interface for managing ingest records.
 
-    Provides functionality to track and manage file ingestion metadata and data ingestion actions.
+    Provides functionality to track and manage ingest metadata and data ingestion actions.
     Prevents direct creation and editing of ingests - they can only be created through the
     'Ingest New Data' action.
     """
@@ -64,36 +83,43 @@ class IngestInfoAdmin(ModelAdmin):
 
     def has_change_permission(self, request: HttpRequest, obj=None) -> bool:
         """
-        Disable the ability to edit ingest instances.
+        Allow viewing ingest instances but prevent editing.
 
         :param request: The HTTP request
         :param obj: The object being changed
 
-        :return: False to prevent editing
+        :return: True to allow viewing
         """
-        return False
+        return True
 
     list_display = (
         "id",
-        "nexus_uuid",
         "status",
         "omics_dataset",
+        "file_count",
         "ingest_start_timestamp",
         "ingest_finish_timestamp",
     )
-    search_fields = ("nexus_uuid", "status")
+    search_fields = ("status",)
     list_filter = ("status", "omics_dataset")
     ordering = ("-ingest_start_timestamp",)
-    readonly_fields = ("ingest_start_timestamp", "ingest_finish_timestamp", "nexus_uuid")
+    readonly_fields = (
+        "status",
+        "omics_dataset",
+        "metadata_extra",
+        "gencode_version",
+        "ingest_start_timestamp",
+        "ingest_finish_timestamp",
+    )
     fieldsets = (
         (
             None,
             {
                 "fields": (
-                    "nexus_uuid",
                     "status",
                     "omics_dataset",
                     "metadata_extra",
+                    "gencode_version",
                     "ingest_start_timestamp",
                     "ingest_finish_timestamp",
                 )
@@ -101,6 +127,12 @@ class IngestInfoAdmin(ModelAdmin):
         ),
     )
     actions_list = ["ingest_new_data", "validate_new_data"]
+    inlines = [IngestFileInline]
+
+    def file_count(self, obj: models.Ingest) -> int:
+        return obj.files.count()
+
+    file_count.short_description = _("File count")
 
     @staticmethod
     def __get_validation_methods(gencode_version: str | None) -> list[str]:
@@ -141,6 +173,31 @@ class IngestInfoAdmin(ModelAdmin):
                 raise ValidationError(f"CSV must contain columns: {', '.join(constants.REQUIRED_CSV_FILE_COLUMNS)}")
 
             column_mapping = column_mapping_utils.create_column_mapping(column_mapping_obj=column_mapping_obj)
+            ingest = models.Ingest.objects.create(
+                omics_dataset=omics_dataset,
+                status=models.Ingest.STATUS_STARTED,
+                gencode_version=gencode_version,
+            )
+
+            ingest_file_ids: list[int] = []
+            for _, row in df.iterrows():
+                tag_value = row.get(constants.TAGS_COLUMN)
+                if pd.isna(tag_value):
+                    tag_value = None
+                ingest_file = models.IngestInfo.objects.create(
+                    ingest=ingest,
+                    omics_dataset=omics_dataset,
+                    status=models.IngestInfo.STATUS_STARTED,
+                    gcs_file_path=row[constants.GCS_PATH_COLUMN],
+                    tag=tag_value,
+                    column_mapping=column_mapping,
+                )
+                ingest_file_ids.append(ingest_file.id)
+
+            df = df.copy()
+            df["ingest_id"] = ingest.id
+            df["ingest_file_id"] = ingest_file_ids
+
             pipeline_url = workflows_utils.submit_ingest_pipeline(
                 df_ingest_file_info=df,
                 column_mapping=column_mapping,
@@ -151,7 +208,7 @@ class IngestInfoAdmin(ModelAdmin):
             messages.success(
                 request=request, message=mark_safe(constants.INGEST_PIPELINE_SUCCESS_MESSAGE.format(pipeline_url))
             )
-            return redirect("admin:ingest_management_ingestinfo_changelist")
+            return redirect("admin:ingest_management_ingest_changelist")
 
         return render(
             request=request,

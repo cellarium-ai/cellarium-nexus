@@ -35,6 +35,14 @@ class OmicsDataset(models.Model):
 
     name = models.CharField(max_length=256, verbose_name=_("name"), unique=True)
     description = models.TextField(verbose_name=_("description"), null=True, blank=True)
+    schema = models.ForeignKey(
+        to="ingest_management.IngestSchema",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="omics_datasets",
+        verbose_name=_("ingest schema"),
+    )
     backend = models.CharField(
         max_length=32,
         choices=OmicsDatasetBackend.choices,

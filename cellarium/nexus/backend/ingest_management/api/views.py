@@ -11,10 +11,21 @@ from cellarium.nexus.backend.ingest_management.services import index_tracking
 
 
 class IngestCreateAPIView(CreateAPIView):
-    serializer_class = serializers.IngestInfoSerializer
+    serializer_class = serializers.IngestSerializer
 
 
 class IngestRetrieveUpdateAPIView(RetrieveUpdateAPIView):
+    serializer_class = serializers.IngestSerializer
+    queryset = models.Ingest.objects.all()
+    lookup_field = "id"
+    http_method_names = ("get", "put", "patch")
+
+
+class IngestFileCreateAPIView(CreateAPIView):
+    serializer_class = serializers.IngestInfoSerializer
+
+
+class IngestFileRetrieveUpdateAPIView(RetrieveUpdateAPIView):
     serializer_class = serializers.IngestInfoSerializer
     queryset = models.IngestInfo.objects.all()
     lookup_field = "id"

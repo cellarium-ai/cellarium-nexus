@@ -54,7 +54,8 @@ def test_export_model_queryset_to_csv_exclude_fields(default_dataset: cm_models.
 
 
 def test_export_model_queryset_to_csv_foreign_key_id(default_dataset: cm_models.OmicsDataset) -> None:
-    ingest = im_models.IngestInfo.objects.create(omics_dataset=default_dataset)
+    parent = im_models.Ingest.objects.create(omics_dataset=default_dataset)
+    ingest = im_models.IngestInfo.objects.create(ingest=parent, omics_dataset=default_dataset)
 
     qs = im_models.IngestInfo.objects.filter(pk=ingest.pk)
     resp = export_model_queryset_to_csv(queryset=qs)

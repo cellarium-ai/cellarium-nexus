@@ -48,6 +48,8 @@ def create_ingest_files_job(gcs_config_path: str):
         max_input_data_size=params.max_input_data_size,
         uns_keys_to_keep=params.uns_keys_to_keep,
         validation_methods=params.validation_methods,
+        ingest_id=params.ingest_id,
+        ingest_file_id=params.ingest_file_id,
     )
 
 

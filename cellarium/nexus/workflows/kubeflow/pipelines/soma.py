@@ -83,3 +83,66 @@ def soma_grouped_extract_data_pipeline(extract_configs: t.List[str], mark_finish
 
     mark_finished_op = components.mark_soma_curriculum_as_finished_job(config_path=mark_finished_config)
     mark_finished_op.after(extract_op)
+
+
+@dsl.pipeline(
+    name="nexus-pipelines-run-soma-validate-sanitize",
+    description="Run parallel SOMA validate and sanitize operations",
+)
+def run_soma_validate_sanitize_pipeline(validate_sanitize_configs: t.List[str]) -> None:
+    """
+    Validate and sanitize multiple SOMA ingest inputs in parallel.
+
+    :param validate_sanitize_configs: List of paths to SomaValidateSanitizeConfig files
+
+    :raise RuntimeError: If any component fails
+    """
+    with dsl.ParallelFor(
+        items=validate_sanitize_configs, name="soma-validate-sanitize-workers", parallelism=64
+    ) as item:
+        components.soma_validate_sanitize_job(config_path=item)
+
+
+@dsl.pipeline(
+    name="nexus-pipelines-soma-validate-sanitize-and-ingest",
+    description="Validate, sanitize, and ingest SOMA data",
+)
+def soma_validate_sanitize_and_ingest_pipeline(
+    validate_sanitize_configs: t.List[str], ingest_plan_config: str, ingest_partition_configs: t.List[str]
+) -> None:
+    """
+    Validate and sanitize inputs, prepare ingest plan, and ingest partitions.
+
+    :param validate_sanitize_configs: List of paths to SomaValidateSanitizeConfig files
+    :param ingest_plan_config: Path to SomaIngestPlanConfig file
+    :param ingest_partition_configs: List of paths to SomaIngestPartitionConfig files
+
+    :raise RuntimeError: If any component fails
+    """
+    validate_op = run_soma_validate_sanitize_pipeline(validate_sanitize_configs=validate_sanitize_configs)
+    plan_op = components.soma_prepare_ingest_plan_job(config_path=ingest_plan_config)
+    plan_op.after(validate_op)
+
+    with dsl.ParallelFor(items=ingest_partition_configs, name="soma-ingest-partition-workers", parallelism=128) as item:
+        ingest_op = components.soma_ingest_partition_job(config_path=item)
+        ingest_op.after(plan_op)
+
+
+@dsl.pipeline(
+    name="nexus-pipelines-soma-ingest",
+    description="Prepare ingest plan and ingest SOMA data",
+)
+def soma_ingest_pipeline(ingest_plan_config: str, ingest_partition_configs: t.List[str]) -> None:
+    """
+    Prepare ingest plan and ingest partitions.
+
+    :param ingest_plan_config: Path to SomaIngestPlanConfig file
+    :param ingest_partition_configs: List of paths to SomaIngestPartitionConfig files
+
+    :raise RuntimeError: If any component fails
+    """
+    plan_op = components.soma_prepare_ingest_plan_job(config_path=ingest_plan_config)
+
+    with dsl.ParallelFor(items=ingest_partition_configs, name="soma-ingest-partition-workers", parallelism=128) as item:
+        ingest_op = components.soma_ingest_partition_job(config_path=item)
+        ingest_op.after(plan_op)

@@ -10,8 +10,11 @@ from cellarium.nexus.workflows.kubeflow.pipelines.bq import (
 from cellarium.nexus.workflows.kubeflow.pipelines.soma import (
     run_soma_grouped_extracts_pipeline,
     run_soma_randomized_extracts_pipeline,
+    run_soma_validate_sanitize_pipeline,
     soma_grouped_extract_data_pipeline,
+    soma_ingest_pipeline,
     soma_randomized_extract_data_pipeline,
+    soma_validate_sanitize_and_ingest_pipeline,
 )
 from cellarium.nexus.workflows.kubeflow.pipelines.validation import validate_anndata_pipeline
 
@@ -27,6 +30,9 @@ __all__ = [
     "run_soma_grouped_extracts_pipeline",
     "soma_randomized_extract_data_pipeline",
     "soma_grouped_extract_data_pipeline",
+    "run_soma_validate_sanitize_pipeline",
+    "soma_validate_sanitize_and_ingest_pipeline",
+    "soma_ingest_pipeline",
     # Validation pipelines
     "validate_anndata_pipeline",
 ]

@@ -3,7 +3,8 @@ from django.utils.translation import gettext_lazy as _
 from unfold.widgets import UnfoldAdminFileFieldWidget, UnfoldAdminSelectWidget
 
 from cellarium.nexus.backend.cell_management.models import OmicsDataset
-from cellarium.nexus.backend.ingest_management.models import ColumnMapping
+from cellarium.nexus.backend.ingest_management import models
+from cellarium.nexus.backend.ingest_management.utils import soma_schema_utils
 
 GENCODE_CHOICES = [
     (43, _("Gencode 43")),
@@ -32,7 +33,7 @@ class IngestNewDataChangeListActionForm(forms.Form):
     column_mapping = forms.ModelChoiceField(
         required=False,
         label=_("Column Mapping"),
-        queryset=ColumnMapping.objects.all(),
+        queryset=models.ColumnMapping.objects.all(),
         widget=UnfoldAdminSelectWidget,
         help_text=_("Select an existing column mapping configuration"),
     )
@@ -48,7 +49,7 @@ class IngestNewDataChangeListActionForm(forms.Form):
         ),
     )
 
-    def clean_column_mapping(self) -> ColumnMapping | None:
+    def clean_column_mapping(self) -> models.ColumnMapping | None:
         """
         Validate the column mapping model instance if provided.
 
@@ -85,3 +86,38 @@ class ValidateNewDataChangeListActionForm(forms.Form):
         help_text=_("Select the Gencode version for validation. Will be ignored for non Homo Sapiens data."),
         initial=44,
     )
+
+
+class SomaVarSchemaInlineForm(forms.ModelForm):
+    """
+    Inline form for creating a SOMA var schema from a CSV file.
+    """
+
+    csv_file = forms.FileField(
+        label=_("Var Schema CSV"),
+        required=True,
+        widget=UnfoldAdminFileFieldWidget,
+        help_text=_("CSV where the first column will be used as the index."),
+    )
+
+    class Meta:
+        model = models.SomaVarSchema
+        fields = ("is_subset", "csv_file")
+        widgets = {}
+
+    def clean(self):
+        cleaned = super().clean()
+        csv_file = cleaned.get("csv_file")
+        if not csv_file:
+            return cleaned
+        if csv_file:
+            try:
+                parsed = soma_schema_utils.parse_var_schema_csv(csv_file=csv_file)
+            except soma_schema_utils.VarSchemaCSVError as exc:
+                self.add_error("csv_file", str(exc))
+                return cleaned
+
+            self._parsed_df = parsed.dataframe
+            self._parsed_from_csv = True
+
+        return cleaned

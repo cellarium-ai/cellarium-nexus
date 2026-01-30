@@ -21,7 +21,8 @@ def ingest(default_dataset: cell_management_models.OmicsDataset) -> ingest_model
 
     :return: Newly created ingest info instance
     """
-    return ingest_models.IngestInfo.objects.create(omics_dataset=default_dataset)
+    parent = ingest_models.Ingest.objects.create(omics_dataset=default_dataset)
+    return ingest_models.IngestInfo.objects.create(ingest=parent, omics_dataset=default_dataset)
 
 
 def test_ingest_from_avro_validate_happy_path(ingest: ingest_models.IngestInfo) -> None:
