@@ -1,4 +1,7 @@
+from pathlib import Path
+
 import pandas as pd
+from django.conf import settings
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse
@@ -11,7 +14,7 @@ from unfold.decorators import action
 from cellarium.nexus.backend.ingest_management import models
 from cellarium.nexus.backend.ingest_management.admin import constants, forms
 from cellarium.nexus.backend.ingest_management.utils.export_csv import export_model_queryset_to_csv
-from cellarium.nexus.backend.ingest_management.utils.workflows_utils import submit_validation_pipeline
+from cellarium.nexus.backend.ingest_management.utils.workflow_utils_local import run_validate_and_sanitize
 
 
 class ValidationReportItemInline(TabularInline):
@@ -142,57 +145,54 @@ class ValidationReportAdmin(ModelAdmin):
     @action(description=_("Validate New Data"), url_path="validate-new-data")
     def validate_new_data(self, request: HttpRequest) -> HttpResponse:
         """
-        Validate new data using the Kubeflow validation pipeline.
-
-        Upload CSV file with GCS paths, create validation report, and submit validation pipeline.
+        Validate and sanitize SOMA data.
 
         :param request: The HTTP request
 
-        :raise ValidationError: If validation fails
-        :raise IOError: If there's an error reading the CSV file or writing configs to GCS
-        :raise google.api_core.exceptions.GoogleAPIError: If pipeline submission fails
+        :raises ValidationError: If validation fails
+        :raises ValueError: If dataset or schema not found
+        :raises IOError: If there's an error with GCS operations
 
         :return: HTTP response
         """
         form = forms.ValidateNewDataChangeListActionForm(request.POST or None, request.FILES or None)
 
         if request.method == "POST" and form.is_valid():
-            csv_file = form.cleaned_data["ingest_csv_file"]
+            dataset_name = form.cleaned_data["omics_dataset"].name
+            csv_file = form.cleaned_data["input_csv_file"]
+            output_directory = form.cleaned_data["output_directory_uri"].rstrip("/")
+
+            # Read CSV file to extract input paths
             df = pd.read_csv(csv_file)
-            if not all(col in df.columns for col in constants.REQUIRED_CSV_FILE_COLUMNS):
-                raise ValidationError(f"CSV must contain columns: {', '.join(constants.REQUIRED_CSV_FILE_COLUMNS)}")
+
+            # Get first column (assuming GCS paths are in first column)
+            input_paths = df.iloc[:, 0].tolist()
+
+            if not input_paths:
+                raise ValidationError(_("CSV file contains no data"))
+
+            # Generate output paths from directory and input filenames
+            output_paths = [f"{output_directory}/{Path(path).name}" for path in input_paths]
 
             # Create validation report
             validation_report = models.ValidationReport.objects.create(creator=request.user)
-            validation_report_id = validation_report.id
 
-            # Get the selected genecode version
-            gencode_version = form.cleaned_data["gencode_version"]
-            gencode_validator = f"nexus.omics_datastore.bq_ops.validate.cellarium_validate_gencode_{gencode_version}"
-
-            # Define validation methods
-            validation_methods = [
-                "nexus.omics_datastore.bq_ops.validate.validate_raw_counts",
-                gencode_validator,
-            ]
-
-            # Extract all AnnData GCS paths from the CSV
-            adata_gcs_paths = df[constants.GCS_PATH_COLUMN].tolist()
-
-            # Submit validation pipeline
-            pipeline_url = submit_validation_pipeline(
-                adata_gcs_paths=adata_gcs_paths,
-                validation_report_id=validation_report_id,
-                validation_methods=validation_methods,
+            # Call validation pipeline
+            run_validate_and_sanitize(
+                dataset_name=dataset_name,
+                input_h5ad_uris=input_paths,
+                output_h5ad_uris=output_paths,
+                validation_report_id=validation_report.id,
+                nexus_backend_api_url=settings.SITE_URL,
             )
 
-            # Use mark_safe to prevent HTML escaping in the message
-            success_message = _(
-                "Validation pipeline submitted successfully. "
-                f"<a href='{pipeline_url}' target='_blank' style='text-decoration: underline;'>View pipeline progress</a>"
+            messages.success(
+                request=request,
+                message=_(
+                    "SOMA validation pipeline completed successfully. " f"Validation Report ID: {validation_report.id}"
+                ),
             )
-            messages.success(request=request, message=mark_safe(success_message))
-            return redirect("admin:ingest_management_validationreport_changelist")
+            return redirect("admin:ingest_management_validationreport_change", object_id=validation_report.id)
 
         return render(
             request=request,

@@ -83,6 +83,16 @@ class ReserveIndexesFeatureInfoAPIView(ReserveIndexesAPIViewAbstract):
     resource_key = "feature_info"
 
 
+class ValidationReportCreateAPIView(CreateAPIView):
+    """
+    API view for creating ValidationReport entries.
+
+    Allows creating validation reports with optional user as creator.
+    """
+
+    serializer_class = serializers.ValidationReportSerializer
+
+
 class ValidationReportItemCreateAPIView(CreateAPIView):
     """
     API view for creating ValidationReportItem entries.

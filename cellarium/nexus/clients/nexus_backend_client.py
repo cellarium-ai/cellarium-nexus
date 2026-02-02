@@ -6,6 +6,7 @@ from cellarium.nexus.clients.api_schemas import (
     BackendResetAPISchema,
     CurriculumAPISchema,
     IngestInfoAPISchema,
+    ValidationReportAPISchema,
     ValidationReportItemAPISchema,
 )
 from cellarium.nexus.clients.base import BaseAPIHTTPClient
@@ -20,6 +21,7 @@ class ApiEndpoints:
     FEATURE_INFO_RESERVE_INDEXES: str = "api/ingest-management/reserve-indexes/feature-info/"
     REGISTER_CURRICULUM: str = "api/curriculum/curriculums/"
     UPDATE_CURRICULUM: str = "api/curriculum/curriculums/{name}/"
+    CREATE_VALIDATION_REPORT: str = "api/ingest-management/validation-report/create/"
     CREATE_VALIDATION_REPORT_ITEM: str = "api/ingest-management/validation-report-item/create/"
     RESET_CACHE: str = "api/ingest-management/reset-cache/"
 
@@ -246,6 +248,20 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
 
         api_out = self.patch_json(endpoint=ApiEndpoints.UPDATE_CURRICULUM.format(name=name), data=data)
         return CurriculumAPISchema(**api_out)
+
+    def create_validation_report(self) -> ValidationReportAPISchema:
+        """
+        Create a new validation report.
+
+        The creator is set from the authenticated request context on the backend.
+
+        :raise: HTTPError if the request fails
+        :raise: ValueError if the response is invalid
+
+        :return: Created validation report
+        """
+        api_out = self.post_json(endpoint=ApiEndpoints.CREATE_VALIDATION_REPORT, data={})
+        return ValidationReportAPISchema(**api_out)
 
     def create_validation_report_item(
         self,

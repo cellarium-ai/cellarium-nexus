@@ -254,6 +254,36 @@ class ValidationReportItem(models.Model):
         return f"{status} - {self.validator_name} - {truncated_path}"
 
 
+class IngestSchema(models.Model):
+    """
+    Model for storing ingest schemas.
+    """
+
+    class XValidationType(models.TextChoices):
+        COUNT_MATRIX = "count_matrix", _("Count matrix")
+        FEATURE_MATRIX = "feature_matrix", _("Feature matrix")
+
+    name = models.CharField(max_length=255, verbose_name=_("name"), unique=True)
+    description = models.TextField(verbose_name=_("description"), null=True, blank=True)
+    x_validation_type = models.CharField(
+        max_length=32,
+        choices=XValidationType.choices,
+        default=XValidationType.COUNT_MATRIX,
+        verbose_name=_("X validation type"),
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("created at"))
+    updated_at = models.DateTimeField(auto_now=True, verbose_name=_("updated at"))
+
+    class Meta:
+        verbose_name = _("ingest schema")
+        verbose_name_plural = _("ingest schemas")
+        ordering = ["-updated_at"]
+        app_label = "ingest_management"
+
+    def __str__(self):
+        return self.name
+
+
 class SomaVarSchema(models.Model):
     """
     Model for storing SOMA var schema definitions as Parquet files.
@@ -295,36 +325,6 @@ class SomaVarSchema(models.Model):
 
     def __str__(self):
         return f"{self.ingest_schema}"
-
-
-class IngestSchema(models.Model):
-    """
-    Model for storing ingest schemas.
-    """
-
-    class XValidationType(models.TextChoices):
-        COUNT_MATRIX = "count_matrix", _("Count matrix")
-        FEATURE_MATRIX = "feature_matrix", _("Feature matrix")
-
-    name = models.CharField(max_length=255, verbose_name=_("name"), unique=True)
-    description = models.TextField(verbose_name=_("description"), null=True, blank=True)
-    x_validation_type = models.CharField(
-        max_length=32,
-        choices=XValidationType.choices,
-        default=XValidationType.COUNT_MATRIX,
-        verbose_name=_("X validation type"),
-    )
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name=_("created at"))
-    updated_at = models.DateTimeField(auto_now=True, verbose_name=_("updated at"))
-
-    class Meta:
-        verbose_name = _("ingest schema")
-        verbose_name_plural = _("ingest schemas")
-        ordering = ["-updated_at"]
-        app_label = "ingest_management"
-
-    def __str__(self):
-        return self.name
 
 
 class SomaObsColumnSchema(models.Model):

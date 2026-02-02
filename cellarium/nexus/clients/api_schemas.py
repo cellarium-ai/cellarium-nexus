@@ -39,6 +39,12 @@ class CurriculumAPISchema(BaseModel):
     filters_json: dict[str, Any] | None = None
 
 
+class ValidationReportAPISchema(BaseModel):
+    id: int
+    creator_id: int | None = None
+    created_at: datetime
+
+
 class ValidationReportItemAPISchema(BaseModel):
     id: int
     report_id: int

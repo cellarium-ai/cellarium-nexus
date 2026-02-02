@@ -1,6 +1,11 @@
 from django import forms
 from django.utils.translation import gettext_lazy as _
-from unfold.widgets import UnfoldAdminFileFieldWidget, UnfoldAdminSelectWidget
+from unfold.widgets import (
+    UnfoldAdminFileFieldWidget,
+    UnfoldAdminSelect2Widget,
+    UnfoldAdminSelectWidget,
+    UnfoldAdminTextInputWidget,
+)
 
 from cellarium.nexus.backend.cell_management.models import OmicsDataset
 from cellarium.nexus.backend.ingest_management import models
@@ -71,21 +76,35 @@ class IngestNewDataChangeListActionForm(forms.Form):
 
 class ValidateNewDataChangeListActionForm(forms.Form):
     """
-    Form for validating new data uploads.
+    Form for SOMA validation and sanitization pipeline.
     """
 
-    ingest_csv_file = forms.FileField(
-        label=_("Input datasets"),
+    omics_dataset = forms.ModelChoiceField(
+        label=_("Omics Dataset"),
+        queryset=OmicsDataset.objects.all(),
+        widget=UnfoldAdminSelect2Widget,
+        help_text=_("Omics dataset containing the schema for validation"),
+    )
+    input_csv_file = forms.FileField(
+        label=_("Input H5AD Files CSV"),
         widget=UnfoldAdminFileFieldWidget,
-        help_text=_("CSV file with GCS Bucket paths of files to validate"),
+        help_text=_("CSV file with one GCS path per line (e.g., gs://bucket/file1.h5ad)"),
     )
-    gencode_version = forms.ChoiceField(
-        label=_("Gencode Version"),
-        choices=GENCODE_CHOICES,
-        widget=UnfoldAdminSelectWidget,
-        help_text=_("Select the Gencode version for validation. Will be ignored for non Homo Sapiens data."),
-        initial=44,
+    output_directory_uri = forms.CharField(
+        label=_("Output Directory URI"),
+        widget=UnfoldAdminTextInputWidget,
+        help_text=_("GCS directory URI for sanitized output files (e.g., gs://bucket/output/)"),
+        required=True,
     )
+
+    def clean(self):
+        cleaned = super().clean()
+        output_directory = cleaned.get("output_directory_uri", "").strip()
+
+        if output_directory and not output_directory.startswith("gs://"):
+            self.add_error("output_directory_uri", _("Output directory URI must start with gs://"))
+
+        return cleaned
 
 
 class SomaVarSchemaInlineForm(forms.ModelForm):

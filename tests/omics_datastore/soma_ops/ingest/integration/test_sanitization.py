@@ -12,7 +12,6 @@ import scipy.sparse as sp
 import tiledbsoma.io
 
 from cellarium.nexus.omics_datastore.soma_ops._ingest.preprocessing import (
-    constants,
     sanitize_first_adata_for_schema,
     sanitize_for_ingest,
 )
@@ -281,8 +280,8 @@ def test_sanitize_all_supported_types_write_h5ad(tmp_path) -> None:
 
     # Verify Strings (Special Mapping: object to support H5AD write)
     assert adata.obs["str_null"].dtype == "object"
-    assert adata.obs["str_null"].isna().sum() == 0  # nulls are filled for ingest compatibility
-    assert (adata.obs["str_null"] == constants.STRING_NULL_FILL_VALUE).sum() == 2
+    assert adata.obs["str_null"].isna().sum() == 0  # None values are sanitized to "unknown"
+    assert (adata.obs["str_null"] == "unknown").sum() == 2  # Two None values became "unknown"
 
     # Verify Categories
     assert isinstance(adata.obs["cat_req"].dtype, pd.CategoricalDtype)

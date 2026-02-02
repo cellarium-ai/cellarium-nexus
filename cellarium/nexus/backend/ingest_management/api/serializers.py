@@ -153,6 +153,36 @@ class ReserveIndexesSerializer(serializers.Serializer):
     index_end = serializers.IntegerField(read_only=True)
 
 
+class ValidationReportSerializer(serializers.ModelSerializer):
+    """
+    Serializer for ValidationReport model.
+
+    Used for creating validation reports.
+    """
+
+    creator_id = serializers.IntegerField(read_only=True, allow_null=True)
+
+    class Meta:
+        model = models.ValidationReport
+        fields = (
+            "id",
+            "creator_id",
+            "created_at",
+        )
+        read_only_fields = ("id", "creator_id", "created_at")
+
+    def create(self, validated_data):
+        """
+        Create a ValidationReport with the current user as creator.
+
+        :param validated_data: Validated data
+
+        :return: Created ValidationReport instance
+        """
+        creator = self.context.get("request").user if "request" in self.context else None
+        return models.ValidationReport.objects.create(creator=creator)
+
+
 class ValidationReportItemSerializer(serializers.ModelSerializer):
     """
     Serializer for ValidationReportItem model.
