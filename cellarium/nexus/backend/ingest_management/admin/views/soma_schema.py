@@ -68,13 +68,13 @@ class SomaObsColumnSchemaInline(TabularInline):
 
 @admin.register(models.IngestSchema)
 class IngestSchemaAdmin(ModelAdmin):
-    list_display = ("name", "x_validation_type", "obs_column_count", "updated_at")
+    list_display = ("name", "measurement_name", "x_validation_type", "obs_column_count", "updated_at")
     search_fields = ("name",)
     list_filter = ("x_validation_type",)
     readonly_fields = ("created_at", "updated_at")
     inlines = [SomaVarSchemaInline, SomaObsColumnSchemaInline]
     fieldsets = (
-        (None, {"fields": ("name", "description", "x_validation_type")}),
+        (None, {"fields": ("name", "description", "measurement_name", "x_validation_type")}),
         (_("Timestamps"), {"fields": ("created_at", "updated_at"), "classes": ("collapse",)}),
     )
 
@@ -115,7 +115,7 @@ class IngestSchemaAdmin(ModelAdmin):
 
     def get_fieldsets(self, request: HttpRequest, obj=None):
         if obj is None:
-            return ((None, {"fields": ("name", "description", "x_validation_type")}),)
+            return ((None, {"fields": ("name", "description", "measurement_name", "x_validation_type")}),)
         return super().get_fieldsets(request, obj)
 
 
