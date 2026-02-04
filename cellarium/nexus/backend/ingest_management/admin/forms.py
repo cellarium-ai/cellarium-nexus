@@ -79,11 +79,11 @@ class ValidateNewDataChangeListActionForm(forms.Form):
     Form for SOMA validation and sanitization pipeline.
     """
 
-    omics_dataset = forms.ModelChoiceField(
-        label=_("Omics Dataset"),
-        queryset=OmicsDataset.objects.all(),
+    ingest_schema = forms.ModelChoiceField(
+        label=_("Ingest Schema"),
+        queryset=models.IngestSchema.objects.all(),
         widget=UnfoldAdminSelect2Widget,
-        help_text=_("Omics dataset containing the schema for validation"),
+        help_text=_("Schema to validate files against"),
     )
     input_csv_file = forms.FileField(
         label=_("Input H5AD Files CSV"),
@@ -148,7 +148,7 @@ class SomaVarSchemaInlineForm(forms.ModelForm):
 
     class Meta:
         model = models.SomaVarSchema
-        fields = ("is_subset", "csv_file")
+        fields = ("allow_subsets", "csv_file")
         widgets = {}
 
     def clean(self):

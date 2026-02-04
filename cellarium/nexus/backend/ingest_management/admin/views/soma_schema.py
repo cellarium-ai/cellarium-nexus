@@ -40,7 +40,7 @@ class SomaVarSchemaInline(StackedInline):
     max_num = 1
     can_delete = False
     fields = (
-        "is_subset",
+        "allow_subsets",
         "csv_file",
         "feature_count",
         "var_columns",
@@ -53,7 +53,7 @@ class SomaVarSchemaInline(StackedInline):
 
     def get_fields(self, request: HttpRequest, obj=None):
         if obj is None:
-            return ("is_subset", "csv_file")
+            return ("allow_subsets", "csv_file")
         return super().get_fields(request, obj)
 
 
@@ -121,13 +121,13 @@ class IngestSchemaAdmin(ModelAdmin):
 
 @admin.register(models.SomaVarSchema)
 class SomaVarSchemaAdmin(ModelAdmin):
-    list_display = ("ingest_schema", "is_subset", "feature_count", "updated_at")
+    list_display = ("ingest_schema", "allow_subsets", "feature_count", "updated_at")
     search_fields = ("ingest_schema__name",)
-    list_filter = ("is_subset",)
+    list_filter = ("allow_subsets",)
     readonly_fields = ("var_parquet_file", "feature_count", "var_columns", "created_at", "updated_at")
     fields = (
         "ingest_schema",
-        "is_subset",
+        "allow_subsets",
         "var_parquet_file",
         "feature_count",
         "var_columns",

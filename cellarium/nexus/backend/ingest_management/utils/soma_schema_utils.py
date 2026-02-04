@@ -73,7 +73,7 @@ def django_ingest_schema_to_pydantic(*, django_schema: DjangoIngestSchema) -> In
     var_parquet_b64 = base64.b64encode(parquet_bytes).decode("utf-8")
     var_schema = ExperimentVarSchema(
         _var_parquet_b64=var_parquet_b64,
-        is_subset=var_schema_model.is_subset,
+        allow_subsets=var_schema_model.allow_subsets,
     )
 
     return IngestSchema(

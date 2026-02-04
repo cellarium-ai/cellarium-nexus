@@ -110,7 +110,7 @@ def validate_var(*, var_df: pd.DataFrame, var_schema: ExperimentVarSchema) -> li
 
     Check that var index is string type and all features in var index are
     present in the schema. Extra features not in schema are always rejected.
-    If is_subset=False, also verify that all schema features are present.
+    If allow_subsets=False, also verify that all schema features are present.
 
     :param var_df: The var DataFrame from AnnData.
     :param var_schema: The experiment var schema to validate against.
@@ -133,8 +133,8 @@ def validate_var(*, var_df: pd.DataFrame, var_schema: ExperimentVarSchema) -> li
         sample = list(unknown_features)[:5]
         errors.append(f"var: Found {len(unknown_features)} feature(s) not in schema. " f"Examples: {sample}")
 
-    # If is_subset=False, all schema features must be present
-    if not var_schema.is_subset:
+    # If allow_subsets=False, all schema features must be present
+    if not var_schema.allow_subsets:
         missing_features = schema_features - input_features
         if missing_features:
             sample = list(missing_features)[:5]

@@ -306,9 +306,9 @@ class SomaVarSchema(models.Model):
         related_name="var_schema",
         verbose_name=_("ingest schema"),
     )
-    is_subset = models.BooleanField(
+    allow_subsets = models.BooleanField(
         default=True,
-        verbose_name=_("is subset"),
+        verbose_name=_("allow subsets"),
         help_text=_("If true, input AnnData may contain a subset of features from the schema"),
     )
     var_parquet_file = models.FileField(

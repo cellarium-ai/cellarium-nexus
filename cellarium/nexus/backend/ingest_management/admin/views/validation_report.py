@@ -153,7 +153,7 @@ class ValidationReportAdmin(ModelAdmin):
         :param request: The HTTP request
 
         :raises ValidationError: If validation fails
-        :raises ValueError: If dataset or schema not found
+        :raises ValueError: If schema is invalid
         :raises IOError: If there's an error with GCS operations
 
         :return: HTTP response
@@ -161,7 +161,7 @@ class ValidationReportAdmin(ModelAdmin):
         form = forms.ValidateNewDataChangeListActionForm(request.POST or None, request.FILES or None)
 
         if request.method == "POST" and form.is_valid():
-            dataset_name = form.cleaned_data["omics_dataset"].name
+            ingest_schema = form.cleaned_data["ingest_schema"]
             csv_file = form.cleaned_data["input_csv_file"]
             output_directory = form.cleaned_data["output_directory_uri"].rstrip("/")
 
@@ -182,7 +182,7 @@ class ValidationReportAdmin(ModelAdmin):
 
             # Call validation pipeline
             run_validate_and_sanitize(
-                dataset_name=dataset_name,
+                ingest_schema=ingest_schema,
                 input_h5ad_uris=input_paths,
                 output_h5ad_uris=output_paths,
                 validation_report_id=validation_report.id,

@@ -182,7 +182,7 @@ def test_validate_var_unknown_features(var_schema: ExperimentVarSchema) -> None:
 
 
 def test_validate_var_subset_allowed(var_schema: ExperimentVarSchema) -> None:
-    """Verify subset of features is allowed when is_subset=True (default)."""
+    """Verify subset of features is allowed when allow_subsets=True (default)."""
     var_df = pd.DataFrame(
         data={"gene_name": ["gene_1"]},
         index=["ENSG0001"],  # Only one of five features
@@ -193,13 +193,13 @@ def test_validate_var_subset_allowed(var_schema: ExperimentVarSchema) -> None:
     assert errors == []
 
 
-def test_validate_var_subset_not_allowed_when_is_subset_false() -> None:
-    """Verify missing features rejected when is_subset=False."""
+def test_validate_var_subset_not_allowed_when_allow_subsets_false() -> None:
+    """Verify missing features rejected when allow_subsets=False."""
     schema_var_df = pd.DataFrame(
         data={"gene_name": ["g1", "g2", "g3"]},
         index=["ENSG0001", "ENSG0002", "ENSG0003"],
     )
-    var_schema = ExperimentVarSchema.from_dataframe(var_df=schema_var_df, is_subset=False)
+    var_schema = ExperimentVarSchema.from_dataframe(var_df=schema_var_df, allow_subsets=False)
 
     var_df = pd.DataFrame(
         data={"gene_name": ["gene_1"]},
