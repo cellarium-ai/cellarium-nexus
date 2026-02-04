@@ -267,19 +267,21 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
         self,
         *,
         report_id: int,
-        input_file_gcs_path: str,
+        input_file_path: str,
         validator_name: str,
         is_valid: bool,
         message: str | None = None,
+        sanitized_file_path: str | None = None,
     ) -> ValidationReportItemAPISchema:
         """
         Create a validation report item for an existing validation report.
 
         :param report_id: ID of the existing validation report
-        :param input_file_gcs_path: GCS path to the input file that was validated
+        :param input_file_path: Path to the input file that was validated
         :param validator_name: Name of the validator that performed the validation
         :param is_valid: Whether the validation passed or failed
         :param message: Optional message with validation details
+        :param sanitized_file_path: Optional path to the sanitized output file
 
         :raise: HTTPError if the request fails
         :raise: ValueError if the response is invalid
@@ -288,13 +290,16 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
         """
         data = {
             "report_id": report_id,
-            "input_file_gcs_path": input_file_gcs_path,
+            "input_file_path": input_file_path,
             "validator_name": validator_name,
             "is_valid": is_valid,
         }
 
         if message is not None:
             data["message"] = message
+
+        if sanitized_file_path is not None:
+            data["sanitized_file_path"] = sanitized_file_path
 
         api_out = self.post_json(endpoint=ApiEndpoints.CREATE_VALIDATION_REPORT_ITEM, data=data)
         return ValidationReportItemAPISchema(**api_out)

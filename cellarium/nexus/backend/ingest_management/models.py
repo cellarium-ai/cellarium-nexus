@@ -215,7 +215,13 @@ class ValidationReportItem(models.Model):
         related_name="items",
         verbose_name=_("report"),
     )
-    input_file_gcs_path = models.CharField(max_length=1024, verbose_name=_("input file GCS path"))
+    input_file_path = models.CharField(max_length=1024, verbose_name=_("input file path"))
+    sanitized_file_path = models.CharField(
+        max_length=1024,
+        verbose_name=_("sanitized file path"),
+        null=True,
+        blank=True,
+    )
     validator_name = models.CharField(max_length=255, verbose_name=_("validator name"))
     is_valid = models.BooleanField(verbose_name=_("is valid"))
     message = models.TextField(verbose_name=_("message"), null=True, blank=True)
@@ -235,21 +241,21 @@ class ValidationReportItem(models.Model):
         """
         status = "Valid" if self.is_valid else "Invalid"
 
-        # Truncate the GCS path if it's too long
+        # Truncate the path if it's too long
         max_length = 40
-        gcs_path = self.input_file_gcs_path
-        if gcs_path and len(gcs_path) > max_length:
+        file_path = self.input_file_path
+        if file_path and len(file_path) > max_length:
             # Extract the filename (last part of the path)
-            path_parts = gcs_path.split("/")
+            path_parts = file_path.split("/")
             filename = path_parts[-1] if path_parts else ""
 
             # Use the filename or a truncated version with ellipsis
             if len(filename) <= max_length:
                 truncated_path = filename
             else:
-                truncated_path = f"{gcs_path[:15]}...{gcs_path[-20:]}"
+                truncated_path = f"{file_path[:15]}...{file_path[-20:]}"
         else:
-            truncated_path = gcs_path
+            truncated_path = file_path
 
         return f"{status} - {self.validator_name} - {truncated_path}"
 

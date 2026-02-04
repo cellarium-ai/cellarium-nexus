@@ -33,7 +33,7 @@ class NexusDataValidationCoordinator:
         size_validation_message = "File size is too large." if not size_is_valid else None
         self.backend_client.create_validation_report_item(
             report_id=self.validation_report_id,
-            input_file_gcs_path=adata_gcs_path,
+            input_file_path=adata_gcs_path,
             validator_name="nexus.omics_datastore.bq_ops.validate.validate_remote_file_size",
             is_valid=size_is_valid,
             message=size_validation_message,

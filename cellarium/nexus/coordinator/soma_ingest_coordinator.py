@@ -138,12 +138,14 @@ class SomaIngestCoordinator:
                 file_results.append(file_result)
 
                 if self.backend_client and validation_report_id is not None:
+                    sanitized_path = output_uri if file_result["is_valid"] else None
                     self.backend_client.create_validation_report_item(
                         report_id=validation_report_id,
-                        input_file_gcs_path=input_uri,
+                        input_file_path=input_uri,
                         validator_name="nexus.soma_ops.validate_and_sanitize",
                         is_valid=file_result["is_valid"],
                         message=file_result["message"],
+                        sanitized_file_path=sanitized_path,
                     )
 
     def prepare_ingest_plan(
@@ -226,24 +228,23 @@ class SomaIngestCoordinator:
         *,
         ingest_plan: IngestPlanMetadata,
         partition_index: int,
-        h5ad_uris: list[str] | None = None,
+        h5ad_file_paths: list[str],
     ) -> None:
         """
         Ingest a single partition of h5ad files into a SOMA experiment.
 
         :param ingest_plan: Ingest plan metadata
         :param partition_index: Zero-based partition index
-        :param h5ad_uris: Optional list of GCS URIs to use instead of plan sources
+        :param h5ad_file_paths: Optional list of GCS URIs to use instead of plan sources
 
         :raise ValueError: If the provided URIs do not match expected partition size
         """
-        source_uris = h5ad_uris if h5ad_uris is not None else ingest_plan.source_h5ad_uris
         slice_start, slice_end = get_block_slice(
             total_items=ingest_plan.total_files,
             partition_index=partition_index,
             block_size=ingest_plan.ingest_batch_size,
         )
-        partition_uris = source_uris[slice_start:slice_end]
+        partition_uris = h5ad_file_paths[slice_start:slice_end]
 
         if not partition_uris:
             logger.info(f"Partition {partition_index} has no files to ingest")

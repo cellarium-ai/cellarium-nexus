@@ -43,6 +43,7 @@ def parse_var_schema_csv(*, csv_file) -> VarSchemaParseResult:
 
 def dataframe_to_parquet_bytes(*, df: pd.DataFrame) -> bytes:
     buffer = io.BytesIO()
+    df.index.name = None
     df.to_parquet(buffer, index=True)
     buffer.seek(0)
     return buffer.getvalue()

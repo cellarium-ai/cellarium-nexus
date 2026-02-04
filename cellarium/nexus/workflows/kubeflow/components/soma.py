@@ -215,4 +215,5 @@ def soma_ingest_partition_job(config_path: str):
     coordinator.ingest_partition(
         ingest_plan=ingest_plan,
         partition_index=params.partition_index,
+        h5ad_file_paths=params.h5ad_file_paths,
     )

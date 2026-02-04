@@ -119,3 +119,4 @@ class SomaIngestPartitionConfig(BaseModel):
     experiment_uri: str
     ingest_plan_gcs_path: str
     partition_index: int
+    h5ad_file_paths: list[str]

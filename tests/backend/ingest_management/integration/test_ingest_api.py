@@ -126,7 +126,7 @@ def test_validation_report_item_create(client: Client, admin_user: object) -> No
     url = reverse("validation-report-item-create")
     payload = {
         "report_id": report.id,
-        "input_file_gcs_path": "gs://bucket/path/file.h5ad",
+        "input_file_path": "gs://bucket/path/file.h5ad",
         "validator_name": "validate_schema",
         "is_valid": True,
         "message": "ok",

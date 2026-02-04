@@ -48,7 +48,8 @@ class ValidationReportAPISchema(BaseModel):
 class ValidationReportItemAPISchema(BaseModel):
     id: int
     report_id: int
-    input_file_gcs_path: str
+    input_file_path: str
+    sanitized_file_path: str | None = None
     validator_name: str
     is_valid: bool
     message: str | None = None

@@ -202,7 +202,8 @@ class ValidationReportItemSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "report_id",
-            "input_file_gcs_path",
+            "input_file_path",
+            "sanitized_file_path",
             "validator_name",
             "is_valid",
             "message",
