@@ -210,10 +210,15 @@ def soma_ingest_partition_job(config_path: str):
 
     params = utils.workflows_configs.read_component_config(gcs_path=config_path, schema_class=SomaIngestPartitionConfig)
 
-    coordinator = SomaIngestCoordinator(experiment_uri=params.experiment_uri)
+    coordinator = SomaIngestCoordinator(
+        experiment_uri=params.experiment_uri,
+        nexus_backend_api_url=params.nexus_backend_api_url,
+    )
     ingest_plan = coordinator.load_ingest_plan_from_gcs(ingest_plan_gcs_path=params.ingest_plan_gcs_path)
     coordinator.ingest_partition(
         ingest_plan=ingest_plan,
         partition_index=params.partition_index,
         h5ad_file_paths=params.h5ad_file_paths,
+        omics_dataset_name=params.omics_dataset_name,
+        parent_ingest_id=params.parent_ingest_id,
     )

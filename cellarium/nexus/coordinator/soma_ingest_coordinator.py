@@ -4,6 +4,7 @@ Coordinate TileDB SOMA ingest workflows for Nexus.
 
 from __future__ import annotations
 
+import datetime
 import logging
 
 import anndata
@@ -53,6 +54,155 @@ class SomaIngestCoordinator:
         if not bucket_name or not blob_path:
             raise ValueError(f"Invalid GCS URI: {gcs_uri}")
         return bucket_name, blob_path
+
+    def _update_ingest_info_with_error(self, *, ingest_id: int, error_message: str | dict[str, str]) -> None:
+        """
+        Update ingest info with error message and mark as failed.
+
+        :param ingest_id: ID of the ingest to update
+        :param error_message: Error message to store
+        """
+        if not self.backend_client:
+            logger.warning(f"Cannot report error for ingest {ingest_id}: backend client not configured")
+            return
+
+        try:
+            self.backend_client.update_ingest_metadata_extra(
+                ingest_id=ingest_id, new_metadata_extra={"error_occurred": error_message}
+            )
+            self.backend_client.update_ingest_status(ingest_id=ingest_id, new_status="FAILED")
+        except Exception as e:
+            logger.error(f"Failed to report error status for ingest {ingest_id}: {e}")
+
+    def _update_ingest_info_with_success(self, *, ingest_id: int) -> None:
+        """
+        Mark ingest info as successfully completed.
+
+        :param ingest_id: ID of the ingest to update
+        """
+        if not self.backend_client:
+            logger.warning(f"Cannot report success for ingest {ingest_id}: backend client not configured")
+            return
+
+        try:
+            self.backend_client.update_ingest_status(
+                ingest_id=ingest_id, new_status="SUCCEEDED", ingest_finish_timestamp=datetime.datetime.now()
+            )
+        except Exception as e:
+            logger.error(f"Failed to report success status for ingest {ingest_id}: {e}")
+
+    def _create_ingest_info_records(
+        self,
+        *,
+        partition_index: int,
+        partition_uris: list[str],
+        omics_dataset_name: str | None,
+        parent_ingest_id: int | None,
+    ) -> list[int]:
+        """
+        Create IngestInfo records for each file in the partition.
+
+        :param partition_index: Zero-based partition index
+        :param partition_uris: List of GCS URIs for this partition
+        :param omics_dataset_name: Dataset name for creating records
+        :param parent_ingest_id: Optional parent ingest ID
+
+        :return: List of created IngestInfo IDs
+        """
+        ingest_file_ids: list[int] = []
+
+        if not self.backend_client or not omics_dataset_name:
+            if not omics_dataset_name:
+                logger.info(
+                    f"Partition {partition_index} ingest without backend reporting (omics_dataset_name not provided)"
+                )
+            return ingest_file_ids
+
+        try:
+            for uri in partition_uris:
+                ingest_info = self.backend_client.create_ingest_file_info(
+                    omics_dataset=omics_dataset_name, ingest_id=parent_ingest_id, gcs_file_path=uri
+                )
+                ingest_file_ids.append(ingest_info.id)
+            logger.info(f"Created {len(ingest_file_ids)} IngestInfo records for partition {partition_index}")
+        except Exception as e:
+            logger.error(f"Failed to create IngestInfo records for partition {partition_index}: {e}")
+
+        return ingest_file_ids
+
+    def _report_ingest_started(self, *, ingest_file_ids: list[int]) -> None:
+        """
+        Report STARTED status for created IngestInfo records.
+
+        :param ingest_file_ids: List of IngestInfo IDs to report
+        """
+        if not self.backend_client:
+            return
+
+        for ingest_id in ingest_file_ids:
+            try:
+                self.backend_client.update_ingest_status(ingest_id=ingest_id, new_status="STARTED")
+            except Exception as e:
+                logger.error(f"Failed to report STARTED status for ingest {ingest_id}: {e}")
+
+    def _report_ingest_succeeded(self, *, ingest_file_ids: list[int], partition_index: int) -> None:
+        """
+        Report SUCCEEDED status for IngestInfo records.
+
+        :param ingest_file_ids: List of IngestInfo IDs to report
+        :param partition_index: Partition index for logging
+        """
+        for ingest_id in ingest_file_ids:
+            self._update_ingest_info_with_success(ingest_id=ingest_id)
+        logger.info(f"Partition {partition_index} ingested successfully, reported to backend")
+
+    def _report_ingest_failed(
+        self,
+        *,
+        ingest_file_ids: list[int],
+        error_message: str,
+        partition_index: int,
+    ) -> None:
+        """
+        Report FAILED status for IngestInfo records.
+
+        :param ingest_file_ids: List of IngestInfo IDs to report
+        :param error_message: Error message to include
+        :param partition_index: Partition index for logging
+        """
+        for ingest_id in ingest_file_ids:
+            self._update_ingest_info_with_error(ingest_id=ingest_id, error_message=error_message)
+        logger.error(f"Partition {partition_index} ingest failed, reported to backend: {error_message}")
+
+    def _download_partition_files(
+        self,
+        *,
+        partition_index: int,
+        partition_uris: list[str],
+        workspace: dict,
+    ) -> list[str]:
+        """
+        Download h5ad files for a partition to local workspace.
+
+        :param partition_index: Zero-based partition index
+        :param partition_uris: List of GCS URIs for this partition
+        :param workspace: Workspace dictionary with 'input' path
+
+        :return: List of local file paths
+        """
+        local_paths: list[str] = []
+
+        for idx, uri in enumerate(partition_uris):
+            bucket_name, blob_path = self._parse_gcs_uri(uri)
+            local_path = workspace["input"] / f"ingest_{partition_index}_{idx}.h5ad"
+            bucket_manager = WorkspaceFileManager(bucket_name=bucket_name)
+            bucket_manager.download_file_from_bucket(
+                remote_path=blob_path,
+                local_path=local_path,
+            )
+            local_paths.append(str(local_path))
+
+        return local_paths
 
     def prepare_ingest_plan(
         self,
@@ -135,13 +285,17 @@ class SomaIngestCoordinator:
         ingest_plan: IngestPlanMetadata,
         partition_index: int,
         h5ad_file_paths: list[str],
+        omics_dataset_name: str | None = None,
+        parent_ingest_id: int | None = None,
     ) -> None:
         """
         Ingest a single partition of h5ad files into a SOMA experiment.
 
         :param ingest_plan: Ingest plan metadata
         :param partition_index: Zero-based partition index
-        :param h5ad_file_paths: Optional list of GCS URIs to use instead of plan sources
+        :param h5ad_file_paths: List of GCS URIs to ingest
+        :param omics_dataset_name: Optional dataset name for creating IngestInfo records
+        :param parent_ingest_id: Optional parent ingest ID
 
         :raise ValueError: If the provided URIs do not match expected partition size
         """
@@ -156,23 +310,37 @@ class SomaIngestCoordinator:
             logger.info(f"Partition {partition_index} has no files to ingest")
             return
 
+        # Create IngestInfo records for each file if backend reporting is enabled
+        ingest_file_ids = self._create_ingest_info_records(
+            partition_index=partition_index,
+            partition_uris=partition_uris,
+            omics_dataset_name=omics_dataset_name,
+            parent_ingest_id=parent_ingest_id,
+        )
+
+        # Report STARTED status for each created IngestInfo record
+        self._report_ingest_started(ingest_file_ids=ingest_file_ids)
+
+        # Download files and perform ingest
         first_bucket, _ = self._parse_gcs_uri(partition_uris[0])
         workspace_manager = WorkspaceFileManager(bucket_name=first_bucket)
         with workspace_manager.temp_workspace() as workspace:
-            local_paths: list[str] = []
-
-            for idx, uri in enumerate(partition_uris):
-                bucket_name, blob_path = self._parse_gcs_uri(uri)
-                local_path = workspace["input"] / f"ingest_{partition_index}_{idx}.h5ad"
-                bucket_manager = WorkspaceFileManager(bucket_name=bucket_name)
-                bucket_manager.download_file_from_bucket(
-                    remote_path=blob_path,
-                    local_path=local_path,
-                )
-                local_paths.append(str(local_path))
-
-            self.ingestor.ingest_h5ads_partition(
-                ingest_plan=ingest_plan,
+            local_paths = self._download_partition_files(
                 partition_index=partition_index,
-                local_h5ad_paths=local_paths,
+                partition_uris=partition_uris,
+                workspace=workspace,
             )
+
+            try:
+                self.ingestor.ingest_h5ads_partition(
+                    ingest_plan=ingest_plan,
+                    local_h5ad_paths=local_paths,
+                )
+                # Report SUCCEEDED status for all files
+                self._report_ingest_succeeded(ingest_file_ids=ingest_file_ids, partition_index=partition_index)
+            except Exception as e:
+                # Report FAILED status for all files
+                self._report_ingest_failed(
+                    ingest_file_ids=ingest_file_ids, error_message=str(e), partition_index=partition_index
+                )
+                raise

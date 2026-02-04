@@ -120,3 +120,6 @@ class SomaIngestPartitionConfig(BaseModel):
     ingest_plan_gcs_path: str
     partition_index: int
     h5ad_file_paths: list[str]
+    nexus_backend_api_url: str | None = None
+    omics_dataset_name: str | None = None
+    parent_ingest_id: int | None = None
