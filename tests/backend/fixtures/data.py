@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import io
 from pathlib import Path
 from typing import Callable
 
+import pandas as pd
 import pytest
 
 from cellarium.nexus.backend.cell_management import models
 from cellarium.nexus.backend.curriculum import models as curriculum_models
+from cellarium.nexus.backend.ingest_management.models import IngestSchema as DjangoIngestSchema
+from cellarium.nexus.backend.ingest_management.models import SomaObsColumnSchema, SomaVarSchema
 
 
 @pytest.fixture()
@@ -42,11 +46,44 @@ def feature_schema_factory() -> Callable:
 @pytest.fixture()
 def default_dataset() -> models.OmicsDataset:
     """
-    Create default omics dataset row for backend tests.
+    Create default omics dataset row for backend tests with schema and URI.
 
-    :return: OmicsDataset instance
+    :return: OmicsDataset instance with schema and URI configured
     """
-    return models.OmicsDataset.objects.create(name="default", description="Default dataset")
+    # Create IngestSchema first (required for SomaVarSchema)
+    ingest_schema = DjangoIngestSchema.objects.create(
+        name="test_schema",
+        x_validation_type="count_matrix",
+    )
+
+    # Create a SomaVarSchema with minimal var data
+    var_df = pd.DataFrame(
+        data={"feature_name": [f"gene_{j}" for j in range(5)]},
+        index=[f"ENSG{j:08d}" for j in range(5)],
+    )
+    parquet_buffer = io.BytesIO()
+    var_df.to_parquet(parquet_buffer, index=True)
+    parquet_buffer.seek(0)
+
+    # Create with minimal var_parquet_file (set directly, don't save to storage)
+    SomaVarSchema.objects.create(
+        ingest_schema=ingest_schema,
+        allow_subsets=True,
+        var_parquet_file="test_var_schema.parquet",
+    )
+
+    # Add obs columns
+    SomaObsColumnSchema.objects.create(ingest_schema=ingest_schema, name="cell_type", dtype="string", nullable=False)
+    SomaObsColumnSchema.objects.create(ingest_schema=ingest_schema, name="tissue", dtype="string", nullable=True)
+
+    # Create OmicsDataset
+    return models.OmicsDataset.objects.create(
+        name="default",
+        description="Default dataset",
+        schema=ingest_schema,
+        backend="tiledb_soma",
+        uri="s3://test-bucket/soma-experiments/default",
+    )
 
 
 @pytest.fixture()
