@@ -118,20 +118,6 @@ class SomaIngestForm(forms.Form):
         widget=UnfoldAdminSelect2Widget,
         help_text=_("Omics dataset to ingest into"),
     )
-    ingest_batch_size = forms.IntegerField(
-        label=_("Ingest Batch Size"),
-        initial=10,
-        min_value=1,
-        widget=UnfoldAdminTextInputWidget,
-        help_text=_("Number of h5ad files per partition (for parallel processing)"),
-    )
-    measurement_name = forms.CharField(
-        label=_("Measurement Name"),
-        initial="RNA",
-        max_length=256,
-        widget=UnfoldAdminTextInputWidget,
-        help_text=_("Name of the SOMA measurement (e.g., RNA, ATAC)"),
-    )
 
 
 class SomaVarSchemaInlineForm(forms.ModelForm):

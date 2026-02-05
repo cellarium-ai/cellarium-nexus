@@ -99,6 +99,8 @@ class SomaValidateSanitizeConfig(BaseModel):
     output_h5ad_uris: list[str]
     ingest_schema: IngestSchema
     max_bytes_per_file: int | None = None
+    validation_report_id: int | None = None
+    nexus_backend_api_url: str | None = None
 
 
 class SomaIngestPlanConfig(BaseModel):

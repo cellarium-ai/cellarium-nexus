@@ -139,10 +139,10 @@ def soma_validate_sanitize_job(config_path: str):
     """
     Validate and sanitize h5ad files for SOMA ingest.
 
-    Read a SomaValidateSanitizeConfig from GCS and use SomaIngestCoordinator
+    Read a SomaValidateSanitizeConfig from GCS and use PreprocessingCoordinator
     to validate and sanitize files for ingestion.
     """
-    from cellarium.nexus.coordinator import SomaIngestCoordinator
+    from cellarium.nexus.coordinator import PreprocessingCoordinator
     from cellarium.nexus.shared import utils
     from cellarium.nexus.shared.schemas.component_configs import SomaValidateSanitizeConfig
 
@@ -150,12 +150,12 @@ def soma_validate_sanitize_job(config_path: str):
         gcs_path=config_path, schema_class=SomaValidateSanitizeConfig
     )
 
-    coordinator = SomaIngestCoordinator(experiment_uri=params.experiment_uri)
+    coordinator = PreprocessingCoordinator(nexus_backend_api_url=params.nexus_backend_api_url)
     coordinator.validate_and_sanitize_files(
         input_h5ad_uris=params.input_h5ad_uris,
         output_h5ad_uris=params.output_h5ad_uris,
         ingest_schema=params.ingest_schema,
-        max_bytes_per_file=params.max_bytes_per_file,
+        validation_report_id=params.validation_report_id,
     )
 
 

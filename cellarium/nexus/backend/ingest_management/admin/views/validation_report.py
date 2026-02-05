@@ -1,7 +1,4 @@
-from pathlib import Path
-
 import pandas as pd
-from django.conf import settings
 from django.contrib import admin, messages
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse
@@ -14,9 +11,9 @@ from unfold.decorators import action
 from cellarium.nexus.backend.ingest_management import models
 from cellarium.nexus.backend.ingest_management.admin import constants, forms
 from cellarium.nexus.backend.ingest_management.utils.export_csv import export_model_queryset_to_csv
-from cellarium.nexus.backend.ingest_management.utils.workflow_utils_local import (
-    run_soma_ingest,
-    run_validate_and_sanitize,
+from cellarium.nexus.backend.ingest_management.utils.workflows_utils import (
+    submit_soma_ingest_pipeline,
+    submit_soma_validation_pipeline,
 )
 
 
@@ -163,7 +160,7 @@ class ValidationReportAdmin(ModelAdmin):
         if request.method == "POST" and form.is_valid():
             ingest_schema = form.cleaned_data["ingest_schema"]
             csv_file = form.cleaned_data["input_csv_file"]
-            output_directory = form.cleaned_data["output_directory_uri"].rstrip("/")
+            output_directory_uri = form.cleaned_data["output_directory_uri"].rstrip("/")
 
             # Read CSV file to extract input paths
             df = pd.read_csv(csv_file)
@@ -174,25 +171,24 @@ class ValidationReportAdmin(ModelAdmin):
             if not input_paths:
                 raise ValidationError(_("CSV file contains no data"))
 
-            # Generate output paths from directory and input filenames
-            output_paths = [f"{output_directory}/{Path(path).name}" for path in input_paths]
-
             # Create validation report
             validation_report = models.ValidationReport.objects.create(creator=request.user)
 
-            # Call validation pipeline
-            run_validate_and_sanitize(
-                ingest_schema=ingest_schema,
+            # Submit validation pipeline
+            pipeline_url, output_uris = submit_soma_validation_pipeline(
                 input_h5ad_uris=input_paths,
-                output_h5ad_uris=output_paths,
+                ingest_schema=ingest_schema,
+                output_directory_uri=output_directory_uri,
                 validation_report_id=validation_report.id,
-                nexus_backend_api_url=settings.SITE_URL,
             )
 
             messages.success(
                 request=request,
-                message=_(
-                    "SOMA validation pipeline completed successfully. " f"Validation Report ID: {validation_report.id}"
+                message=mark_safe(
+                    f"SOMA validation pipeline submitted successfully. "
+                    f"Validation Report ID: {validation_report.id}. "
+                    f'<a href="{pipeline_url}" target="_blank" style="text-decoration: underline;">'
+                    f"View Pipeline in Vertex AI</a>"
                 ),
             )
             return redirect("admin:ingest_management_validationreport_change", object_id=validation_report.id)
@@ -249,28 +245,25 @@ class ValidationReportAdmin(ModelAdmin):
 
             omics_dataset = form.cleaned_data["omics_dataset"]
             dataset_name = omics_dataset.name
-            ingest_batch_size = form.cleaned_data["ingest_batch_size"]
-            measurement_name = form.cleaned_data["measurement_name"]
 
-            parent_ingest_info = models.Ingest.objects.create(
+            parent_ingest = models.Ingest.objects.create(
                 omics_dataset=omics_dataset, status=models.Ingest.STATUS_STARTED
             )
 
-            # Call ingest pipeline
-            run_soma_ingest(
-                omics_dataset=omics_dataset,
-                ingest=parent_ingest_info,
+            # Submit ingest pipeline
+            pipeline_url = submit_soma_ingest_pipeline(
                 sanitized_h5ad_uris=sanitized_uris,
-                ingest_batch_size=ingest_batch_size,
-                measurement_name=measurement_name,
-                nexus_backend_api_url=settings.SITE_URL,
+                omics_dataset=omics_dataset,
+                parent_ingest_id=parent_ingest.id,
             )
 
             messages.success(
                 request=request,
-                message=_(
-                    f"SOMA ingest pipeline completed successfully. "
-                    f"Ingested {len(sanitized_uris)} files into dataset '{dataset_name}'."
+                message=mark_safe(
+                    f"SOMA ingest pipeline submitted successfully. "
+                    f"Ingesting {len(sanitized_uris)} files into dataset '{dataset_name}'. "
+                    f'<a href="{pipeline_url}" target="_blank" style="text-decoration: underline;">'
+                    f"View Pipeline in Vertex AI</a>"
                 ),
             )
             return redirect("admin:ingest_management_validationreport_change", object_id=object_id)
