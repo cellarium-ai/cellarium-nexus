@@ -247,13 +247,19 @@ class ValidationReportAdmin(ModelAdmin):
                 messages.error(request, _("No sanitized file paths found in valid items"))
                 return redirect("admin:ingest_management_validationreport_change", object_id=object_id)
 
-            dataset_name = form.cleaned_data["omics_dataset"].name
+            omics_dataset = form.cleaned_data["omics_dataset"]
+            dataset_name = omics_dataset.name
             ingest_batch_size = form.cleaned_data["ingest_batch_size"]
             measurement_name = form.cleaned_data["measurement_name"]
 
+            parent_ingest_info = models.Ingest.objects.create(
+                omics_dataset=omics_dataset, status=models.Ingest.STATUS_STARTED
+            )
+
             # Call ingest pipeline
             run_soma_ingest(
-                dataset_name=dataset_name,
+                omics_dataset=omics_dataset,
+                ingest=parent_ingest_info,
                 sanitized_h5ad_uris=sanitized_uris,
                 ingest_batch_size=ingest_batch_size,
                 measurement_name=measurement_name,

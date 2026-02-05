@@ -176,7 +176,6 @@ def test_ingest_h5ads_partition_writes_data_to_soma(
     # Ingest the partition
     ingest_h5ads_partition(
         ingest_plan=plan,
-        partition_index=0,
         local_h5ad_paths=[str(h5ad_path)],
     )
 
@@ -245,14 +244,12 @@ def test_ingest_h5ads_partition_appends_data_across_multiple_partitions(
     # Ingest partition 0 (files 0 and 1)
     ingest_h5ads_partition(
         ingest_plan=plan,
-        partition_index=0,
         local_h5ad_paths=[h5ad_paths[0], h5ad_paths[1]],
     )
 
     # Ingest partition 1 (file 2)
     ingest_h5ads_partition(
         ingest_plan=plan,
-        partition_index=1,
         local_h5ad_paths=[h5ad_paths[2]],
     )
 

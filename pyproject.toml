@@ -86,7 +86,7 @@ poethepoet = "^0.29.0"
 pre-commit = "^4.3.0"
 
 [tool.poetry-dynamic-versioning]
-enable = true
+enable = false
 
 [tool.poe.tasks]
 test = "pytest"

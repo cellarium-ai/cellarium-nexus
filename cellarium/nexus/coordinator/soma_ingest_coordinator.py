@@ -299,6 +299,13 @@ class SomaIngestCoordinator:
 
         :raise ValueError: If the provided URIs do not match expected partition size
         """
+        dataset_name_or_ingest_id_missing = any([not omics_dataset_name, parent_ingest_id is None])
+        if dataset_name_or_ingest_id_missing and self.backend_client is not None:
+            raise ValueError(
+                "Ingest plan metadata and parent ingest ID must be provided to report ingest status to backend. "
+                "Either provide both or disable backend reporting by reinitializing the coordinator with "
+                "backend_api_url=None."
+            )
         slice_start, slice_end = get_block_slice(
             total_items=ingest_plan.total_files,
             partition_index=partition_index,

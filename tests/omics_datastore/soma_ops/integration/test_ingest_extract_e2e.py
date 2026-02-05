@@ -43,12 +43,10 @@ def test_ingest_then_extract_randomized_e2e(
 
     ingestor.ingest_h5ads_partition(
         ingest_plan=plan,
-        partition_index=0,
         local_h5ad_paths=h5ad_paths[:2],
     )
     ingestor.ingest_h5ads_partition(
         ingest_plan=plan,
-        partition_index=1,
         local_h5ad_paths=h5ad_paths[2:],
     )
 
