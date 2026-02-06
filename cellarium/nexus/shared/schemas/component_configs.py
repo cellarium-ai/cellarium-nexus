@@ -2,7 +2,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-from cellarium.nexus.shared.schemas.omics_datastore import FeatureSchema, IngestSchema
+from cellarium.nexus.shared.schemas.omics_datastore import FeatureSchema
 
 
 class CreateIngestFilesConfig(BaseModel):
@@ -97,7 +97,7 @@ class SomaValidateSanitizeConfig(BaseModel):
     experiment_uri: str
     input_h5ad_uris: list[str]
     output_h5ad_uris: list[str]
-    ingest_schema: IngestSchema
+    ingest_schema_uri: str
     max_bytes_per_file: int | None = None
     validation_report_id: int | None = None
     nexus_backend_api_url: str | None = None
@@ -108,7 +108,7 @@ class SomaIngestPlanConfig(BaseModel):
 
     experiment_uri: str
     measurement_name: str
-    ingest_schema: IngestSchema
+    ingest_schema_uri: str
     ingest_batch_size: int
     h5ad_uris: list[str]
     ingest_plan_gcs_path: str
@@ -119,7 +119,7 @@ class SomaIngestPartitionConfig(BaseModel):
     """Configuration for ingesting a SOMA partition."""
 
     experiment_uri: str
-    ingest_plan_gcs_path: str
+    ingest_plan_uri: str
     partition_index: int
     h5ad_file_paths: list[str]
     nexus_backend_api_url: str | None = None

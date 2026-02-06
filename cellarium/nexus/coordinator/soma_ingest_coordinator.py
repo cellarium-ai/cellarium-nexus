@@ -209,23 +209,31 @@ class SomaIngestCoordinator:
         *,
         h5ad_uris: list[str],
         measurement_name: str,
-        ingest_schema: IngestSchema,
+        ingest_schema_uri: str,
         ingest_batch_size: int,
+        ingest_plan_output_uri: str,
         first_adata_gcs_path: str | None = None,
-    ) -> IngestPlanMetadata:
+    ) -> str:
         """
-        Prepare a partitioned SOMA ingest plan.
+        Prepare a partitioned SOMA ingest plan and save it to GCS.
 
         :param h5ad_uris: List of GCS URIs for h5ad files to ingest
         :param measurement_name: Name of the SOMA measurement
-        :param ingest_schema: Schema for validation and sanitization
+        :param ingest_schema_uri: GCS URI to the ingest schema JSON file
         :param ingest_batch_size: Number of h5ads per partition
+        :param ingest_plan_output_uri: GCS URI where the ingest plan should be saved
         :param first_adata_gcs_path: Optional GCS URI for first AnnData used to create schema-only experiment
 
         :raise ValueError: If ingest plan preparation fails
 
-        :return: IngestPlanMetadata
+        :return: GCS URI to the saved ingest plan
         """
+        bucket_name, _ = self._parse_gcs_uri(h5ad_uris[0])
+        workspace_manager = WorkspaceFileManager(bucket_name=bucket_name)
+
+        ingest_schema_data = workspace_manager.load_json_from_bucket(remote_path=ingest_schema_uri)
+        ingest_schema = IngestSchema.model_validate(ingest_schema_data)
+
         first_adata = None
         if first_adata_gcs_path:
             logger.info(f"Loading first AnnData from {first_adata_gcs_path}")
@@ -241,7 +249,7 @@ class SomaIngestCoordinator:
                 # The ingestor only needs anndata for using it as a schema to create the experiment
                 first_adata = anndata.read_h5ad(filename=local_path)[:10]
 
-        return self.ingestor.prepare_ingest_plan(
+        ingest_plan = self.ingestor.prepare_ingest_plan(
             experiment_uri=self.experiment_uri,
             h5ad_paths=h5ad_uris,
             measurement_name=measurement_name,
@@ -250,39 +258,28 @@ class SomaIngestCoordinator:
             first_adata=first_adata,
         )
 
-    def save_ingest_plan_to_gcs(self, *, ingest_plan: IngestPlanMetadata, ingest_plan_gcs_path: str) -> str:
+        return self._save_ingest_plan(ingest_plan=ingest_plan, ingest_plan_uri=ingest_plan_output_uri)
+
+    def _save_ingest_plan(self, *, ingest_plan: IngestPlanMetadata, ingest_plan_uri: str) -> str:
         """
         Serialize and save an ingest plan to GCS.
 
-        :param ingest_plan: Ingest plan metadata
-        :param ingest_plan_gcs_path: GCS URI where plan should be stored
+        :param ingest_plan: Ingest plan metadata to save
+        :param ingest_plan_uri: GCS URI where plan should be stored
 
         :return: Full GCS URI to the stored plan
         """
-        bucket_name, blob_path = self._parse_gcs_uri(ingest_plan_gcs_path)
+        bucket_name, blob_path = self._parse_gcs_uri(ingest_plan_uri)
         workspace_manager = WorkspaceFileManager(bucket_name=bucket_name)
         return workspace_manager.save_json_to_bucket(
             data=ingest_plan.model_dump(),
             remote_path=blob_path,
         )
 
-    def load_ingest_plan_from_gcs(self, *, ingest_plan_gcs_path: str) -> IngestPlanMetadata:
-        """
-        Load and deserialize an ingest plan from GCS.
-
-        :param ingest_plan_gcs_path: GCS URI for the ingest plan JSON
-
-        :return: IngestPlanMetadata
-        """
-        bucket_name, blob_path = self._parse_gcs_uri(ingest_plan_gcs_path)
-        workspace_manager = WorkspaceFileManager(bucket_name=bucket_name)
-        data = workspace_manager.load_json_from_bucket(remote_path=blob_path)
-        return IngestPlanMetadata.model_validate(obj=data)
-
     def ingest_partition(
         self,
         *,
-        ingest_plan: IngestPlanMetadata,
+        ingest_plan_uri: str,
         partition_index: int,
         h5ad_file_paths: list[str],
         omics_dataset_name: str | None = None,
@@ -291,7 +288,7 @@ class SomaIngestCoordinator:
         """
         Ingest a single partition of h5ad files into a SOMA experiment.
 
-        :param ingest_plan: Ingest plan metadata
+        :param ingest_plan_uri: URI to the ingest plan JSON file
         :param partition_index: Zero-based partition index
         :param h5ad_file_paths: List of GCS URIs to ingest
         :param omics_dataset_name: Optional dataset name for creating IngestInfo records
@@ -306,6 +303,12 @@ class SomaIngestCoordinator:
                 "Either provide both or disable backend reporting by reinitializing the coordinator with "
                 "backend_api_url=None."
             )
+
+        bucket_name, blob_path = self._parse_gcs_uri(ingest_plan_uri)
+        workspace_manager = WorkspaceFileManager(bucket_name=bucket_name)
+        ingest_plan_data = workspace_manager.load_json_from_bucket(remote_path=blob_path)
+        ingest_plan = IngestPlanMetadata.model_validate(ingest_plan_data)
+
         slice_start, slice_end = get_block_slice(
             total_items=ingest_plan.total_files,
             partition_index=partition_index,

@@ -10,6 +10,7 @@ from cellarium.nexus.backend.cell_management.models import OmicsDataset
 from cellarium.nexus.backend.ingest_management.models import IngestSchema
 from cellarium.nexus.backend.ingest_management.utils.soma_schema_utils import django_ingest_schema_to_pydantic
 from cellarium.nexus.shared import schemas, utils
+from cellarium.nexus.shared.utils import WorkspaceFileManager
 
 
 def _generate_ingest_plan_path(*, base_name: str = "soma-ingests") -> str:
@@ -60,10 +61,33 @@ def _generate_output_uris(*, input_uris: list[str], output_dir: str) -> list[str
     return output_uris
 
 
+def _dump_ingest_schema_to_gcs(*, ingest_schema: IngestSchema) -> str:
+    """
+    Dump Django IngestSchema to GCS as JSON and return the URI.
+
+    :param ingest_schema: Django IngestSchema model instance
+
+    :return: GCS URI to the dumped schema JSON file
+    """
+    pydantic_schema = django_ingest_schema_to_pydantic(django_schema=ingest_schema)
+
+    timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+    schema_filename = f"ingest_schema_{timestamp}_{secrets.token_hex(6)}.json"
+
+    bucket_name = settings.BUCKET_NAME_PRIVATE
+    workspace_manager = WorkspaceFileManager(bucket_name=bucket_name)
+    workspace_manager.save_json_to_bucket(
+        data=pydantic_schema.model_dump(),
+        remote_path=f"{settings.PIPELINE_CONFIGS_DIR}/{schema_filename}",
+    )
+
+    return f"gs://{bucket_name}/{settings.PIPELINE_CONFIGS_DIR}/{schema_filename}"
+
+
 def create_soma_validate_sanitize_configs(
     *,
     input_h5ad_uris: list[str],
-    ingest_schema: IngestSchema,
+    ingest_schema_uri: str,
     output_base_dir: str,
     validation_report_id: int | None = None,
 ) -> tuple[list[schemas.component_configs.SomaValidateSanitizeConfig], list[str]]:
@@ -71,13 +95,12 @@ def create_soma_validate_sanitize_configs(
     Create SomaValidateSanitizeConfig objects for batched validation.
 
     :param input_h5ad_uris: List of GCS paths to input h5ad files
-    :param ingest_schema: Django IngestSchema model for validation
+    :param ingest_schema_uri: GCS URI to the dumped ingest schema JSON file
     :param output_base_dir: Base GCS directory for sanitized output files
     :param validation_report_id: Optional validation report ID for status tracking
 
     :return: Tuple of (list of configs, list of all output URIs)
     """
-    pydantic_schema = django_ingest_schema_to_pydantic(django_schema=ingest_schema)
     all_output_uris = _generate_output_uris(input_uris=input_h5ad_uris, output_dir=output_base_dir)
 
     files_per_batch = settings.SOMA_FILES_PER_VALIDATION_BATCH
@@ -90,7 +113,7 @@ def create_soma_validate_sanitize_configs(
             experiment_uri="",  # Not used by PreprocessingCoordinator for validation
             input_h5ad_uris=input_batch,
             output_h5ad_uris=output_batch,
-            ingest_schema=pydantic_schema,
+            ingest_schema_uri=ingest_schema_uri,
             validation_report_id=validation_report_id,
             nexus_backend_api_url=settings.SITE_URL,
         )
@@ -103,6 +126,7 @@ def create_soma_ingest_plan_config(
     *,
     sanitized_h5ad_uris: list[str],
     omics_dataset: OmicsDataset,
+    ingest_schema_uri: str,
     ingest_plan_gcs_path: str,
 ) -> schemas.component_configs.SomaIngestPlanConfig:
     """
@@ -110,6 +134,7 @@ def create_soma_ingest_plan_config(
 
     :param sanitized_h5ad_uris: List of sanitized h5ad file URIs
     :param omics_dataset: OmicsDataset with schema and URI configured
+    :param ingest_schema_uri: GCS URI to the dumped ingest schema JSON file
     :param ingest_plan_gcs_path: GCS path to store the ingest plan
 
     :raises ValueError: If omics_dataset has no schema or URI
@@ -121,12 +146,10 @@ def create_soma_ingest_plan_config(
     if not omics_dataset.uri:
         raise ValueError(f"OmicsDataset '{omics_dataset.name}' has no URI configured")
 
-    ingest_schema = django_ingest_schema_to_pydantic(django_schema=omics_dataset.schema)
-
     return schemas.component_configs.SomaIngestPlanConfig(
         experiment_uri=omics_dataset.uri,
         measurement_name="RNA",
-        ingest_schema=ingest_schema,
+        ingest_schema_uri=ingest_schema_uri,
         ingest_batch_size=settings.SOMA_FILES_PER_INGEST_PARTITION,
         h5ad_uris=sanitized_h5ad_uris,
         ingest_plan_gcs_path=ingest_plan_gcs_path,
@@ -162,7 +185,7 @@ def create_soma_ingest_partition_configs(
     for partition_index in range(num_partitions):
         config = schemas.component_configs.SomaIngestPartitionConfig(
             experiment_uri=omics_dataset.uri,
-            ingest_plan_gcs_path=ingest_plan_gcs_path,
+            ingest_plan_uri=ingest_plan_gcs_path,
             partition_index=partition_index,
             h5ad_file_paths=sanitized_h5ad_uris,
             nexus_backend_api_url=settings.SITE_URL,
@@ -201,9 +224,12 @@ def submit_soma_validation_pipeline(
     from cellarium.nexus.workflows.kubeflow.pipelines.soma import run_soma_validate_sanitize_pipeline
     from cellarium.nexus.workflows.kubeflow.utils.job import submit_pipeline
 
+    schema_uri = _dump_ingest_schema_to_gcs(ingest_schema=ingest_schema)
+
     configs, output_uris = create_soma_validate_sanitize_configs(
         input_h5ad_uris=input_h5ad_uris,
         ingest_schema=ingest_schema,
+        ingest_schema_uri=schema_uri,
         output_base_dir=output_directory_uri,
         validation_report_id=validation_report_id,
     )
@@ -253,10 +279,12 @@ def submit_soma_ingest_pipeline(
         raise ValueError("sanitized_h5ad_uris cannot be empty")
 
     ingest_plan_path = _generate_ingest_plan_path()
+    schema_uri = _dump_ingest_schema_to_gcs(ingest_schema=omics_dataset.schema)
 
     ingest_plan_config = create_soma_ingest_plan_config(
         sanitized_h5ad_uris=sanitized_h5ad_uris,
         omics_dataset=omics_dataset,
+        ingest_schema_uri=schema_uri,
         ingest_plan_gcs_path=ingest_plan_path,
     )
 

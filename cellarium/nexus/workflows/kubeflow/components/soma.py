@@ -154,7 +154,7 @@ def soma_validate_sanitize_job(config_path: str):
     coordinator.validate_and_sanitize_files(
         input_h5ad_uris=params.input_h5ad_uris,
         output_h5ad_uris=params.output_h5ad_uris,
-        ingest_schema=params.ingest_schema,
+        ingest_schema_uri=params.ingest_schema_uri,
         validation_report_id=params.validation_report_id,
     )
 
@@ -180,14 +180,14 @@ def soma_prepare_ingest_plan_job(config_path: str):
     params = utils.workflows_configs.read_component_config(gcs_path=config_path, schema_class=SomaIngestPlanConfig)
 
     coordinator = SomaIngestCoordinator(experiment_uri=params.experiment_uri)
-    ingest_plan = coordinator.prepare_ingest_plan(
+    coordinator.prepare_ingest_plan(
         h5ad_uris=params.h5ad_uris,
         measurement_name=params.measurement_name,
-        ingest_schema=params.ingest_schema,
+        ingest_schema_uri=params.ingest_schema_uri,
         ingest_batch_size=params.ingest_batch_size,
+        ingest_plan_output_uri=params.ingest_plan_gcs_path,
         first_adata_gcs_path=params.first_adata_gcs_path,
     )
-    coordinator.save_ingest_plan_to_gcs(ingest_plan=ingest_plan, ingest_plan_gcs_path=params.ingest_plan_gcs_path)
 
 
 @job.dsl_component_job(
@@ -214,9 +214,8 @@ def soma_ingest_partition_job(config_path: str):
         experiment_uri=params.experiment_uri,
         nexus_backend_api_url=params.nexus_backend_api_url,
     )
-    ingest_plan = coordinator.load_ingest_plan_from_gcs(ingest_plan_gcs_path=params.ingest_plan_gcs_path)
     coordinator.ingest_partition(
-        ingest_plan=ingest_plan,
+        ingest_plan_uri=params.ingest_plan_uri,
         partition_index=params.partition_index,
         h5ad_file_paths=params.h5ad_file_paths,
         omics_dataset_name=params.omics_dataset_name,

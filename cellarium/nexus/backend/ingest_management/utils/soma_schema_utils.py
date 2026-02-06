@@ -58,6 +58,7 @@ def django_ingest_schema_to_pydantic(*, django_schema: DjangoIngestSchema) -> In
     :return: Pydantic IngestSchema instance
 
     :raises AttributeError: If schema structure is invalid
+    :raises ValueError: If var_parquet_file is missing or empty
     """
     obs_columns = [
         ObsSchemaDescriptor(
@@ -69,7 +70,13 @@ def django_ingest_schema_to_pydantic(*, django_schema: DjangoIngestSchema) -> In
     ]
 
     var_schema_model = django_schema.var_schema
+    if not var_schema_model.var_parquet_file:
+        raise ValueError(f"IngestSchema '{django_schema.name}' has no var_parquet_file")
+
     parquet_bytes = var_schema_model.var_parquet_file.read()
+    if not parquet_bytes:
+        raise ValueError(f"var_parquet_file for IngestSchema '{django_schema.name}' is empty")
+
     var_parquet_b64 = base64.b64encode(parquet_bytes).decode("utf-8")
     var_schema = ExperimentVarSchema(
         _var_parquet_b64=var_parquet_b64,

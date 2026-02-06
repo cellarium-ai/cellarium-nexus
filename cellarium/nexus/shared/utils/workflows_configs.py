@@ -33,7 +33,7 @@ def read_component_config(gcs_path: str, schema_class: type[T]) -> T:
     """
     with open(gcs_path, "r") as f:
         data = yaml.safe_load(f)
-        return schema_class.model_validate(data)
+        return schema_class(**data)
 
 
 def dump_configs_to_bucket(configs: list[BaseModel], bucket_path: str, workers: int = 8) -> list[str]:

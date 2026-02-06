@@ -54,7 +54,7 @@ class PreprocessingCoordinator:
     def validate_and_sanitize_files(
         self,
         *,
-        ingest_schema: IngestSchema,
+        ingest_schema_uri: str,
         input_h5ad_uris: list[str],
         output_h5ad_uris: list[str],
         validation_report_id: int | None = None,
@@ -65,7 +65,7 @@ class PreprocessingCoordinator:
         Validate and sanitize each file, and create validation report items if backend API is available.
         Per-file semantics: is_valid=True only if validation AND sanitization both succeeded.
 
-        :param ingest_schema: Pydantic schema for validation and sanitization
+        :param ingest_schema_uri: GCS URI to the ingest schema JSON file
         :param input_h5ad_uris: List of GCS URIs for input h5ad files
         :param output_h5ad_uris: List of GCS URIs for sanitized output files
         :param validation_report_id: Optional ID of ValidationReport to attach items to (requires backend API)
@@ -83,9 +83,13 @@ class PreprocessingCoordinator:
             f"Starting validation (reporting {'enabled' if self.backend_client and validation_report_id else 'disabled'})"
         )
 
-        file_results = []
         first_bucket, _ = self._parse_gcs_uri(input_h5ad_uris[0])
         workspace_manager = WorkspaceFileManager(bucket_name=first_bucket)
+
+        ingest_schema_data = workspace_manager.load_json_from_bucket(remote_path=ingest_schema_uri)
+        ingest_schema = IngestSchema.model_validate(ingest_schema_data)
+
+        file_results = []
 
         with workspace_manager.temp_workspace() as workspace:
             for idx, (input_uri, output_uri) in enumerate(zip(input_h5ad_uris, output_h5ad_uris)):
