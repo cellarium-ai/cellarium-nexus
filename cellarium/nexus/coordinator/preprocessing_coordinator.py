@@ -83,13 +83,14 @@ class PreprocessingCoordinator:
             f"Starting validation (reporting {'enabled' if self.backend_client and validation_report_id else 'disabled'})"
         )
 
-        first_bucket, _ = self._parse_gcs_uri(input_h5ad_uris[0])
-        workspace_manager = WorkspaceFileManager(bucket_name=first_bucket)
-
-        ingest_schema_data = workspace_manager.load_json_from_bucket(remote_path=ingest_schema_uri)
+        schema_bucket, schema_blob = gcp.get_bucket_name_and_file_path_from_gc_path(ingest_schema_uri)
+        schema_manager = WorkspaceFileManager(bucket_name=schema_bucket)
+        ingest_schema_data = schema_manager.load_json_from_bucket(remote_path=schema_blob)
         ingest_schema = IngestSchema.model_validate(ingest_schema_data)
 
         file_results = []
+        first_bucket, _ = self._parse_gcs_uri(input_h5ad_uris[0])
+        workspace_manager = WorkspaceFileManager(bucket_name=first_bucket)
 
         with workspace_manager.temp_workspace() as workspace:
             for idx, (input_uri, output_uri) in enumerate(zip(input_h5ad_uris, output_h5ad_uris)):

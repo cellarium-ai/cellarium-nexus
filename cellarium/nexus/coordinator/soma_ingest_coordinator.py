@@ -228,10 +228,9 @@ class SomaIngestCoordinator:
 
         :return: GCS URI to the saved ingest plan
         """
-        bucket_name, _ = self._parse_gcs_uri(h5ad_uris[0])
-        workspace_manager = WorkspaceFileManager(bucket_name=bucket_name)
-
-        ingest_schema_data = workspace_manager.load_json_from_bucket(remote_path=ingest_schema_uri)
+        schema_bucket, schema_blob = self._parse_gcs_uri(ingest_schema_uri)
+        schema_manager = WorkspaceFileManager(bucket_name=schema_bucket)
+        ingest_schema_data = schema_manager.load_json_from_bucket(remote_path=schema_blob)
         ingest_schema = IngestSchema.model_validate(ingest_schema_data)
 
         first_adata = None

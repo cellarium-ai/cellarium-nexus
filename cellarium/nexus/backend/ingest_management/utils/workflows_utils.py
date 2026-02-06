@@ -228,7 +228,6 @@ def submit_soma_validation_pipeline(
 
     configs, output_uris = create_soma_validate_sanitize_configs(
         input_h5ad_uris=input_h5ad_uris,
-        ingest_schema=ingest_schema,
         ingest_schema_uri=schema_uri,
         output_base_dir=output_directory_uri,
         validation_report_id=validation_report_id,
