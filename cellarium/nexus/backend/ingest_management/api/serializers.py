@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
@@ -5,9 +6,70 @@ from cellarium.nexus.backend.cell_management import models as cell_models
 from cellarium.nexus.backend.ingest_management import models
 
 
+def _refresh_ingest_status(ingest: models.Ingest) -> None:
+    statuses = set(ingest.files.values_list("status", flat=True))
+    if not statuses:
+        return
+
+    if models.IngestInfo.STATUS_FAILED in statuses:
+        new_status = models.Ingest.STATUS_FAILED
+    elif statuses == {models.IngestInfo.STATUS_SUCCEEDED}:
+        new_status = models.Ingest.STATUS_SUCCEEDED
+    else:
+        new_status = models.Ingest.STATUS_STARTED
+
+    updates: dict[str, object] = {}
+    if ingest.status != new_status:
+        updates["status"] = new_status
+
+    if new_status in (models.Ingest.STATUS_FAILED, models.Ingest.STATUS_SUCCEEDED):
+        if ingest.ingest_finish_timestamp is None:
+            updates["ingest_finish_timestamp"] = timezone.now()
+    elif ingest.ingest_finish_timestamp is not None:
+        updates["ingest_finish_timestamp"] = None
+
+    if updates:
+        models.Ingest.objects.filter(pk=ingest.pk).update(**updates)
+
+
+class IngestSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(read_only=True)
+    omics_dataset = serializers.SlugRelatedField(
+        slug_field="name",
+        queryset=cell_models.OmicsDataset.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    ingest_start_timestamp = serializers.DateTimeField(read_only=True)
+    status = serializers.ChoiceField(choices=models.Ingest.STATUS_CHOICES, required=False)
+
+    class Meta:
+        model = models.Ingest
+        fields = (
+            "id",
+            "omics_dataset",
+            "status",
+            "metadata_extra",
+            "gencode_version",
+            "ingest_start_timestamp",
+            "ingest_finish_timestamp",
+        )
+
+
 class IngestInfoSerializer(serializers.ModelSerializer):
-    id = serializers.UUIDField(read_only=True)
-    omics_dataset = serializers.SlugRelatedField(slug_field="name", queryset=cell_models.OmicsDataset.objects.all())
+    id = serializers.IntegerField(read_only=True)
+    ingest_id = serializers.PrimaryKeyRelatedField(
+        source="ingest",
+        queryset=models.Ingest.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    omics_dataset = serializers.SlugRelatedField(
+        slug_field="name",
+        queryset=cell_models.OmicsDataset.objects.all(),
+        required=False,
+        allow_null=True,
+    )
     ingest_start_timestamp = serializers.DateTimeField(read_only=True)
     status = serializers.ChoiceField(choices=models.IngestInfo.STATUS_CHOICES, required=False)
 
@@ -15,13 +77,40 @@ class IngestInfoSerializer(serializers.ModelSerializer):
         model = models.IngestInfo
         fields = (
             "id",
+            "ingest_id",
             "nexus_uuid",
             "omics_dataset",
             "status",
+            "gcs_file_path",
+            "tag",
             "metadata_extra",
             "ingest_start_timestamp",
             "ingest_finish_timestamp",
         )
+
+    def create(self, validated_data):
+        ingest = validated_data.get("ingest")
+        omics_dataset = validated_data.get("omics_dataset")
+
+        if ingest is None:
+            if omics_dataset is None:
+                raise ValidationError("omics_dataset is required when ingest_id is not provided.")
+            ingest = models.Ingest.objects.create(
+                omics_dataset=omics_dataset,
+                status=models.Ingest.STATUS_STARTED,
+            )
+            validated_data["ingest"] = ingest
+        else:
+            validated_data["omics_dataset"] = ingest.omics_dataset
+
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        ingest = instance.ingest
+        validated_data.pop("ingest", None)
+        updated = super().update(instance, validated_data)
+        _refresh_ingest_status(ingest)
+        return updated
 
 
 class IngestFromAvroSerializer(serializers.Serializer):
@@ -64,6 +153,36 @@ class ReserveIndexesSerializer(serializers.Serializer):
     index_end = serializers.IntegerField(read_only=True)
 
 
+class ValidationReportSerializer(serializers.ModelSerializer):
+    """
+    Serializer for ValidationReport model.
+
+    Used for creating validation reports.
+    """
+
+    creator_id = serializers.IntegerField(read_only=True, allow_null=True)
+
+    class Meta:
+        model = models.ValidationReport
+        fields = (
+            "id",
+            "creator_id",
+            "created_at",
+        )
+        read_only_fields = ("id", "creator_id", "created_at")
+
+    def create(self, validated_data):
+        """
+        Create a ValidationReport with the current user as creator.
+
+        :param validated_data: Validated data
+
+        :return: Created ValidationReport instance
+        """
+        creator = self.context.get("request").user if "request" in self.context else None
+        return models.ValidationReport.objects.create(creator=creator)
+
+
 class ValidationReportItemSerializer(serializers.ModelSerializer):
     """
     Serializer for ValidationReportItem model.
@@ -83,7 +202,8 @@ class ValidationReportItemSerializer(serializers.ModelSerializer):
         fields = (
             "id",
             "report_id",
-            "input_file_gcs_path",
+            "input_file_path",
+            "sanitized_file_path",
             "validator_name",
             "is_valid",
             "message",

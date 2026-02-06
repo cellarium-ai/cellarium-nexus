@@ -5,6 +5,7 @@ from cellarium.nexus.workflows.kubeflow.utils import job
 
 SOMA_RANDOMIZED_EXTRACT_LABELS = {**conf.LABELS, "method": "soma_randomized_extract"}
 SOMA_GROUPED_EXTRACT_LABELS = {**conf.LABELS, "method": "soma_grouped_extract"}
+SOMA_INGEST_LABELS = {**conf.LABELS, "method": "soma_ingest"}
 
 
 @job.dsl_component_job(
@@ -124,4 +125,99 @@ def mark_soma_curriculum_as_finished_job(config_path: str):
         curriculum_metadata_path=params.extract_metadata_path,
         extract_bucket_path=params.extract_bucket_path,
         extract_type=params.extract_type,
+    )
+
+
+@job.dsl_component_job(
+    machine_type="e2-highmem-8",
+    display_name="soma_validate_sanitize",
+    base_image=conf.BASE_IMAGE,
+    service_account=conf.SERVICE_ACCOUNT,
+    labels=SOMA_INGEST_LABELS,
+)
+def soma_validate_sanitize_job(config_path: str):
+    """
+    Validate and sanitize h5ad files for SOMA ingest.
+
+    Read a SomaValidateSanitizeConfig from GCS and use PreprocessingCoordinator
+    to validate and sanitize files for ingestion.
+    """
+    from cellarium.nexus.coordinator import PreprocessingCoordinator
+    from cellarium.nexus.shared import utils
+    from cellarium.nexus.shared.schemas.component_configs import SomaValidateSanitizeConfig
+
+    params = utils.workflows_configs.read_component_config(
+        gcs_path=config_path, schema_class=SomaValidateSanitizeConfig
+    )
+
+    coordinator = PreprocessingCoordinator(nexus_backend_api_url=params.nexus_backend_api_url)
+    coordinator.validate_and_sanitize_files(
+        input_h5ad_uris=params.input_h5ad_uris,
+        output_h5ad_uris=params.output_h5ad_uris,
+        ingest_schema_uri=params.ingest_schema_uri,
+        validation_report_id=params.validation_report_id,
+    )
+
+
+@job.dsl_component_job(
+    machine_type="e2-standard-4",
+    display_name="soma_prepare_ingest_plan",
+    base_image=conf.BASE_IMAGE,
+    service_account=conf.SERVICE_ACCOUNT,
+    labels=SOMA_INGEST_LABELS,
+)
+def soma_prepare_ingest_plan_job(config_path: str):
+    """
+    Prepare a SOMA ingest plan and write it to GCS.
+
+    Read a SomaIngestPlanConfig from GCS and use SomaIngestCoordinator
+    to compute and save the ingest plan.
+    """
+    from cellarium.nexus.coordinator import SomaIngestCoordinator
+    from cellarium.nexus.shared import utils
+    from cellarium.nexus.shared.schemas.component_configs import SomaIngestPlanConfig
+
+    params = utils.workflows_configs.read_component_config(gcs_path=config_path, schema_class=SomaIngestPlanConfig)
+
+    coordinator = SomaIngestCoordinator(experiment_uri=params.experiment_uri)
+    coordinator.prepare_ingest_plan(
+        h5ad_uris=params.h5ad_uris,
+        measurement_name=params.measurement_name,
+        ingest_schema_uri=params.ingest_schema_uri,
+        ingest_batch_size=params.ingest_batch_size,
+        ingest_plan_output_uri=params.ingest_plan_gcs_path,
+        first_adata_gcs_path=params.first_adata_gcs_path,
+    )
+
+
+@job.dsl_component_job(
+    machine_type="e2-highmem-8",
+    display_name="soma_ingest_partition",
+    base_image=conf.BASE_IMAGE,
+    service_account=conf.SERVICE_ACCOUNT,
+    labels=SOMA_INGEST_LABELS,
+)
+def soma_ingest_partition_job(config_path: str):
+    """
+    Ingest a SOMA partition.
+
+    Read a SomaIngestPartitionConfig from GCS and use SomaIngestCoordinator
+    to ingest a single partition of h5ad files.
+    """
+    from cellarium.nexus.coordinator import SomaIngestCoordinator
+    from cellarium.nexus.shared import utils
+    from cellarium.nexus.shared.schemas.component_configs import SomaIngestPartitionConfig
+
+    params = utils.workflows_configs.read_component_config(gcs_path=config_path, schema_class=SomaIngestPartitionConfig)
+
+    coordinator = SomaIngestCoordinator(
+        experiment_uri=params.experiment_uri,
+        nexus_backend_api_url=params.nexus_backend_api_url,
+    )
+    coordinator.ingest_partition(
+        ingest_plan_uri=params.ingest_plan_uri,
+        partition_index=params.partition_index,
+        h5ad_file_paths=params.h5ad_file_paths,
+        omics_dataset_name=params.omics_dataset_name,
+        parent_ingest_id=params.parent_ingest_id,
     )

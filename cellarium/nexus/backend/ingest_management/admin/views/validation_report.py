@@ -11,7 +11,10 @@ from unfold.decorators import action
 from cellarium.nexus.backend.ingest_management import models
 from cellarium.nexus.backend.ingest_management.admin import constants, forms
 from cellarium.nexus.backend.ingest_management.utils.export_csv import export_model_queryset_to_csv
-from cellarium.nexus.backend.ingest_management.utils.workflows_utils import submit_validation_pipeline
+from cellarium.nexus.backend.ingest_management.utils.workflows_utils import (
+    submit_soma_ingest_pipeline,
+    submit_soma_validation_pipeline,
+)
 
 
 class ValidationReportItemInline(TabularInline):
@@ -32,28 +35,28 @@ class ValidationReportItemInline(TabularInline):
 
     def truncated_gcs_path(self, obj):
         """
-        Display a truncated version of the GCS path with a tooltip showing the full path.
+        Display a truncated version of the file path with a tooltip showing the full path.
 
         :param obj: ValidationReportItem instance
 
-        :return: Truncated GCS path with tooltip
+        :return: Truncated file path with tooltip
         """
-        if not obj.input_file_gcs_path:
+        if not obj.input_file_path:
             return "-"
 
         # Create a truncated version with ellipsis in the middle
         max_length = 50
-        if len(obj.input_file_gcs_path) > max_length:
-            prefix = obj.input_file_gcs_path[:20]
-            suffix = obj.input_file_gcs_path[-25:]
+        if len(obj.input_file_path) > max_length:
+            prefix = obj.input_file_path[:20]
+            suffix = obj.input_file_path[-25:]
             truncated = f"{prefix}...{suffix}"
         else:
-            truncated = obj.input_file_gcs_path
+            truncated = obj.input_file_path
 
         # Return HTML with tooltip showing full path
-        return mark_safe(f'<span title="{obj.input_file_gcs_path}">{truncated}</span>')
+        return mark_safe(f'<span title="{obj.input_file_path}">{truncated}</span>')
 
-    truncated_gcs_path.short_description = _("Input File GCS Path")
+    truncated_gcs_path.short_description = _("Input File Path")
 
 
 @admin.register(models.ValidationReport)
@@ -71,7 +74,7 @@ class ValidationReportAdmin(ModelAdmin):
     readonly_fields = ("created_at",)
     inlines = [ValidationReportItemInline]
     actions_list = ["validate_new_data"]
-    actions_detail = ["export_items_as_csv"]
+    actions_detail = ["export_items_as_csv", "ingest_validated_data"]
 
     def item_count(self, obj):
         """
@@ -142,57 +145,53 @@ class ValidationReportAdmin(ModelAdmin):
     @action(description=_("Validate New Data"), url_path="validate-new-data")
     def validate_new_data(self, request: HttpRequest) -> HttpResponse:
         """
-        Validate new data using the Kubeflow validation pipeline.
-
-        Upload CSV file with GCS paths, create validation report, and submit validation pipeline.
+        Validate and sanitize SOMA data.
 
         :param request: The HTTP request
 
-        :raise ValidationError: If validation fails
-        :raise IOError: If there's an error reading the CSV file or writing configs to GCS
-        :raise google.api_core.exceptions.GoogleAPIError: If pipeline submission fails
+        :raises ValidationError: If validation fails
+        :raises ValueError: If schema is invalid
+        :raises IOError: If there's an error with GCS operations
 
         :return: HTTP response
         """
         form = forms.ValidateNewDataChangeListActionForm(request.POST or None, request.FILES or None)
 
         if request.method == "POST" and form.is_valid():
-            csv_file = form.cleaned_data["ingest_csv_file"]
+            ingest_schema = form.cleaned_data["ingest_schema"]
+            csv_file = form.cleaned_data["input_csv_file"]
+            output_directory_uri = form.cleaned_data["output_directory_uri"].rstrip("/")
+
+            # Read CSV file to extract input paths
             df = pd.read_csv(csv_file)
-            if not all(col in df.columns for col in constants.REQUIRED_CSV_FILE_COLUMNS):
-                raise ValidationError(f"CSV must contain columns: {', '.join(constants.REQUIRED_CSV_FILE_COLUMNS)}")
+
+            # Get first column (assuming GCS paths are in first column)
+            input_paths = df.iloc[:, 0].tolist()
+
+            if not input_paths:
+                raise ValidationError(_("CSV file contains no data"))
 
             # Create validation report
             validation_report = models.ValidationReport.objects.create(creator=request.user)
-            validation_report_id = validation_report.id
-
-            # Get the selected genecode version
-            gencode_version = form.cleaned_data["gencode_version"]
-            gencode_validator = f"nexus.omics_datastore.bq_ops.validate.cellarium_validate_gencode_{gencode_version}"
-
-            # Define validation methods
-            validation_methods = [
-                "nexus.omics_datastore.bq_ops.validate.validate_raw_counts",
-                gencode_validator,
-            ]
-
-            # Extract all AnnData GCS paths from the CSV
-            adata_gcs_paths = df[constants.GCS_PATH_COLUMN].tolist()
 
             # Submit validation pipeline
-            pipeline_url = submit_validation_pipeline(
-                adata_gcs_paths=adata_gcs_paths,
-                validation_report_id=validation_report_id,
-                validation_methods=validation_methods,
+            pipeline_url, output_uris = submit_soma_validation_pipeline(
+                input_h5ad_uris=input_paths,
+                ingest_schema=ingest_schema,
+                output_directory_uri=output_directory_uri,
+                validation_report_id=validation_report.id,
             )
 
-            # Use mark_safe to prevent HTML escaping in the message
-            success_message = _(
-                "Validation pipeline submitted successfully. "
-                f"<a href='{pipeline_url}' target='_blank' style='text-decoration: underline;'>View pipeline progress</a>"
+            messages.success(
+                request=request,
+                message=mark_safe(
+                    f"SOMA validation pipeline submitted successfully. "
+                    f"Validation Report ID: {validation_report.id}. "
+                    f'<a href="{pipeline_url}" target="_blank" style="text-decoration: underline;">'
+                    f"View Pipeline in Vertex AI</a>"
+                ),
             )
-            messages.success(request=request, message=mark_safe(success_message))
-            return redirect("admin:ingest_management_validationreport_changelist")
+            return redirect("admin:ingest_management_validationreport_change", object_id=validation_report.id)
 
         return render(
             request=request,
@@ -201,6 +200,81 @@ class ValidationReportAdmin(ModelAdmin):
                 "form": form,
                 "title": _("Validate New Data"),
                 "submit_button_title": _("Validate"),
+                **self.admin_site.each_context(request),
+            },
+        )
+
+    @action(description=_("Ingest Validated Data into SOMA"), url_path="ingest-validated-data")
+    def ingest_validated_data(self, request: HttpRequest, object_id: str) -> HttpResponse:
+        """
+        Ingest validated and sanitized data into SOMA experiment.
+
+        Collect all valid items from validation report and submit them to the ingest pipeline.
+
+        :param request: The HTTP request
+        :param object_id: The validation report ID
+
+        :raises ValidationError: If ingest fails
+        :raises ValueError: If no valid items found or dataset not found
+        :raises IOError: If there's an error with GCS operations
+
+        :return: HTTP response
+        """
+        try:
+            validation_report = models.ValidationReport.objects.get(id=object_id)
+        except models.ValidationReport.DoesNotExist:
+            messages.error(request, _("Validation report not found"))
+            return redirect("admin:ingest_management_validationreport_changelist")
+
+        form = forms.SomaIngestForm(request.POST or None)
+
+        if request.method == "POST" and form.is_valid():
+            # Get all valid items from this validation report
+            valid_items = validation_report.items.filter(is_valid=True).order_by("created_at")
+
+            if not valid_items.exists():
+                messages.error(request, _("No valid items found in validation report"))
+                return redirect("admin:ingest_management_validationreport_change", object_id=object_id)
+
+            # Extract sanitized file paths (sorted by creation order for consistency)
+            sanitized_uris = [item.sanitized_file_path for item in valid_items if item.sanitized_file_path]
+
+            if not sanitized_uris:
+                messages.error(request, _("No sanitized file paths found in valid items"))
+                return redirect("admin:ingest_management_validationreport_change", object_id=object_id)
+
+            omics_dataset = form.cleaned_data["omics_dataset"]
+            dataset_name = omics_dataset.name
+
+            parent_ingest = models.Ingest.objects.create(
+                omics_dataset=omics_dataset, status=models.Ingest.STATUS_STARTED
+            )
+
+            # Submit ingest pipeline
+            pipeline_url = submit_soma_ingest_pipeline(
+                sanitized_h5ad_uris=sanitized_uris,
+                omics_dataset=omics_dataset,
+                parent_ingest_id=parent_ingest.id,
+            )
+
+            messages.success(
+                request=request,
+                message=mark_safe(
+                    f"SOMA ingest pipeline submitted successfully. "
+                    f"Ingesting {len(sanitized_uris)} files into dataset '{dataset_name}'. "
+                    f'<a href="{pipeline_url}" target="_blank" style="text-decoration: underline;">'
+                    f"View Pipeline in Vertex AI</a>"
+                ),
+            )
+            return redirect("admin:ingest_management_validationreport_change", object_id=object_id)
+
+        return render(
+            request=request,
+            template_name=constants.CHANGELIST_ACTION_FORM,
+            context={
+                "form": form,
+                "title": _("Ingest Validated Data"),
+                "submit_button_title": _("Ingest"),
                 **self.admin_site.each_context(request),
             },
         )
@@ -216,8 +290,8 @@ class ValidationReportItemAdmin(ModelAdmin):
 
     list_display = ("id", "report", "validator_name", "is_valid", "truncated_gcs_path", "created_at")
     list_filter = ("is_valid", "validator_name", "created_at", "report")
-    search_fields = ("input_file_gcs_path", "validator_name", "message")
-    readonly_fields = ("created_at", "input_file_gcs_path", "truncated_gcs_path")
+    search_fields = ("input_file_path", "validator_name", "message")
+    readonly_fields = ("created_at", "input_file_path", "truncated_gcs_path")
 
     def truncated_gcs_path(self, obj):
         """

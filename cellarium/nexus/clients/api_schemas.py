@@ -7,9 +7,12 @@ from pydantic import BaseModel
 class IngestInfoAPISchema(BaseModel):
     id: int
     nexus_uuid: str
-    bigquery_dataset: str
+    omics_dataset: str | None = None
+    ingest_id: int | None = None
     ingest_start_timestamp: datetime
     ingest_finish_timestamp: datetime | None = None
+    gcs_file_path: str | None = None
+    tag: str | None = None
     metadata_extra: dict[str, Any] | None = None
     status: str | None = None
 
@@ -36,10 +39,17 @@ class CurriculumAPISchema(BaseModel):
     filters_json: dict[str, Any] | None = None
 
 
+class ValidationReportAPISchema(BaseModel):
+    id: int
+    creator_id: int | None = None
+    created_at: datetime
+
+
 class ValidationReportItemAPISchema(BaseModel):
     id: int
     report_id: int
-    input_file_gcs_path: str
+    input_file_path: str
+    sanitized_file_path: str | None = None
     validator_name: str
     is_valid: bool
     message: str | None = None

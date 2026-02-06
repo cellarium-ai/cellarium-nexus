@@ -105,6 +105,8 @@ class BQDataOpsCoordinator:
         column_mapping: dict[str, Any] | None = None,
         uns_keys_to_keep: list[str] | None = None,
         validation_methods: list[str] | None = None,
+        ingest_id: int | None = None,
+        ingest_file_id: int | None = None,
     ) -> tuple[int, str]:
         """
         Create ingest files and prepare them for ingestion.
@@ -120,6 +122,8 @@ class BQDataOpsCoordinator:
         :param uns_keys_to_keep: Optional list of keys to keep in the `uns` JSON blob. If not provided,
             all keys will be kept
         :param validation_methods: Optional list of validation methods to run on the data. If not provided, none applied
+        :param ingest_id: Optional parent ingest ID to associate with this file
+        :param ingest_file_id: Optional ingest file ID to reuse
 
         :raise Exception: If file creation or upload fails
 
@@ -139,8 +143,18 @@ class BQDataOpsCoordinator:
             os.makedirs(local_input_data_dir, exist_ok=True)
             os.makedirs(local_output_dir, exist_ok=True)
 
-            # Create ingest info on backend
-            ingest_info_api_struct = self.backend_client.create_ingest_file_info(bigquery_dataset=bigquery_dataset)
+            # Create or reuse ingest info on backend
+            if ingest_file_id is not None:
+                ingest_info_api_struct = self.backend_client.update_ingest_status(
+                    ingest_id=ingest_file_id, new_status="STARTED"
+                )
+            else:
+                ingest_info_api_struct = self.backend_client.create_ingest_file_info(
+                    omics_dataset=bigquery_dataset,
+                    ingest_id=ingest_id,
+                    gcs_file_path=input_file_path,
+                    tag=tag,
+                )
 
             logger.info("Validating the file size...")
             BigQueryDataValidator.validate_remote_file_size(

@@ -231,12 +231,17 @@ UNFOLD = {
                     {
                         "title": _("Data Ingests"),
                         "icon": "upload_file",
-                        "link": reverse_lazy("admin:ingest_management_ingestinfo_changelist"),
+                        "link": reverse_lazy("admin:ingest_management_ingest_changelist"),
                     },
                     {
                         "title": _("Column Mappers"),
                         "icon": "table_rows",
                         "link": reverse_lazy("admin:ingest_management_columnmapping_changelist"),
+                    },
+                    {
+                        "title": _("Ingest Schemas"),
+                        "icon": "schema",
+                        "link": reverse_lazy("admin:ingest_management_ingestschema_changelist"),
                     },
                     {
                         "title": _("Validation Reports"),
@@ -331,6 +336,10 @@ PIPELINE_CONFIGS_DIR = "pipeline-configs"
 # Pipeline settings
 INGEST_INPUT_FILE_MAX_SIZE = 3e9  # 3 Gb
 MAX_ADATA_FILES_PER_VALIDATION_BATCH = 50  # Maximum number of AnnData files per validation batch
+
+# SOMA Pipeline Batch Sizes
+SOMA_FILES_PER_VALIDATION_BATCH = 10
+SOMA_FILES_PER_INGEST_PARTITION = 10
 INGEST_BATCH_SIZE = 2_500  # Used by Django's api that inserts Cell Info and Cell Feature Info into the database
 INGEST_NUM_WORKERS = 4
 INGEST_UNS_KEYS_TO_KEEP = ["citation", "schema_reference", "schema_version", "title", "batch_condition"]

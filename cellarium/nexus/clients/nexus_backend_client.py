@@ -6,18 +6,22 @@ from cellarium.nexus.clients.api_schemas import (
     BackendResetAPISchema,
     CurriculumAPISchema,
     IngestInfoAPISchema,
+    ValidationReportAPISchema,
     ValidationReportItemAPISchema,
 )
 from cellarium.nexus.clients.base import BaseAPIHTTPClient
 
 
 class ApiEndpoints:
-    CREATE_INGEST_FILE: str = "api/ingest-management/ingest/create"
-    UPDATE_INGEST_FILE_INFO: str = "api/ingest-management/ingest/{id}"
+    CREATE_INGEST: str = "api/ingest-management/ingest/create"
+    UPDATE_INGEST: str = "api/ingest-management/ingest/{id}"
+    CREATE_INGEST_FILE: str = "api/ingest-management/ingest-file/create"
+    UPDATE_INGEST_FILE_INFO: str = "api/ingest-management/ingest-file/{id}"
     CELL_INFO_RESERVE_INDEXES: str = "api/ingest-management/reserve-indexes/cell-info/"
     FEATURE_INFO_RESERVE_INDEXES: str = "api/ingest-management/reserve-indexes/feature-info/"
     REGISTER_CURRICULUM: str = "api/curriculum/curriculums/"
     UPDATE_CURRICULUM: str = "api/curriculum/curriculums/{name}/"
+    CREATE_VALIDATION_REPORT: str = "api/ingest-management/validation-report/create/"
     CREATE_VALIDATION_REPORT_ITEM: str = "api/ingest-management/validation-report-item/create/"
     RESET_CACHE: str = "api/ingest-management/reset-cache/"
 
@@ -28,18 +32,37 @@ class ReserveIndexesModelType(Enum):
 
 
 class NexusBackendAPIClient(BaseAPIHTTPClient):
-    def create_ingest_file_info(self, bigquery_dataset: str) -> IngestInfoAPISchema:
+    def create_ingest_file_info(
+        self,
+        *,
+        omics_dataset: str | None = None,
+        ingest_id: int | None = None,
+        gcs_file_path: str | None = None,
+        tag: str | None = None,
+    ) -> IngestInfoAPISchema:
         """
         Create a new ingest file info record.
 
-        :param bigquery_dataset: Name of the BigQuery dataset
+        :param omics_dataset: Name of the Omics dataset
+        :param ingest_id: Optional parent ingest ID
+        :param gcs_file_path: Optional GCS file path
+        :param tag: Optional tag value
 
         :raise HTTPError: if the request fails
         :raise ValueError: if the response is invalid
 
         :return: Created ingest file info record
         """
-        data = {"bigquery_dataset": bigquery_dataset}
+        data: dict[str, Any] = {}
+        if omics_dataset is not None:
+            data["omics_dataset"] = omics_dataset
+        if ingest_id is not None:
+            data["ingest_id"] = ingest_id
+        if gcs_file_path is not None:
+            data["gcs_file_path"] = gcs_file_path
+        if tag is not None:
+            data["tag"] = tag
+
         api_out = self.post_json(endpoint=ApiEndpoints.CREATE_INGEST_FILE, data=data)
         return IngestInfoAPISchema(**api_out)
 
@@ -63,7 +86,7 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
     def update_ingest_status(
         self,
         ingest_id: int,
-        new_status: Literal["SUCCEEDED", "FAILED"],
+        new_status: Literal["STARTED", "SUCCEEDED", "FAILED"],
         ingest_finish_timestamp: datetime | None = None,
     ) -> IngestInfoAPISchema:
         """
@@ -113,7 +136,7 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
         api_out = self.post_json(
             endpoint=endpoint,
             data={
-                "bigquery_dataset": bigquery_dataset,
+                "omics_dataset": bigquery_dataset,
                 "batch_size": batch_size,
             },
         )
@@ -226,23 +249,39 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
         api_out = self.patch_json(endpoint=ApiEndpoints.UPDATE_CURRICULUM.format(name=name), data=data)
         return CurriculumAPISchema(**api_out)
 
+    def create_validation_report(self) -> ValidationReportAPISchema:
+        """
+        Create a new validation report.
+
+        The creator is set from the authenticated request context on the backend.
+
+        :raise: HTTPError if the request fails
+        :raise: ValueError if the response is invalid
+
+        :return: Created validation report
+        """
+        api_out = self.post_json(endpoint=ApiEndpoints.CREATE_VALIDATION_REPORT, data={})
+        return ValidationReportAPISchema(**api_out)
+
     def create_validation_report_item(
         self,
         *,
         report_id: int,
-        input_file_gcs_path: str,
+        input_file_path: str,
         validator_name: str,
         is_valid: bool,
         message: str | None = None,
+        sanitized_file_path: str | None = None,
     ) -> ValidationReportItemAPISchema:
         """
         Create a validation report item for an existing validation report.
 
         :param report_id: ID of the existing validation report
-        :param input_file_gcs_path: GCS path to the input file that was validated
+        :param input_file_path: Path to the input file that was validated
         :param validator_name: Name of the validator that performed the validation
         :param is_valid: Whether the validation passed or failed
         :param message: Optional message with validation details
+        :param sanitized_file_path: Optional path to the sanitized output file
 
         :raise: HTTPError if the request fails
         :raise: ValueError if the response is invalid
@@ -251,13 +290,16 @@ class NexusBackendAPIClient(BaseAPIHTTPClient):
         """
         data = {
             "report_id": report_id,
-            "input_file_gcs_path": input_file_gcs_path,
+            "input_file_path": input_file_path,
             "validator_name": validator_name,
             "is_valid": is_valid,
         }
 
         if message is not None:
             data["message"] = message
+
+        if sanitized_file_path is not None:
+            data["sanitized_file_path"] = sanitized_file_path
 
         api_out = self.post_json(endpoint=ApiEndpoints.CREATE_VALIDATION_REPORT_ITEM, data=data)
         return ValidationReportItemAPISchema(**api_out)

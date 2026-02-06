@@ -27,12 +27,12 @@ class OmicsDatasetAdmin(ModelAdmin):
     Provides functionality to create and manage omics datasets with different backends.
     """
 
-    list_display = ("id", "name", "backend", "description", "link_display")
+    list_display = ("id", "name", "backend", "schema", "description", "link_display")
     search_fields = ("name",)
-    list_filter = ("name", "backend")
+    list_filter = ("name", "backend", "schema")
     ordering = ("name",)
     readonly_fields = ("link",)
-    fieldsets = ((None, {"fields": ("name", "backend", "description", "uri", "link")}),)
+    fieldsets = ((None, {"fields": ("name", "schema", "backend", "description", "uri", "link")}),)
 
     def save_model(self, request: HttpRequest, obj: OmicsDataset, form: forms.Form, change: bool) -> None:
         """

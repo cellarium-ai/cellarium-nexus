@@ -1,128 +1,56 @@
+"""Tests for SOMA validation and ingest pipeline submission utilities."""
+
 from __future__ import annotations
 
-from typing import Any
-
-import pandas as pd
 import pytest
-from django.conf import settings as dj_settings
 
-from cellarium.nexus.backend.cell_management import models as cm_models
 from cellarium.nexus.backend.ingest_management.utils import workflows_utils
 
 
-@pytest.mark.usefixtures("vertex_ai_pipeline_stub")
 @pytest.mark.django_db
-def test_submit_ingest_pipeline_creates_configs_and_calls_submit(
-    default_dataset: cm_models.OmicsDataset, monkeypatch: pytest.MonkeyPatch, vertex_ai_pipeline_stub
-) -> None:
+def test_batch_uris_creates_correct_batches() -> None:
     """
-    Ensure submit_ingest_pipeline builds one CreateIngestFilesConfig per input row,
-    dumps both create+ingest configs, and calls submit_pipeline with their paths.
+    Ensure _batch_uris creates correct batches.
     """
-    # Arrange input dataframe (two files, with tags)
-    df = pd.DataFrame(
-        [
-            {"gcs_file_path": "gs://bucket/data/a1.h5ad", "tag": "t1"},
-            {"gcs_file_path": "gs://bucket/data/b2.h5ad", "tag": "t2"},
-        ]
-    )
+    uris = [f"gs://bucket/file{i}.h5ad" for i in range(7)]
 
-    # Capture configs passed to dump
-    captured: dict[str, Any] = {"create": None, "ingest": None}
-
-    def _dump_configs(configs, bucket_path, workers=8):
-        # Determine type by first element's class name
-        if not configs:
-            return []
-        model_name = configs[0].__class__.__name__
-        if model_name.lower().startswith("createingestfilesconfig"):
-            captured["create"] = configs
-            return [f"gs://cfg/create_{i}.yaml" for i in range(len(configs))]
-        else:
-            captured["ingest"] = configs
-            return ["gs://cfg/ingest.yaml"]
-
-    monkeypatch.setattr(
-        workflows_utils.utils.workflows_configs,
-        "dump_configs_to_bucket",
-        _dump_configs,
-        raising=True,
-    )
-
-    # Act
-    url = workflows_utils.submit_ingest_pipeline(
-        df_ingest_file_info=df,
-        omics_dataset=default_dataset,
-        column_mapping={"donor_id": "donor_id"},
-        validation_methods=["validate_shapes"],
-    )
-
-    # Assert pipeline URL from stub
-    assert isinstance(url, str) and url == vertex_ai_pipeline_stub.default_url
-
-    # Assert we created one CreateIngestFilesConfig per row
-    assert captured["create"] is not None and len(captured["create"]) == 2
-    for cfg, row in zip(captured["create"], df.to_dict(orient="records")):
-        assert cfg.bigquery_dataset == default_dataset.name
-        assert cfg.input_file_path == row["gcs_file_path"]
-        assert cfg.tag == row["tag"]
-        assert cfg.column_mapping == {"donor_id": "donor_id"}
-        assert cfg.validation_methods == ["validate_shapes"]
-        # Unique stage dirs, ending with filename stem prefix
-        stem = row["gcs_file_path"].split("/")[-1].split(".")[0][:10]
-        assert cfg.bucket_stage_dir.endswith(stem)
-    # Ingest config should aggregate stage dirs from create configs
-    assert captured["ingest"] is not None and len(captured["ingest"]) == 1
-    ingest_cfg = captured["ingest"][0]
-    assert len(ingest_cfg.bucket_stage_dirs) == 2
-    assert all(sd in ingest_cfg.bucket_stage_dirs for sd in [c.bucket_stage_dir for c in captured["create"]])
+    # Test with batch size 2: expect 4 batches (2,2,2,1)
+    batches = workflows_utils._batch_uris(uris=uris, batch_size=2)
+    assert len(batches) == 4
+    assert len(batches[0]) == 2
+    assert len(batches[1]) == 2
+    assert len(batches[2]) == 2
+    assert len(batches[3]) == 1
 
 
-@pytest.mark.usefixtures("vertex_ai_pipeline_stub")
-def test_submit_validation_pipeline_batches_and_calls_submit(
-    monkeypatch: pytest.MonkeyPatch, vertex_ai_pipeline_stub
-) -> None:
+@pytest.mark.django_db
+def test_generate_output_uris_creates_correct_paths() -> None:
     """
-    Ensure submit_validation_pipeline batches adata paths by MAX_ADATA_FILES_PER_VALIDATION_BATCH,
-    dumps all ValidationConfig batches, and calls submit_pipeline with the resulting paths.
+    Ensure _generate_output_uris generates correct output paths.
     """
-    # Force small batch size to exercise batching
-    monkeypatch.setattr(dj_settings, "MAX_ADATA_FILES_PER_VALIDATION_BATCH", 3, raising=False)
+    input_uris = [
+        "gs://bucket/path/file1.h5ad",
+        "gs://bucket/path/file2.h5ad",
+        "gs://bucket/path/file3.h5ad",
+    ]
+    output_dir = "gs://bucket/output/"
 
-    adata_paths = [f"gs://bucket/d{i}.h5ad" for i in range(7)]  # -> 3,3,1 batches
-    validation_methods = ["validate_shapes", "validate_schema"]
+    output_uris = workflows_utils._generate_output_uris(input_uris=input_uris, output_dir=output_dir)
 
-    captured: dict[str, Any] = {"validation": None}
+    assert len(output_uris) == 3
+    assert output_uris[0] == "gs://bucket/output/file1.h5ad"
+    assert output_uris[1] == "gs://bucket/output/file2.h5ad"
+    assert output_uris[2] == "gs://bucket/output/file3.h5ad"
 
-    def _dump_configs(configs, bucket_path, workers=8):
-        captured["validation"] = configs
-        # Return deterministic paths per config
-        return [f"gs://cfg/validation_{i}.yaml" for i in range(len(configs))]
 
-    monkeypatch.setattr(
-        workflows_utils.utils.workflows_configs,
-        "dump_configs_to_bucket",
-        _dump_configs,
-        raising=True,
-    )
+@pytest.mark.django_db
+def test_generate_output_uris_strips_trailing_slash() -> None:
+    """
+    Ensure _generate_output_uris correctly handles trailing slashes.
+    """
+    input_uris = ["gs://bucket/file.h5ad"]
+    output_dir = "gs://bucket/output///////"
 
-    url = workflows_utils.submit_validation_pipeline(
-        adata_gcs_paths=adata_paths,
-        validation_report_id=123,
-        validation_methods=validation_methods,
-    )
+    output_uris = workflows_utils._generate_output_uris(input_uris=input_uris, output_dir=output_dir)
 
-    assert isinstance(url, str) and url == vertex_ai_pipeline_stub.default_url
-
-    # We expect 3 configs (3,3,1)
-    assert captured["validation"] is not None
-    configs = captured["validation"]
-    assert len(configs) == 3
-    # Check payloads in each config
-    assert configs[0].adata_gcs_paths == adata_paths[:3]
-    assert configs[1].adata_gcs_paths == adata_paths[3:6]
-    assert configs[2].adata_gcs_paths == adata_paths[6:]
-    for cfg in configs:
-        assert cfg.validation_report_id == 123
-        assert cfg.validation_methods == validation_methods
-        assert cfg.max_bytes_valid_per_file == dj_settings.INGEST_INPUT_FILE_MAX_SIZE
+    assert output_uris[0] == "gs://bucket/output/file.h5ad"

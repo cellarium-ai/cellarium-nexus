@@ -127,24 +127,24 @@ class ExperimentVarSchema(BaseModel):
     Used for first AnnData to define experiment var DataFrame, and for
     subsequent AnnDatas to validate feature subset membership.
 
-    :param is_subset: If True, input AnnData may have fewer features than schema
+    :param allow_subsets: If True, input AnnData may have fewer features than schema
         (e.g., scRNA-seq with GENCODE47 where file has 10k measured genes).
         If False, input must have exactly the same features (e.g., OPS imaging).
         Extra features not in schema are always rejected.
     """
 
-    is_subset: bool = True
+    allow_subsets: bool = True
     _var_parquet_b64: str = PrivateAttr()
     _cached_df: pd.DataFrame | None = PrivateAttr(default=None)
 
-    def __init__(self, *, _var_parquet_b64: str, is_subset: bool = True, **data: Any) -> None:
+    def __init__(self, *, _var_parquet_b64: str, allow_subsets: bool = True, **data: Any) -> None:
         """
         Initialize ExperimentVarSchema.
 
         :param _var_parquet_b64: Base64-encoded Parquet bytes of var DataFrame.
-        :param is_subset: Whether input AnnData may have subset of schema features.
+        :param allow_subsets: Whether input AnnData may have subset of schema features.
         """
-        super().__init__(is_subset=is_subset, **data)
+        super().__init__(allow_subsets=allow_subsets, **data)
         self._var_parquet_b64 = _var_parquet_b64
 
     def to_dataframe(self) -> pd.DataFrame:
@@ -167,7 +167,7 @@ class ExperimentVarSchema(BaseModel):
         return self.to_dataframe().index.tolist()
 
     @classmethod
-    def from_dataframe(cls, *, var_df: pd.DataFrame, is_subset: bool = True) -> ExperimentVarSchema:
+    def from_dataframe(cls, *, var_df: pd.DataFrame, allow_subsets: bool = True) -> ExperimentVarSchema:
         """
         Create schema from pandas DataFrame.
 
@@ -175,14 +175,14 @@ class ExperimentVarSchema(BaseModel):
         All columns will be preserved as var metadata.
 
         :param var_df: Var DataFrame with feature IDs as index.
-        :param is_subset: Whether input AnnData may have subset of schema features.
+        :param allow_subsets: Whether input AnnData may have subset of schema features.
 
         :return: ExperimentVarSchema instance.
         """
         buffer = io.BytesIO()
         var_df.to_parquet(buffer, index=True)
         b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-        return cls(_var_parquet_b64=b64, is_subset=is_subset)
+        return cls(_var_parquet_b64=b64, allow_subsets=allow_subsets)
 
     def model_dump(self, **kwargs: Any) -> dict[str, Any]:
         """
@@ -204,8 +204,8 @@ class ExperimentVarSchema(BaseModel):
         :return: ExperimentVarSchema instance.
         """
         if isinstance(obj, dict) and "_var_parquet_b64" in obj:
-            is_subset = obj.get("is_subset", True)
-            return cls(_var_parquet_b64=obj["_var_parquet_b64"], is_subset=is_subset)
+            allow_subsets = obj.get("allow_subsets", True)
+            return cls(_var_parquet_b64=obj["_var_parquet_b64"], allow_subsets=allow_subsets)
         return super().model_validate(obj, **kwargs)
 
 
@@ -215,6 +215,19 @@ class IngestSchema(BaseModel):
     obs_columns: list[ObsSchemaDescriptor]
     var_schema: ExperimentVarSchema
     x_validation_type: Literal["count_matrix", "feature_matrix"]
+
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
+        """
+        Serialize to dict including private attribute.
+
+        :return: Dictionary with _var_parquet_b64 field.
+        """
+        data = super().model_dump(**kwargs)
+        # Serialize var_schema separately, as pydantic doesn't handle recursive model dump
+        # when a nested object is another BaseModel subclass with a custom model_dump method
+        # that is the case for ExperimentVarSchema
+        data["var_schema"] = self.var_schema.model_dump(**kwargs)
+        return data
 
 
 class IngestPlanMetadata(BaseModel):
@@ -240,3 +253,16 @@ class IngestPlanMetadata(BaseModel):
     last_partition_size: int
     ingest_schema: IngestSchema
     registration_mapping_pickle: str
+
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
+        """
+        Serialize to dict including private attribute.
+
+        :return: Dictionary with _var_parquet_b64 field.
+        """
+        data = super().model_dump(**kwargs)
+        # Serialize ingest_schema separately, as pydantic doesn't handle recursive model dump
+        # when a nested object is another BaseModel subclass with a custom model_dump method
+        # that is the case for ExperimentVarSchema
+        data["ingest_schema"] = self.ingest_schema.model_dump(**kwargs)
+        return data

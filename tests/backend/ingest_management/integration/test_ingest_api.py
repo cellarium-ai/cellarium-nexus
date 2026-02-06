@@ -14,13 +14,13 @@ from cellarium.nexus.backend.ingest_management import models as im_models
 @pytest.mark.django_db
 def test_ingest_create_retrieve_and_update(client: Client, default_dataset: cm_models.OmicsDataset) -> None:
     """
-    Create an ingest via API, retrieve it, then update fields via PATCH.
+    Create a parent ingest via API, retrieve it, then update fields via PATCH.
     """
-    # Create
+    # Create parent ingest
     create_url = reverse("ingest-create")
     payload = {"omics_dataset": default_dataset.name}
     resp = client.post(path=create_url, data=json.dumps(payload), content_type="application/json")
-    assert resp.status_code in (200, 201)
+    assert resp.status_code in (200, 201), resp.json()
     created = resp.json()
     ingest_id = created["id"]
 
@@ -32,12 +32,47 @@ def test_ingest_create_retrieve_and_update(client: Client, default_dataset: cm_m
     assert data["omics_dataset"] == default_dataset.name
 
     # Update metadata_extra and status via PATCH
+    patch_payload = {"metadata_extra": {"foo": "bar"}, "status": im_models.Ingest.STATUS_SUCCEEDED}
+    resp = client.patch(path=detail_url, data=json.dumps(patch_payload), content_type="application/json")
+    assert resp.status_code == 200
+    updated = resp.json()
+    assert updated["metadata_extra"] == {"foo": "bar"}
+    assert updated["status"] == im_models.Ingest.STATUS_SUCCEEDED
+
+
+@pytest.mark.django_db
+def test_ingest_file_create_retrieve_and_update(client: Client, default_dataset: cm_models.OmicsDataset) -> None:
+    """
+    Create an ingest file via API, retrieve it, then update fields via PATCH.
+    """
+    parent = im_models.Ingest.objects.create(omics_dataset=default_dataset)
+
+    create_url = reverse("ingest-file-create")
+    payload = {
+        "ingest_id": parent.id,
+        "gcs_file_path": "gs://bucket/data/file1.h5ad",
+        "tag": "t1",
+    }
+    resp = client.post(path=create_url, data=json.dumps(payload), content_type="application/json")
+    assert resp.status_code in (200, 201)
+    created = resp.json()
+    ingest_file_id = created["id"]
+
+    detail_url = reverse("ingest-file-retrieve-update", kwargs={"id": ingest_file_id})
+    resp = client.get(path=detail_url)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["tag"] == "t1"
+
     patch_payload = {"metadata_extra": {"foo": "bar"}, "status": im_models.IngestInfo.STATUS_SUCCEEDED}
     resp = client.patch(path=detail_url, data=json.dumps(patch_payload), content_type="application/json")
     assert resp.status_code == 200
     updated = resp.json()
     assert updated["metadata_extra"] == {"foo": "bar"}
     assert updated["status"] == im_models.IngestInfo.STATUS_SUCCEEDED
+
+    parent.refresh_from_db()
+    assert parent.status == im_models.Ingest.STATUS_SUCCEEDED
 
 
 @pytest.mark.django_db
@@ -91,7 +126,7 @@ def test_validation_report_item_create(client: Client, admin_user: object) -> No
     url = reverse("validation-report-item-create")
     payload = {
         "report_id": report.id,
-        "input_file_gcs_path": "gs://bucket/path/file.h5ad",
+        "input_file_path": "gs://bucket/path/file.h5ad",
         "validator_name": "validate_schema",
         "is_valid": True,
         "message": "ok",

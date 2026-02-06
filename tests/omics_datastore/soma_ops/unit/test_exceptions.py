@@ -93,6 +93,7 @@ def test_all_list_contains_expected_names() -> None:
     """
     expected_names = {
         "TileDBSOMADataOperator",
+        "TileDBSOMAIngestor",
         "SomaOperationError",
         "SomaReadError",
         "SomaWriteError",

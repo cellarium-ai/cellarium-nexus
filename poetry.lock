@@ -4913,14 +4913,14 @@ files = [
 
 [[package]]
 name = "somacore"
-version = "1.0.28"
+version = "1.0.29"
 description = "Python-language API specification and base utilities for implementation of the SOMA system."
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "somacore-1.0.28-py3-none-any.whl", hash = "sha256:5aae5f2af05a15fdbf14f96bc54007104ba564ed3ef74908e63d0df446a9cda5"},
-    {file = "somacore-1.0.28.tar.gz", hash = "sha256:ae58dc26ca93b4e1537d420dc7a868e172d13177fa1afdf3e55aec49b12edd3d"},
+    {file = "somacore-1.0.29-py3-none-any.whl", hash = "sha256:5bb91a9c8b36d45fbe408b39311ccc09ae43fb418b322ea5d025e119b0c7d639"},
+    {file = "somacore-1.0.29.tar.gz", hash = "sha256:93ef9f4d1ba88925ddb5f1772d465b9d8ce96bec329bc2ad9de44d7857e13126"},
 ]
 
 [package.dependencies]
@@ -5080,33 +5080,33 @@ files = [
 
 [[package]]
 name = "tiledbsoma"
-version = "1.17.1"
+version = "2.2.0"
 description = "Python API for efficient storage and retrieval of single-cell data using TileDB"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "tiledbsoma-1.17.1-cp310-cp310-macosx_13_0_arm64.whl", hash = "sha256:b5463efae9137f61235d67d7289bc2b6e84407d6632d1bd67983887ffb4b8d47"},
-    {file = "tiledbsoma-1.17.1-cp310-cp310-macosx_13_0_x86_64.whl", hash = "sha256:ac43c5917b50ddd6ce0f207500e2e141bbdb1252c96b52ad1d172366bf25d797"},
-    {file = "tiledbsoma-1.17.1-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:afe1256177d477f60a1163e23b138299fed03e42434c588bb83a8d84b33d7b47"},
-    {file = "tiledbsoma-1.17.1-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:c3755f3cdf0e316d648e8bd1638aa94cf0ccc6b70c6ca0ff22d4be7909c2b378"},
-    {file = "tiledbsoma-1.17.1-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:77f8365d49cddf7c5bab50279c562138283f06ab022481822fbff18295b67ec2"},
-    {file = "tiledbsoma-1.17.1-cp311-cp311-macosx_13_0_x86_64.whl", hash = "sha256:c778c1e43c3f1cc5430d9b68bb91a35d84801e9ba47a64a6c9c615f82600e838"},
-    {file = "tiledbsoma-1.17.1-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:b6c2a3be33b63fbb2037f5e46c93c7e445413c5221969d631024ba77b1ff5c05"},
-    {file = "tiledbsoma-1.17.1-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:0ae69dcbd8292e57a6c30e0fe8e6f50a56c1cb7e990ff9c54be4e86a554cb119"},
-    {file = "tiledbsoma-1.17.1-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:cf41e080cffe24596ab2977698b19b46dbe970727a849a10af59aa30e35d3e8f"},
-    {file = "tiledbsoma-1.17.1-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:9d3d6ea5ead423e0bc5547a9bce37eb811a67e73a9d00a94bfe129d220717e9a"},
-    {file = "tiledbsoma-1.17.1-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:e71c13cc9c8f54edb3884f49b8c24bbf68b13e6f474e0638760b22ef1d3d40f1"},
-    {file = "tiledbsoma-1.17.1-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:dae3ca76db4881d25a9f61fc0caac25418105dabacb6e25dc4d9a0dd2041afa4"},
-    {file = "tiledbsoma-1.17.1-cp313-cp313-macosx_13_0_arm64.whl", hash = "sha256:e7a1fcf74c19616a70cf9faa3a803d6825ff18f5c7233356878b62df831b56f3"},
-    {file = "tiledbsoma-1.17.1-cp313-cp313-macosx_13_0_x86_64.whl", hash = "sha256:5cc484f7a0aa2967b8ed3127478e73c7f8d098188eb590f8a33be468eb67022a"},
-    {file = "tiledbsoma-1.17.1-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:eaa4e628b733e72fcf13ecf8490cbccfe15b1c4324c247d04329d4d099f2aed3"},
-    {file = "tiledbsoma-1.17.1-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:7d62ff463d0fc22f92621eafbecbfd73d7404573358d39fe9146129153879180"},
-    {file = "tiledbsoma-1.17.1-cp39-cp39-macosx_13_0_arm64.whl", hash = "sha256:9278fbdcc6c362fec133052a29f4e30bd7e81c358b4cfe742d3959bbfb9dbddd"},
-    {file = "tiledbsoma-1.17.1-cp39-cp39-macosx_13_0_x86_64.whl", hash = "sha256:5b8a9281ed23904ce2d00ecb27b07e16d1e9de4731dd84c3f8d61f7bd4c62a15"},
-    {file = "tiledbsoma-1.17.1-cp39-cp39-manylinux_2_28_aarch64.whl", hash = "sha256:b6c301c12360e20a69b682daca5eab22182d5e12a1037cc5d7d43f3859001f2a"},
-    {file = "tiledbsoma-1.17.1-cp39-cp39-manylinux_2_28_x86_64.whl", hash = "sha256:625396327ae00053291ec36ff4596cb1f3f52900664b0053c8c071084edf9492"},
-    {file = "tiledbsoma-1.17.1.tar.gz", hash = "sha256:85c4a6e3120b0f41e1506472dcc6cc3f05c0273d94808c74fe22b7b522cf6865"},
+    {file = "tiledbsoma-2.2.0-cp310-cp310-macosx_13_0_arm64.whl", hash = "sha256:415fc043bb99ccedb8381e62d4b057c643d7d97acf0b6f61797347fba4470a44"},
+    {file = "tiledbsoma-2.2.0-cp310-cp310-macosx_13_0_x86_64.whl", hash = "sha256:0c0a612dbd4ecd7f017016e5ebb0599ecc70ca378a2ac1f01bec87e96bdf1dc2"},
+    {file = "tiledbsoma-2.2.0-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:83b1a0b54bc96dbac29931867053580940fc355244963884008842b762170632"},
+    {file = "tiledbsoma-2.2.0-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:165d03b7ee47d56fee4a3202f32b4d7cc352ed591dc798d8eb3d53de6291d258"},
+    {file = "tiledbsoma-2.2.0-cp311-cp311-macosx_13_0_arm64.whl", hash = "sha256:8b1b5041214e7c9e171d8fc4bd574ea6a385a0b4db06f015b5882d4f7d96031c"},
+    {file = "tiledbsoma-2.2.0-cp311-cp311-macosx_13_0_x86_64.whl", hash = "sha256:c0359e9e94ddc36e16cf66a3ad2e040f987894f107d9dbb1b910a5e9eac3dac5"},
+    {file = "tiledbsoma-2.2.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:9150a66462666c7b39b802e7682dc3aac27a582c1b1e81aed01834de3d4cd42e"},
+    {file = "tiledbsoma-2.2.0-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:33c1837735dc40cb33a2b303eb78c8de474d156ff5cafcf6d010ce96e142bb9f"},
+    {file = "tiledbsoma-2.2.0-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:2ff3d24b428cb53c83eba4a92b53190e87510665f114b6640f05e4b66ddebcec"},
+    {file = "tiledbsoma-2.2.0-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:f67ff4042113dcd431e83bd484f93cc1903efa59142fbbb87af0036561b574df"},
+    {file = "tiledbsoma-2.2.0-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:677336926a00bfd9e5512b49162bf43d34e69bf3d42731db7be85d80adc24b38"},
+    {file = "tiledbsoma-2.2.0-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:266f0489a8ebf04ad4752c4034ed999cc2510b5507859a53ad9a4a4d4473636a"},
+    {file = "tiledbsoma-2.2.0-cp313-cp313-macosx_13_0_arm64.whl", hash = "sha256:63528e275dd2d7ced6217636513cc00c1cd19f22e5340909278cef0799fde6d7"},
+    {file = "tiledbsoma-2.2.0-cp313-cp313-macosx_13_0_x86_64.whl", hash = "sha256:e04a2f5cd1f8caf7643e308ae743cba074cf4759fa0c26542abbe58ae0fad717"},
+    {file = "tiledbsoma-2.2.0-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:2631000a73c4b752814cafec55e79dc32b169842a65b142aedba955bdebf511e"},
+    {file = "tiledbsoma-2.2.0-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:f23796f7832fab715d27e9300b17fe3e29f452ec78f68e8f0b4cc10a74f48827"},
+    {file = "tiledbsoma-2.2.0-cp39-cp39-macosx_13_0_arm64.whl", hash = "sha256:50958a28f31a2568042e14a96463003f90135422521f6678c845a8d387d83fb3"},
+    {file = "tiledbsoma-2.2.0-cp39-cp39-macosx_13_0_x86_64.whl", hash = "sha256:3f1af01f44c45b7f4b5c9995449dd56291a5e426187ff999e435e04a7eb61417"},
+    {file = "tiledbsoma-2.2.0-cp39-cp39-manylinux_2_28_aarch64.whl", hash = "sha256:5832dbed903c06a7385e26f869499d638080b51e91af77ff19d2faeda6e997a7"},
+    {file = "tiledbsoma-2.2.0-cp39-cp39-manylinux_2_28_x86_64.whl", hash = "sha256:724a1bf3bdbdef6e53ed5c474a150a528e86fe9166163fce780e512db04b4bb3"},
+    {file = "tiledbsoma-2.2.0.tar.gz", hash = "sha256:a033db98805d26acd0a46e6081c001b2c1a7594828459bfe1868171ca8844576"},
 ]
 
 [package.dependencies]
@@ -5118,13 +5118,13 @@ pandas = "*"
 pyarrow = "*"
 scanpy = ">=1.9.2"
 scipy = "*"
-somacore = "1.0.28"
-typing-extensions = "*"
+somacore = "1.0.29"
+typing-extensions = ">=4.5.0"
 
 [package.extras]
-all = ["black", "dask", "dask (<=2024.11.2)", "deepdiff", "geopandas", "hypothesis", "more-itertools", "pillow", "pytest", "pytest-cov", "ruff", "sparse", "spatialdata (>=0.2.5)", "tifffile", "typeguard (==4.4.2)", "types-setuptools", "xarray"]
+all = ["black", "dask", "dask", "deepdiff", "geopandas", "hypothesis", "more-itertools", "pillow", "pytest", "pytest-cov", "ruff", "sparse", "spatialdata (>=0.2.5)", "tifffile", "typeguard (==4.4.2)", "types-setuptools", "xarray"]
 dev = ["black", "dask", "deepdiff", "hypothesis", "more-itertools", "pytest", "pytest-cov", "ruff", "sparse", "typeguard (==4.4.2)", "types-setuptools"]
-spatial-io = ["dask (<=2024.11.2)", "geopandas", "pillow", "spatialdata (>=0.2.5)", "tifffile", "xarray"]
+spatial-io = ["dask", "geopandas", "pillow", "spatialdata (>=0.2.5)", "tifffile", "xarray"]
 
 [[package]]
 name = "tomli"
@@ -5851,4 +5851,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "e3cacf2586720fdd53d8dfcbfdf9c14623b2a69634bd8446282ace371ba106c5"
+content-hash = "77f56886f90aedd0332139fe0c5c7ce9d66f5b7c2bcdf9c0ecb5539b67303dbe"

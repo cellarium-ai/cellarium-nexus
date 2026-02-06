@@ -62,26 +62,22 @@ class TileDBSOMAIngestor:
         self,
         *,
         ingest_plan: IngestPlanMetadata,
-        partition_index: int,
         local_h5ad_paths: list[str],
     ) -> None:
         """
-        Ingest a partition of h5ad files into a SOMA experiment.
+        Ingest h5ad files into a SOMA experiment.
 
         Load each h5ad file, validate and sanitize it using the ingest schema,
         then ingest into SOMA.
 
         :param ingest_plan: The ingest plan metadata containing experiment info,
             schema, and serialized registration mapping.
-        :param partition_index: Zero-based partition index.
-        :param local_h5ad_paths: List of local file paths to h5ad files for this
-            partition (pre-downloaded by coordinator).
+        :param local_h5ad_paths: List of local file paths to h5ad files
+            (pre-downloaded and pre-sliced by coordinator).
 
-        :raises ValueError: If the number of provided paths does not match the
-            expected partition slice size.
+        :raises ValueError: If local_h5ad_paths is empty.
         """
         ingest_h5ads_partition(
             ingest_plan=ingest_plan,
-            partition_index=partition_index,
             local_h5ad_paths=local_h5ad_paths,
         )
