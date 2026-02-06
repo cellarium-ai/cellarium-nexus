@@ -216,6 +216,19 @@ class IngestSchema(BaseModel):
     var_schema: ExperimentVarSchema
     x_validation_type: Literal["count_matrix", "feature_matrix"]
 
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
+        """
+        Serialize to dict including private attribute.
+
+        :return: Dictionary with _var_parquet_b64 field.
+        """
+        data = super().model_dump(**kwargs)
+        # Serialize var_schema separately, as pydantic doesn't handle recursive model dump
+        # when a nested object is another BaseModel subclass with a custom model_dump method
+        # that is the case for ExperimentVarSchema
+        data["var_schema"] = self.var_schema.model_dump(**kwargs)
+        return data
+
 
 class IngestPlanMetadata(BaseModel):
     """
