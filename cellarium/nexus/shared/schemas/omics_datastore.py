@@ -253,3 +253,16 @@ class IngestPlanMetadata(BaseModel):
     last_partition_size: int
     ingest_schema: IngestSchema
     registration_mapping_pickle: str
+
+    def model_dump(self, **kwargs: Any) -> dict[str, Any]:
+        """
+        Serialize to dict including private attribute.
+
+        :return: Dictionary with _var_parquet_b64 field.
+        """
+        data = super().model_dump(**kwargs)
+        # Serialize ingest_schema separately, as pydantic doesn't handle recursive model dump
+        # when a nested object is another BaseModel subclass with a custom model_dump method
+        # that is the case for ExperimentVarSchema
+        data["ingest_schema"] = self.ingest_schema.model_dump(**kwargs)
+        return data
